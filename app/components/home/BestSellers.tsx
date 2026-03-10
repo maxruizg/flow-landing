@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from "react";
+import { useRef, useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Container } from "~/components/ui/Container";
 import { AnimatedText } from "~/components/ui/AnimatedText";
@@ -14,6 +14,14 @@ export function BestSellers({ products }: BestSellersProps) {
   const scrollSpeedRef = useRef(0);
   const rafRef = useRef<number>(0);
   const cursorZoneRef = useRef<"left" | "right" | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   const scrollLoop = useCallback(() => {
     if (scrollSpeedRef.current !== 0 && constraintsRef.current) {
@@ -108,7 +116,7 @@ export function BestSellers({ products }: BestSellersProps) {
       >
         <motion.div
           className="flex gap-4 md:gap-6 pl-4 sm:pl-6 lg:pl-[max(2rem,calc((100vw-80rem)/2+2rem))] active:cursor-grabbing"
-          drag="x"
+          drag={isMobile ? false : "x"}
           dragConstraints={constraintsRef}
           dragElastic={0.1}
         >
