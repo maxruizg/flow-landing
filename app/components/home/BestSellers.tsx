@@ -104,7 +104,7 @@ export function BestSellers({ products }: BestSellersProps) {
       {/* Drag carousel with mouse-position auto-scroll */}
       <div
         ref={constraintsRef}
-        className="overflow-x-auto md:overflow-hidden scrollbar-hide"
+        className="overflow-x-auto overflow-y-hidden md:overflow-hidden scrollbar-hide"
         onMouseMove={(e) => {
           handleMouseMove(e);
           e.currentTarget.style.cursor = getCursor(e);
