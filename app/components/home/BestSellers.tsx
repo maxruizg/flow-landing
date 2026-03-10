@@ -96,7 +96,7 @@ export function BestSellers({ products }: BestSellersProps) {
       {/* Drag carousel with mouse-position auto-scroll */}
       <div
         ref={constraintsRef}
-        className="overflow-hidden"
+        className="overflow-x-auto md:overflow-hidden scrollbar-hide"
         onMouseMove={(e) => {
           handleMouseMove(e);
           e.currentTarget.style.cursor = getCursor(e);
@@ -113,7 +113,7 @@ export function BestSellers({ products }: BestSellersProps) {
           dragElastic={0.1}
         >
           {products.map((product, i) => (
-            <div key={product.id} className="w-[280px] md:w-[340px] flex-shrink-0">
+            <div key={product.id} className="w-[200px] sm:w-[280px] md:w-[340px] flex-shrink-0">
               <ProductCard product={product} index={i} />
             </div>
           ))}

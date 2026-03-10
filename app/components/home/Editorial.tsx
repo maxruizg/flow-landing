@@ -25,10 +25,10 @@ export function Editorial({ images }: EditorialProps) {
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 h-[60vh] md:h-[65vh]">
+        <div className="grid grid-cols-2 md:grid-cols-2 gap-3 md:gap-6 h-[40vh] md:h-[65vh]">
           {/* Left tall image */}
           <motion.div
-            className="relative overflow-hidden group cursor-pointer"
+            className="relative overflow-hidden rounded-lg md:rounded-none group cursor-pointer"
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
@@ -49,7 +49,7 @@ export function Editorial({ images }: EditorialProps) {
           </motion.div>
 
           {/* Right stacked */}
-          <div className="grid grid-rows-2 gap-4 md:gap-6">
+          <div className="grid grid-rows-2 gap-3 md:gap-6">
             {images.slice(1, 3).map((img, i) => (
               <motion.div
                 key={img.id}

@@ -32,7 +32,12 @@ export function NewCollection({ products }: NewCollectionProps) {
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
           {products.map((product, i) => (
-            <ProductCard key={product.id} product={product} index={i} variant="light" />
+            <div
+              key={product.id}
+              className={i >= 4 ? "hidden sm:block" : undefined}
+            >
+              <ProductCard product={product} index={i} variant="light" />
+            </div>
           ))}
         </div>
       </Container>
