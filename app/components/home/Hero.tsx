@@ -72,7 +72,9 @@ export function Hero({ collection }: HeroProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1.1, duration: 0.5 }}
         >
-          <Button size="lg">Explore Collection</Button>
+          <a href="/showroom">
+            <Button size="lg">Explore Collection</Button>
+          </a>
         </motion.div>
 
         {/* Scroll indicator */}

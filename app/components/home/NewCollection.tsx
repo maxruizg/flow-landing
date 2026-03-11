@@ -23,7 +23,7 @@ export function NewCollection({ products }: NewCollectionProps) {
             />
           </div>
           <a
-            href="#"
+            href="/showroom"
             className="link-underline text-xs uppercase tracking-[0.2em] text-flow-600 hover:text-flow-black transition-colors hidden md:block"
           >
             View All

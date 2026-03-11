@@ -8,9 +8,9 @@ import { CartPanel } from "./CartPanel";
 import { LocalePanel } from "./LocalePanel";
 
 const navLinks = [
-  { label: "Shop", href: "#new-collection" },
-  { label: "Collections", href: "#editorial" },
-  { label: "About Us", href: "#manifesto" },
+  { label: "Shop", href: "/showroom" },
+  { label: "Collections", href: "/#editorial" },
+  { label: "About Us", href: "/#manifesto" },
 ];
 
 export function Navbar() {

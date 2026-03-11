@@ -5,7 +5,15 @@ import { AboutPanel } from "./AboutPanel";
 import { ShippingPanel } from "./ShippingPanel";
 import { PolicyPanel } from "./PolicyPanel";
 
-const shopLinks = ["New Arrivals", "Best Sellers", "Tees", "Crop Tops", "Shorts", "Hoodies", "Accessories"];
+const shopLinks = [
+  { label: "New Arrivals", href: "/showroom?new=true" },
+  { label: "Best Sellers", href: "/showroom" },
+  { label: "Tees", href: "/showroom?category=Tops" },
+  { label: "Crop Tops", href: "/showroom?category=Tops&gender=women" },
+  { label: "Shorts", href: "/showroom?category=Bottoms" },
+  { label: "Hoodies", href: "/showroom?category=Tops" },
+  { label: "Accessories", href: "/showroom?category=Accessories" },
+];
 const socialLinks = ["Instagram", "TikTok", "Twitter/X", "Pinterest"];
 
 interface CompanyLink {
@@ -50,9 +58,9 @@ export function Footer() {
               </h4>
               <ul className="space-y-2.5">
                 {shopLinks.map((link) => (
-                  <li key={link}>
-                    <a href="#" className="text-sm text-flow-500 hover:text-white transition-colors">
-                      {link}
+                  <li key={link.label}>
+                    <a href={link.href} className="text-sm text-flow-500 hover:text-white transition-colors">
+                      {link.label}
                     </a>
                   </li>
                 ))}
