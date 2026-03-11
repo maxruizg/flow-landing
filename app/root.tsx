@@ -24,17 +24,17 @@ export const links: LinksFunction = () => [
 ];
 
 export const meta: MetaFunction = () => [
-  { title: "FLOW URBAN WEAR — Set The Pace" },
+  { title: "FLOW URBAN WEAR — Less Thinking More Flow" },
   {
     name: "description",
     content:
-      "FLOW URBAN WEAR. Premium streetwear for those who move with intention. Explore the Concrete Jungle SS26 collection.",
+      "FLOW URBAN WEAR. Streetwear born in Mexico City for those who move with intention. Self-expression, culture, and the freedom to just flow.",
   },
   { property: "og:type", content: "website" },
-  { property: "og:title", content: "FLOW URBAN WEAR — Set The Pace" },
+  { property: "og:title", content: "FLOW URBAN WEAR — Less Thinking More Flow" },
   {
     property: "og:description",
-    content: "Premium streetwear for those who move with intention.",
+    content: "Streetwear born in Mexico City for those who move with intention.",
   },
 ];
 

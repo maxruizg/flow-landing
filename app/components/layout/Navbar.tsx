@@ -58,9 +58,13 @@ export function Navbar() {
           {/* Center logo */}
           <a
             href="/"
-            className="absolute left-1/2 -translate-x-1/2 font-display text-xl md:text-2xl font-bold tracking-[0.15em] text-white"
+            className="absolute left-1/2 -translate-x-1/2"
           >
-            FLOW
+            <img
+              src="/images/logo/flow-white.png"
+              alt="FLOW Urban Wear"
+              className="h-6 md:h-8 w-auto"
+            />
           </a>
 
           {/* Right icons */}

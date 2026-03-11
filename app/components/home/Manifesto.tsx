@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { Container } from "~/components/ui/Container";
 
-const words = "WE DON'T FOLLOW TRENDS. WE SET THE PACE.".split(" ");
+const words = "LESS THINKING MORE FLOW".split(" ");
 
 export function Manifesto() {
   const ref = useRef<HTMLDivElement>(null);
@@ -18,7 +18,7 @@ export function Manifesto() {
       className="relative bg-flow-black py-32 md:py-48 overflow-hidden noise-overlay"
     >
       <Container className="relative z-10">
-        <p className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.1] tracking-tight text-center max-w-5xl mx-auto">
+        <p className="font-display text-5xl sm:text-6xl md:text-7xl lg:text-8xl xl:text-9xl font-bold leading-[1.1] tracking-tight text-center max-w-5xl mx-auto">
           {words.map((word, i) => {
             const start = i / words.length;
             const end = start + 1 / words.length;

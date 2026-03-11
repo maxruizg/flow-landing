@@ -20,9 +20,9 @@ interface LocaleContextValue {
 const LocaleContext = createContext<LocaleContextValue | null>(null);
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
-  const [currency, setCurrency] = useState<Currency>("USD");
-  const [language, setLanguage] = useState<Language>("en");
-  const [country, setCountry] = useState<Country>("US");
+  const [currency, setCurrency] = useState<Currency>("MXN");
+  const [language, setLanguage] = useState<Language>("es");
+  const [country, setCountry] = useState<Country>("MX");
 
   const formatLocalPrice = useCallback(
     (amount: number) => {
