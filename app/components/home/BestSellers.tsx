@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Container } from "~/components/ui/Container";
 import { AnimatedText } from "~/components/ui/AnimatedText";
 import { ProductCard } from "~/components/product/ProductCard";
-import type { Product } from "~/data/mock";
+import type { Product } from "~/lib/types";
 
 interface BestSellersProps {
   products: Product[];

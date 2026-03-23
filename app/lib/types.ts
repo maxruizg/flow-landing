@@ -1,0 +1,104 @@
+export interface Product {
+  id: string;
+  slug: string;
+  name: string;
+  price: number;
+  image: string;
+  imageHover: string;
+  images: string[];
+  category: string;
+  badge?: string;
+  sizes: string[];
+  isNew?: boolean;
+  description: string;
+  material: string;
+  origin: string;
+  color: string;
+  fit?: string;
+  gender: "men" | "women" | "unisex";
+  colorVariants?: { color: string; slug: string }[];
+}
+
+export interface CartItem {
+  productId: string;
+  productSlug: string;
+  productName: string;
+  productImage: string;
+  size: string;
+  price: number;
+  quantity: number;
+}
+
+export interface Collection {
+  id: string;
+  name: string;
+  season: string;
+  description: string;
+  image: string;
+  tags: string[];
+}
+
+export interface EditorialImage {
+  id: string;
+  src: string;
+  alt: string;
+  caption: string;
+}
+
+export interface AdminProduct extends Product {
+  stock: number;
+  status: "active" | "draft" | "out_of_stock";
+  position: number;
+}
+
+export interface OrderItem {
+  productName: string;
+  size: string;
+  quantity: number;
+  price: number;
+}
+
+export interface AdminOrder {
+  id: string;
+  customerName: string;
+  customerEmail: string;
+  date: string;
+  items: OrderItem[];
+  total: number;
+  status: "processing" | "shipped" | "delivered" | "cancelled";
+  shippingAddress: string;
+}
+
+export interface AdminCustomer {
+  id: string;
+  name: string;
+  email: string;
+  totalOrders: number;
+  totalSpent: number;
+  joinedDate: string;
+  lastOrderDate: string;
+}
+
+export interface DashboardStats {
+  totalRevenue: number;
+  ordersToday: number;
+  totalProducts: number;
+  totalCustomers: number;
+  revenueChange: number;
+  ordersChange: number;
+}
+
+export interface RevenueDataPoint {
+  month: string;
+  revenue: number;
+}
+
+export interface AdminNotification {
+  id: string;
+  type: "order" | "stock" | "customer" | "system";
+  title: string;
+  message: string;
+  date: string;
+  read: boolean;
+  linkTo?: string;
+}

@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Container } from "~/components/ui/Container";
 import { AnimatedText } from "~/components/ui/AnimatedText";
-import type { EditorialImage } from "~/data/mock";
+import type { EditorialImage } from "~/lib/types";
 
 interface EditorialProps {
   images: EditorialImage[];

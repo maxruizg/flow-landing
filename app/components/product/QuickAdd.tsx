@@ -1,11 +1,45 @@
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useCart } from "~/context/CartContext";
+import { cn } from "~/lib/utils";
 
 interface QuickAddProps {
   sizes: string[];
   visible: boolean;
+  productId: string;
+  productSlug: string;
+  productName: string;
+  productImage: string;
+  productPrice: number;
 }
 
-export function QuickAdd({ sizes, visible }: QuickAddProps) {
+export function QuickAdd({
+  sizes,
+  visible,
+  productId,
+  productSlug,
+  productName,
+  productImage,
+  productPrice,
+}: QuickAddProps) {
+  const { addItem } = useCart();
+  const [activeSize, setActiveSize] = useState<string | null>(null);
+
+  const handleAdd = (e: React.MouseEvent, size: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    addItem({
+      productId,
+      productSlug,
+      productName,
+      productImage,
+      size,
+      price: productPrice,
+    });
+    setActiveSize(size);
+    setTimeout(() => setActiveSize(null), 800);
+  };
+
   return (
     <AnimatePresence>
       {visible && (
@@ -23,9 +57,15 @@ export function QuickAdd({ sizes, visible }: QuickAddProps) {
             {sizes.map((size) => (
               <button
                 key={size}
-                className="flex-1 py-1.5 text-xs font-medium text-flow-200 border border-flow-700 rounded-full hover:bg-white hover:text-flow-black hover:border-white transition-all duration-200"
+                onClick={(e) => handleAdd(e, size)}
+                className={cn(
+                  "flex-1 py-1.5 text-xs font-medium rounded-full border transition-all duration-200",
+                  activeSize === size
+                    ? "bg-green-500 text-white border-green-500"
+                    : "text-flow-200 border-flow-700 hover:bg-white hover:text-flow-black hover:border-white"
+                )}
               >
-                {size}
+                {activeSize === size ? "✓" : size}
               </button>
             ))}
           </div>

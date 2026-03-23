@@ -1,26 +1,29 @@
-import { useSearchParams } from "@remix-run/react";
+import { json } from "@remix-run/node";
+import { useLoaderData, useSearchParams } from "@remix-run/react";
 import { useMemo, useCallback } from "react";
-import { LocaleProvider } from "~/context/LocaleContext";
 import { Navbar } from "~/components/layout/Navbar";
 import { Footer } from "~/components/layout/Footer";
 import { Newsletter } from "~/components/home/Newsletter";
 import { ShowroomHero } from "~/components/showroom/ShowroomHero";
 import { ShowroomFilters } from "~/components/showroom/ShowroomFilters";
 import { ShowroomGrid } from "~/components/showroom/ShowroomGrid";
-import { bestSellers, newArrivals } from "~/data/mock";
-import type { Product } from "~/data/mock";
+import { getAllProducts } from "~/data/queries.server";
 import type { MetaFunction } from "@remix-run/node";
 
 export const meta: MetaFunction = () => {
   return [
     { title: "Showroom — FLOW URBAN WEAR" },
-    { name: "description", content: "Explore the full FLOW Urban Wear collection. 18 pieces made in Mexico, curated for those who move with intention." },
+    { name: "description", content: "Explore the full FLOW Urban Wear collection. 36 pieces made in Mexico, curated for those who move with intention." },
   ];
 };
 
-const allProducts: Product[] = [...bestSellers, ...newArrivals];
+export async function loader() {
+  const allProducts = await getAllProducts();
+  return json({ allProducts });
+}
 
 export default function Showroom() {
+  const { allProducts } = useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const activeCategory = searchParams.get("category") || "All";
@@ -105,7 +108,7 @@ export default function Showroom() {
     }
 
     return result;
-  }, [activeCategory, activeGender, showNewOnly, sortBy]);
+  }, [allProducts, activeCategory, activeGender, showNewOnly, sortBy]);
 
   // Normalize gender display (URL is lowercase, pills are capitalized)
   const displayGender =
@@ -114,7 +117,6 @@ export default function Showroom() {
       : activeGender.charAt(0).toUpperCase() + activeGender.slice(1);
 
   return (
-    <LocaleProvider>
       <div id="main-content">
         <Navbar />
         <ShowroomHero />
@@ -137,6 +139,5 @@ export default function Showroom() {
         <Newsletter />
         <Footer />
       </div>
-    </LocaleProvider>
   );
 }

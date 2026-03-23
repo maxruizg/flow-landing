@@ -3,7 +3,7 @@ import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from "framer-m
 import { Container } from "~/components/ui/Container";
 import { Button } from "~/components/ui/Button";
 import { ProductCard } from "~/components/product/ProductCard";
-import type { Product } from "~/data/mock";
+import type { Product } from "~/lib/types";
 
 interface ShowroomGridProps {
   products: Product[];

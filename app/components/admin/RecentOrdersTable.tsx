@@ -1,6 +1,6 @@
 import { Link } from "@remix-run/react";
 import { motion } from "framer-motion";
-import type { AdminOrder } from "~/data/admin-mock";
+import type { AdminOrder } from "~/lib/types";
 import { AdminStatusBadge } from "./AdminStatusBadge";
 import { formatPrice } from "~/lib/utils";
 

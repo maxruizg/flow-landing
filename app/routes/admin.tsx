@@ -6,6 +6,7 @@ import { AdminTopbar } from "~/components/admin/AdminTopbar";
 const pageTitles: Record<string, string> = {
   "/admin/dashboard": "Dashboard",
   "/admin/products": "Products",
+  "/admin/content": "Content",
   "/admin/orders": "Orders",
   "/admin/customers": "Customers",
   "/admin/notifications": "Notifications",
@@ -16,7 +17,8 @@ export default function AdminLayout() {
   const location = useLocation();
   const isLoginPage = location.pathname === "/admin" || location.pathname === "/admin/";
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const title = pageTitles[location.pathname] ?? "Admin";
+  const title = pageTitles[location.pathname]
+    ?? (location.pathname.startsWith("/admin/products/") ? "Products" : "Admin");
 
   if (isLoginPage) {
     return (

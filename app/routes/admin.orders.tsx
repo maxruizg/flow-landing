@@ -1,17 +1,26 @@
+import { json } from "@remix-run/node";
+import { useLoaderData } from "@remix-run/react";
 import type { MetaFunction } from "@remix-run/node";
 import { motion } from "framer-motion";
 import { useState, useMemo } from "react";
 import { cn, formatPrice } from "~/lib/utils";
-import { adminOrders, type AdminOrder } from "~/data/admin-mock";
+import { getAdminOrders } from "~/data/queries.server";
 import { AdminStatusBadge } from "~/components/admin/AdminStatusBadge";
 import { OrderDetailPanel } from "~/components/admin/OrderDetailPanel";
 import { AdminEmptyState } from "~/components/admin/AdminEmptyState";
+import type { AdminOrder } from "~/lib/types";
 
 export const meta: MetaFunction = () => [{ title: "FLOW Admin — Orders" }];
 
 const statusTabs = ["all", "processing", "shipped", "delivered", "cancelled"] as const;
 
+export async function loader() {
+  const adminOrders = await getAdminOrders();
+  return json({ adminOrders });
+}
+
 export default function AdminOrders() {
+  const { adminOrders } = useLoaderData<typeof loader>();
   const [activeTab, setActiveTab] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null);
@@ -24,7 +33,7 @@ export default function AdminOrders() {
         o.customerName.toLowerCase().includes(search.toLowerCase());
       return matchStatus && matchSearch;
     });
-  }, [activeTab, search]);
+  }, [adminOrders, activeTab, search]);
 
   return (
     <motion.div

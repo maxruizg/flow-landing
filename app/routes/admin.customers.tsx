@@ -1,13 +1,21 @@
+import { json } from "@remix-run/node";
+import { useLoaderData } from "@remix-run/react";
 import type { MetaFunction } from "@remix-run/node";
 import { motion } from "framer-motion";
 import { useState, useMemo } from "react";
 import { formatPrice } from "~/lib/utils";
-import { adminCustomers } from "~/data/admin-mock";
+import { getAdminCustomers } from "~/data/queries.server";
 import { AdminEmptyState } from "~/components/admin/AdminEmptyState";
 
 export const meta: MetaFunction = () => [{ title: "FLOW Admin — Customers" }];
 
+export async function loader() {
+  const adminCustomers = await getAdminCustomers();
+  return json({ adminCustomers });
+}
+
 export default function AdminCustomers() {
+  const { adminCustomers } = useLoaderData<typeof loader>();
   const [search, setSearch] = useState("");
 
   const filtered = useMemo(() => {
@@ -16,7 +24,7 @@ export default function AdminCustomers() {
     return adminCustomers.filter(
       (c) => c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)
     );
-  }, [search]);
+  }, [adminCustomers, search]);
 
   return (
     <motion.div

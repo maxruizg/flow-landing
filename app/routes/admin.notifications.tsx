@@ -1,12 +1,33 @@
-import type { MetaFunction } from "@remix-run/node";
-import { useNavigate } from "@remix-run/react";
+import { json, redirect } from "@remix-run/node";
+import { useLoaderData, useNavigate, useFetcher } from "@remix-run/react";
+import type { MetaFunction, ActionFunctionArgs } from "@remix-run/node";
 import { motion } from "framer-motion";
 import { useState, useMemo } from "react";
 import { cn } from "~/lib/utils";
-import { adminNotifications, type AdminNotification } from "~/data/admin-mock";
+import { getAdminNotifications, markNotificationRead, markAllNotificationsRead } from "~/data/queries.server";
 import { AdminEmptyState } from "~/components/admin/AdminEmptyState";
+import type { AdminNotification } from "~/lib/types";
 
 export const meta: MetaFunction = () => [{ title: "FLOW Admin — Notifications" }];
+
+export async function loader() {
+  const adminNotifications = await getAdminNotifications();
+  return json({ adminNotifications });
+}
+
+export async function action({ request }: ActionFunctionArgs) {
+  const form = await request.formData();
+  const intent = form.get("intent");
+
+  if (intent === "markRead") {
+    const id = form.get("id") as string;
+    await markNotificationRead(id);
+  } else if (intent === "markAllRead") {
+    await markAllNotificationsRead();
+  }
+
+  return redirect("/admin/notifications");
+}
 
 const filterTabs = ["all", "unread", "order", "stock", "customer", "system"] as const;
 
@@ -60,13 +81,14 @@ function formatDate(iso: string) {
 }
 
 export default function AdminNotifications() {
+  const { adminNotifications } = useLoaderData<typeof loader>();
   const [activeTab, setActiveTab] = useState<string>("all");
   const [search, setSearch] = useState("");
-  const [notifications, setNotifications] = useState(adminNotifications);
   const navigate = useNavigate();
+  const fetcher = useFetcher();
 
   const filtered = useMemo(() => {
-    return notifications.filter((n) => {
+    return adminNotifications.filter((n) => {
       const matchTab =
         activeTab === "all" ||
         (activeTab === "unread" ? !n.read : n.type === activeTab);
@@ -76,18 +98,18 @@ export default function AdminNotifications() {
         n.message.toLowerCase().includes(q);
       return matchTab && matchSearch;
     });
-  }, [activeTab, search, notifications]);
+  }, [adminNotifications, activeTab, search]);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const unreadCount = adminNotifications.filter((n) => !n.read).length;
 
   function markAllRead() {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    fetcher.submit({ intent: "markAllRead" }, { method: "post" });
   }
 
   function handleClick(n: AdminNotification) {
-    setNotifications((prev) =>
-      prev.map((item) => (item.id === n.id ? { ...item, read: true } : item))
-    );
+    if (!n.read) {
+      fetcher.submit({ intent: "markRead", id: n.id }, { method: "post" });
+    }
     if (n.linkTo) navigate(n.linkTo);
   }
 

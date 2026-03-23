@@ -1,7 +1,7 @@
 import { SlidePanel } from "~/components/layout/SlidePanel";
 import { AdminStatusBadge } from "./AdminStatusBadge";
 import { formatPrice } from "~/lib/utils";
-import type { AdminOrder } from "~/data/admin-mock";
+import type { AdminOrder } from "~/lib/types";
 
 interface OrderDetailPanelProps {
   isOpen: boolean;

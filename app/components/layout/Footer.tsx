@@ -5,15 +5,6 @@ import { AboutPanel } from "./AboutPanel";
 import { ShippingPanel } from "./ShippingPanel";
 import { PolicyPanel } from "./PolicyPanel";
 
-const shopLinks = [
-  { label: "New Arrivals", href: "/showroom?new=true" },
-  { label: "Best Sellers", href: "/showroom" },
-  { label: "Tees", href: "/showroom?category=Tops" },
-  { label: "Crop Tops", href: "/showroom?category=Tops&gender=women" },
-  { label: "Shorts", href: "/showroom?category=Bottoms" },
-  { label: "Hoodies", href: "/showroom?category=Tops" },
-  { label: "Accessories", href: "/showroom?category=Accessories" },
-];
 const socialLinks = ["Instagram", "TikTok", "Twitter/X", "Pinterest"];
 
 interface CompanyLink {
@@ -23,9 +14,6 @@ interface CompanyLink {
 
 const companyLinks: CompanyLink[] = [
   { label: "About Us", action: "about" },
-  { label: "Sustainability", action: "link" },
-  { label: "Careers", action: "link" },
-  { label: "Press", action: "link" },
   { label: "Contact", action: "about" },
 ];
 
@@ -38,9 +26,9 @@ export function Footer() {
     <>
       <footer className="bg-flow-950 border-t border-flow-800">
         <Container className="py-16 md:py-20">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-8">
+          <div className="flex flex-col lg:flex-row lg:justify-between gap-10">
             {/* Brand */}
-            <div>
+            <div className="lg:max-w-sm">
               <img
                 src="/images/logo/flow-white.png"
                 alt="FLOW Urban Wear"
@@ -51,58 +39,45 @@ export function Footer() {
               </p>
             </div>
 
-            {/* Shop */}
-            <div>
-              <h4 className="text-xs uppercase tracking-[0.25em] text-flow-300 font-medium mb-4">
-                Shop
-              </h4>
-              <ul className="space-y-2.5">
-                {shopLinks.map((link) => (
-                  <li key={link.label}>
-                    <a href={link.href} className="text-sm text-flow-500 hover:text-white transition-colors">
-                      {link.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {/* Links */}
+            <div className="flex gap-16 sm:gap-24">
+              {/* Company */}
+              <div>
+                <h4 className="text-xs uppercase tracking-[0.25em] text-flow-300 font-medium mb-4">
+                  Company
+                </h4>
+                <ul className="space-y-2.5">
+                  {companyLinks.map((link) => (
+                    <li key={link.label}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (link.action === "about") setAboutOpen(true);
+                        }}
+                        className="text-sm text-flow-500 hover:text-white transition-colors"
+                      >
+                        {link.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-            {/* Company */}
-            <div>
-              <h4 className="text-xs uppercase tracking-[0.25em] text-flow-300 font-medium mb-4">
-                Company
-              </h4>
-              <ul className="space-y-2.5">
-                {companyLinks.map((link) => (
-                  <li key={link.label}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (link.action === "about") setAboutOpen(true);
-                      }}
-                      className="text-sm text-flow-500 hover:text-white transition-colors"
-                    >
-                      {link.label}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Social */}
-            <div>
-              <h4 className="text-xs uppercase tracking-[0.25em] text-flow-300 font-medium mb-4">
-                Follow Us
-              </h4>
-              <ul className="space-y-2.5">
-                {socialLinks.map((link) => (
-                  <li key={link}>
-                    <a href="#" className="text-sm text-flow-500 hover:text-white transition-colors">
-                      {link}
-                    </a>
-                  </li>
-                ))}
-              </ul>
+              {/* Social */}
+              <div>
+                <h4 className="text-xs uppercase tracking-[0.25em] text-flow-300 font-medium mb-4">
+                  Follow Us
+                </h4>
+                <ul className="space-y-2.5">
+                  {socialLinks.map((link) => (
+                    <li key={link}>
+                      <a href="#" className="text-sm text-flow-500 hover:text-white transition-colors">
+                        {link}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </div>
 

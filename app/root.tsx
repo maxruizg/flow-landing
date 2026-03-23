@@ -5,7 +5,11 @@ import {
   Scripts,
   ScrollRestoration,
 } from "@remix-run/react";
+import { json } from "@remix-run/node";
 import type { LinksFunction, MetaFunction } from "@remix-run/node";
+import { getTrendingProducts } from "~/data/queries.server";
+import { LocaleProvider } from "~/context/LocaleContext";
+import { CartProvider } from "~/context/CartContext";
 
 import styles from "~/styles/global.css?url";
 
@@ -38,6 +42,11 @@ export const meta: MetaFunction = () => [
   },
 ];
 
+export async function loader() {
+  const trendingProducts = await getTrendingProducts();
+  return json({ trendingProducts });
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
@@ -63,7 +72,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  return <Outlet />;
+  return (
+    <LocaleProvider>
+      <CartProvider>
+        <Outlet />
+      </CartProvider>
+    </LocaleProvider>
+  );
 }
 
 export function ErrorBoundary() {

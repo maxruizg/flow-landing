@@ -54,7 +54,7 @@ export function ShowroomHero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8, duration: prefersReducedMotion ? 0 : 0.6 }}
         >
-          18 pieces. Made in Mexico. Curated for those who move with intention.
+          36 pieces. Made in Mexico. Curated for those who move with intention.
         </motion.p>
       </Container>
     </div>

@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { Container } from "~/components/ui/Container";
 import { Button } from "~/components/ui/Button";
-import type { Collection } from "~/data/mock";
+import type { Collection } from "~/lib/types";
 
 interface HeroProps {
   collection: Collection;
@@ -57,13 +57,18 @@ export function Hero({ collection }: HeroProps) {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.9, duration: 0.5 }}
         >
-          {collection.tags.map((tag) => (
-            <span
-              key={tag}
-              className="text-xs uppercase tracking-[0.2em] text-flow-400 border border-flow-700 px-3 py-1.5 rounded-full"
+          {[
+            { label: "Men's", gender: "men" },
+            { label: "Women's", gender: "women" },
+            { label: "Unisex", gender: "unisex" },
+          ].map(({ label, gender }) => (
+            <a
+              key={gender}
+              href={`/showroom?gender=${gender}`}
+              className="text-xs uppercase tracking-[0.2em] text-flow-400 border border-flow-700 px-3 py-1.5 rounded-full hover:text-white hover:border-flow-400 transition-colors"
             >
-              {tag}
-            </span>
+              {label}
+            </a>
           ))}
         </motion.div>
 

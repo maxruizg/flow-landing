@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import type { RevenueDataPoint } from "~/data/admin-mock";
+import type { RevenueDataPoint } from "~/lib/types";
 import { formatPrice } from "~/lib/utils";
 
 interface RevenueChartProps {

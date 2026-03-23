@@ -1,10 +1,10 @@
 import { useRef, useEffect } from "react";
+import { useRouteLoaderData } from "@remix-run/react";
 import { SlidePanel } from "./SlidePanel";
-import { bestSellers } from "~/data/mock";
 import { useLocale } from "~/context/LocaleContext";
+import type { Product } from "~/lib/types";
 
 const popularSearches = ["Oversized Tee", "Cargo Pants", "Bomber Jacket", "New Arrivals"];
-const trendingProducts = bestSellers.slice(0, 3);
 
 interface SearchPanelProps {
   isOpen: boolean;
@@ -14,6 +14,8 @@ interface SearchPanelProps {
 export function SearchPanel({ isOpen, onClose }: SearchPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { formatLocalPrice } = useLocale();
+  const rootData = useRouteLoaderData("root") as { trendingProducts?: Product[] } | undefined;
+  const trendingProducts = rootData?.trendingProducts || [];
 
   useEffect(() => {
     if (isOpen) {

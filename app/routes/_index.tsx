@@ -1,4 +1,5 @@
-import { LocaleProvider } from "~/context/LocaleContext";
+import { json } from "@remix-run/node";
+import { useLoaderData } from "@remix-run/react";
 import { Navbar } from "~/components/layout/Navbar";
 import { Footer } from "~/components/layout/Footer";
 import { Hero } from "~/components/home/Hero";
@@ -12,15 +13,28 @@ import {
   DrawerRevealSection,
 } from "~/components/ui/DrawerReveal";
 import {
-  collections,
-  bestSellers,
-  editorialImages,
-  newArrivals,
-} from "~/data/mock";
+  getCollections,
+  getBestSellers,
+  getEditorialImages,
+  getNewArrivals,
+} from "~/data/queries.server";
+
+export async function loader() {
+  const [collections, bestSellers, editorialImages, newArrivals] =
+    await Promise.all([
+      getCollections(),
+      getBestSellers(),
+      getEditorialImages(),
+      getNewArrivals(),
+    ]);
+  return json({ collections, bestSellers, editorialImages, newArrivals });
+}
 
 export default function Index() {
+  const { collections, bestSellers, editorialImages, newArrivals } =
+    useLoaderData<typeof loader>();
+
   return (
-    <LocaleProvider>
     <div id="main-content">
       <Navbar />
 
@@ -30,7 +44,7 @@ export default function Index() {
           <Hero collection={collections[0]} />
         </DrawerRevealSection>
         <DrawerRevealSection index={1} total={3}>
-          <NewCollection products={[...newArrivals, ...bestSellers.slice(0, 4)]} />
+          <NewCollection products={newArrivals} />
         </DrawerRevealSection>
         <DrawerRevealSection index={2} total={3}>
           <Editorial images={editorialImages} />
@@ -43,6 +57,5 @@ export default function Index() {
       <Newsletter />
       <Footer />
     </div>
-    </LocaleProvider>
   );
 }

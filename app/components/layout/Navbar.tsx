@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { cn } from "~/lib/utils";
 import { useLocale } from "~/context/LocaleContext";
+import { useCart } from "~/context/CartContext";
+import { AnimatePresence, motion } from "framer-motion";
 import { MobileMenu } from "./MobileMenu";
 import { SearchPanel } from "./SearchPanel";
 import { AccountPanel } from "./AccountPanel";
@@ -9,12 +11,12 @@ import { LocalePanel } from "./LocalePanel";
 
 const navLinks = [
   { label: "Shop", href: "/showroom" },
-  { label: "Collections", href: "/#editorial" },
   { label: "About Us", href: "/#manifesto" },
 ];
 
 export function Navbar() {
   const { currency } = useLocale();
+  const { itemCount } = useCart();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activePanel, setActivePanel] = useState<"search" | "account" | "cart" | "locale" | null>(null);
@@ -91,9 +93,19 @@ export function Navbar() {
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
               </svg>
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-white text-flow-black text-[10px] font-bold rounded-full flex items-center justify-center">
-                0
-              </span>
+              <AnimatePresence>
+                {itemCount > 0 && (
+                  <motion.span
+                    key={itemCount}
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    exit={{ scale: 0 }}
+                    className="absolute -top-1 -right-1 w-4 h-4 bg-white text-flow-black text-[10px] font-bold rounded-full flex items-center justify-center"
+                  >
+                    {itemCount}
+                  </motion.span>
+                )}
+              </AnimatePresence>
             </button>
           </div>
 
