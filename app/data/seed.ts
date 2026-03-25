@@ -1,4 +1,6 @@
 import "dotenv/config";
+import fs from "node:fs";
+import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { collections, bestSellers, newArrivals, editorialImages } from "./mock.ts";
 import { adminOrders, adminCustomers, adminNotifications } from "./admin-mock.ts";
@@ -6,6 +8,8 @@ import { adminOrders, adminCustomers, adminNotifications } from "./admin-mock.ts
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+const uploadImages = process.argv.includes("--upload-images");
 
 function slugify(name: string, color: string, gender: string): string {
   return `${name}-${color}-${gender}`.toLowerCase().replace(/\s+/g, "-");
@@ -19,8 +23,117 @@ function deriveStock(index: number): { stock: number; status: "active" | "draft"
   return { stock, status: "active" };
 }
 
+function mimeFromExt(filePath: string): string {
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === ".png") return "image/png";
+  if (ext === ".webp") return "image/webp";
+  return "image/jpeg";
+}
+
+/** Map a local `/images/...` path to a deterministic storage path inside the `images` bucket. */
+function toStoragePath(localPath: string): string {
+  // Remove leading `/images/`
+  const rel = localPath.replace(/^\/images\//, "");
+  // editorial/collection-* → collections/collection-*
+  if (rel.startsWith("editorial/collection-")) {
+    return `collections/${rel.replace("editorial/", "")}`;
+  }
+  // editorial/editorial-* → editorial/editorial-*
+  if (rel.startsWith("editorial/")) {
+    return rel; // already editorial/…
+  }
+  // menswear/* and womenswear/* → products/menswear/* and products/womenswear/*
+  return `products/${rel}`;
+}
+
+function toPublicUrl(storagePath: string): string {
+  return `${supabaseUrl}/storage/v1/object/public/images/${storagePath}`;
+}
+
+/** Collect every unique local image path from mock data. */
+function collectLocalPaths(): Set<string> {
+  const paths = new Set<string>();
+  const allProducts = [...bestSellers, ...newArrivals];
+  for (const p of allProducts) {
+    paths.add(p.image);
+    paths.add(p.imageHover);
+  }
+  for (const c of collections) {
+    paths.add(c.image);
+  }
+  for (const e of editorialImages) {
+    paths.add(e.src);
+  }
+  return paths;
+}
+
+/** Upload images to Supabase Storage in batches, return map of local path → public URL. */
+async function uploadAllImages(): Promise<Map<string, string>> {
+  const localPaths = collectLocalPaths();
+  const urlMap = new Map<string, string>();
+  const publicDir = path.resolve(process.cwd(), "public");
+
+  console.log(`Uploading ${localPaths.size} unique images to Supabase Storage...\n`);
+
+  const entries = [...localPaths];
+  const BATCH = 10;
+
+  for (let i = 0; i < entries.length; i += BATCH) {
+    const batch = entries.slice(i, i + BATCH);
+    const results = await Promise.all(
+      batch.map(async (localPath) => {
+        const storagePath = toStoragePath(localPath);
+        const filePath = path.join(publicDir, localPath);
+        try {
+          const fileBuffer = fs.readFileSync(filePath);
+          const { error } = await supabase.storage
+            .from("images")
+            .upload(storagePath, fileBuffer, {
+              contentType: mimeFromExt(localPath),
+              upsert: true,
+            });
+          if (error) {
+            console.warn(`  ⚠ Upload failed for ${localPath}: ${error.message} — using fallback`);
+            return [localPath, localPath] as const;
+          }
+          const publicUrl = toPublicUrl(storagePath);
+          return [localPath, publicUrl] as const;
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(`  ⚠ Could not read ${filePath}: ${msg} — using fallback`);
+          return [localPath, localPath] as const;
+        }
+      }),
+    );
+    for (const [local, url] of results) {
+      urlMap.set(local, url);
+    }
+    console.log(`  Batch ${Math.floor(i / BATCH) + 1}/${Math.ceil(entries.length / BATCH)} done`);
+  }
+
+  console.log("  Upload complete.\n");
+  return urlMap;
+}
+
+/** Build URL map deterministically (no uploads). */
+function buildDeterministicUrlMap(): Map<string, string> {
+  const localPaths = collectLocalPaths();
+  const urlMap = new Map<string, string>();
+  for (const localPath of localPaths) {
+    urlMap.set(localPath, toPublicUrl(toStoragePath(localPath)));
+  }
+  return urlMap;
+}
+
+function rewrite(urlMap: Map<string, string>, localPath: string): string {
+  return urlMap.get(localPath) ?? localPath;
+}
+
 async function seed() {
   console.log("Seeding database...\n");
+
+  // Build URL map: either upload or deterministic
+  const urlMap = uploadImages ? await uploadAllImages() : buildDeterministicUrlMap();
 
   // Combine all products (bestSellers + newArrivals, deduplicated by id)
   const seenIds = new Set<string>();
@@ -35,14 +148,16 @@ async function seed() {
   const productRows = allProducts.map((p, i) => {
     const { stock, status } = deriveStock(i);
     const slug = slugify(p.name, p.color, p.gender);
-    const images = p.image === p.imageHover ? [p.image] : [p.image, p.imageHover];
+    const img = rewrite(urlMap, p.image);
+    const imgHover = rewrite(urlMap, p.imageHover);
+    const images = img === imgHover ? [img] : [img, imgHover];
     return {
       id: p.id,
       slug,
       name: p.name,
       price: p.price,
-      image: p.image,
-      image_hover: p.imageHover,
+      image: img,
+      image_hover: imgHover,
       images,
       category: p.category,
       badge: p.badge || null,
@@ -69,7 +184,7 @@ async function seed() {
     name: c.name,
     season: c.season,
     description: c.description,
-    image: c.image,
+    image: rewrite(urlMap, c.image),
     tags: c.tags,
   }));
   const { error: collErr } = await supabase.from("collections").upsert(collectionRows);
@@ -80,7 +195,7 @@ async function seed() {
   console.log(`Inserting ${editorialImages.length} editorial images...`);
   const editRows = editorialImages.map((e) => ({
     id: e.id,
-    src: e.src,
+    src: rewrite(urlMap, e.src),
     alt: e.alt,
     caption: e.caption,
   }));
@@ -134,7 +249,7 @@ async function seed() {
   if (notifErr) throw notifErr;
   console.log("  Done.\n");
 
-  console.log("Seed complete!");
+  console.log(`Seed complete! (images: ${uploadImages ? "uploaded" : "deterministic URLs"})`);
 }
 
 seed().catch((err) => {

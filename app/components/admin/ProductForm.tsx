@@ -1,6 +1,7 @@
-import { Link } from "@remix-run/react";
+import { Link, useNavigation } from "@remix-run/react";
 import type { AdminProduct } from "~/lib/types";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { uploadImageClient } from "~/lib/supabase.client";
 
 const inputClass =
   "w-full bg-flow-950 border border-flow-700 rounded-lg px-4 py-3 text-sm text-flow-100 placeholder:text-flow-500 focus:border-accent-500 focus:outline-none transition-colors";
@@ -10,22 +11,34 @@ function ImageUpload({
   label,
   name,
   existingUrl,
+  onUploaded,
 }: {
   label: string;
   name: string;
   existingUrl?: string;
+  onUploaded: (url: string) => void;
 }) {
   const [preview, setPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setPreview(null);
   }, [existingUrl]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setPreview(URL.createObjectURL(file));
+    if (!file) return;
+    setPreview(URL.createObjectURL(file));
+    setUploading(true);
+    try {
+      const url = await uploadImageClient(file, "products");
+      onUploaded(url);
+    } catch (err) {
+      console.error("Upload failed:", err);
+      setPreview(null);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -34,13 +47,9 @@ function ImageUpload({
   return (
     <div>
       <label className={labelClass}>{label}</label>
-      {existingUrl && !preview && (
-        <input type="hidden" name={`${name}_existing`} value={existingUrl} />
-      )}
       <input
         ref={inputRef}
         type="file"
-        name={name}
         accept="image/*"
         onChange={handleChange}
         className="hidden"
@@ -52,7 +61,11 @@ function ImageUpload({
         >
           <img src={displayUrl} alt="" className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <span className="text-xs text-white uppercase tracking-wide">Change</span>
+            {uploading ? (
+              <span className="text-xs text-white uppercase tracking-wide">Uploading…</span>
+            ) : (
+              <span className="text-xs text-white uppercase tracking-wide">Change</span>
+            )}
           </div>
         </div>
       ) : (
@@ -60,10 +73,16 @@ function ImageUpload({
           className="w-full h-40 border-2 border-dashed border-flow-700 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-accent-500 transition-colors"
           onClick={() => inputRef.current?.click()}
         >
-          <svg className="w-6 h-6 text-flow-500 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-          <span className="text-xs text-flow-500">Click to upload</span>
+          {uploading ? (
+            <span className="text-xs text-flow-500">Uploading…</span>
+          ) : (
+            <>
+              <svg className="w-6 h-6 text-flow-500 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span className="text-xs text-flow-500">Click to upload</span>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -73,65 +92,55 @@ function ImageUpload({
 function GalleryUpload({
   namePrefix,
   existingUrls,
+  onUrlsChange,
 }: {
   namePrefix: string;
   existingUrls: string[];
+  onUrlsChange: (urls: string[]) => void;
 }) {
-  const [newPreviews, setNewPreviews] = useState<{ file: File; preview: string }[]>([]);
-  const [kept, setKept] = useState<string[]>(existingUrls);
+  const [urls, setUrls] = useState<string[]>(existingUrls);
+  const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setKept(existingUrls);
-    setNewPreviews([]);
+    setUrls(existingUrls);
   }, [existingUrls]);
 
-  const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    const previews = files.map((file) => ({
-      file,
-      preview: URL.createObjectURL(file),
-    }));
-    setNewPreviews((prev) => [...prev, ...previews]);
-    if (inputRef.current) inputRef.current.value = "";
+    if (files.length === 0) return;
+    setUploading(true);
+    try {
+      const uploaded = await Promise.all(
+        files.map((file) => uploadImageClient(file, "products"))
+      );
+      const next = [...urls, ...uploaded];
+      setUrls(next);
+      onUrlsChange(next);
+    } catch (err) {
+      console.error("Gallery upload failed:", err);
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
   };
 
-  const removeKept = (url: string) => {
-    setKept((prev) => prev.filter((u) => u !== url));
-  };
-
-  const removeNew = (index: number) => {
-    setNewPreviews((prev) => prev.filter((_, i) => i !== index));
+  const removeUrl = (index: number) => {
+    const next = urls.filter((_, i) => i !== index);
+    setUrls(next);
+    onUrlsChange(next);
   };
 
   return (
     <div>
       <label className={labelClass}>Gallery Images</label>
-      {kept.map((url) => (
-        <input key={url} type="hidden" name={`${namePrefix}_gallery_existing`} value={url} />
-      ))}
       <div className="grid grid-cols-4 gap-3 mb-2">
-        {kept.map((url) => (
-          <div key={url} className="relative group h-32 rounded-lg overflow-hidden bg-flow-950 border border-flow-700">
+        {urls.map((url, i) => (
+          <div key={`${url}-${i}`} className="relative group h-32 rounded-lg overflow-hidden bg-flow-950 border border-flow-700">
             <img src={url} alt="" className="w-full h-full object-cover" />
             <button
               type="button"
-              onClick={() => removeKept(url)}
-              className="absolute top-1.5 right-1.5 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        ))}
-        {newPreviews.map((item, i) => (
-          <div key={i} className="relative group h-32 rounded-lg overflow-hidden bg-flow-950 border border-flow-700">
-            <img src={item.preview} alt="" className="w-full h-full object-cover" />
-            <input type="file" name={`${namePrefix}_gallery_new`} className="hidden" />
-            <button
-              type="button"
-              onClick={() => removeNew(i)}
+              onClick={() => removeUrl(i)}
               className="absolute top-1.5 right-1.5 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
             >
               <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -144,16 +153,21 @@ function GalleryUpload({
           className="h-32 border-2 border-dashed border-flow-700 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-accent-500 transition-colors"
           onClick={() => inputRef.current?.click()}
         >
-          <svg className="w-6 h-6 text-flow-500 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
-          </svg>
-          <span className="text-xs text-flow-500">Add Images</span>
+          {uploading ? (
+            <span className="text-xs text-flow-500">Uploading…</span>
+          ) : (
+            <>
+              <svg className="w-6 h-6 text-flow-500 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+              </svg>
+              <span className="text-xs text-flow-500">Add Images</span>
+            </>
+          )}
         </div>
       </div>
       <input
         ref={inputRef}
         type="file"
-        name={`${namePrefix}_gallery_new`}
         accept="image/*"
         multiple
         onChange={handleFiles}
@@ -166,9 +180,9 @@ function GalleryUpload({
 interface Variant {
   id: string;
   color: string;
-  imageExisting?: string;
-  imageHoverExisting?: string;
-  galleryExisting: string[];
+  image: string;
+  imageHover: string;
+  gallery: string[];
   position: number;
 }
 
@@ -179,6 +193,8 @@ interface ProductFormProps {
 
 export function ProductForm({ product, siblings }: ProductFormProps) {
   const isEdit = !!product;
+  const navigation = useNavigation();
+  const isSubmitting = navigation.state === "submitting";
 
   const [form, setForm] = useState({
     name: "",
@@ -197,7 +213,7 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
   });
 
   const [variants, setVariants] = useState<Variant[]>([
-    { id: `new-${Date.now()}`, color: "", galleryExisting: [], position: -1 },
+    { id: `new-${Date.now()}`, color: "", image: "", imageHover: "", gallery: [], position: -1 },
   ]);
   const [activeVariantIndex, setActiveVariantIndex] = useState(0);
   const [deletedVariantIds, setDeletedVariantIds] = useState<string[]>([]);
@@ -226,9 +242,9 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
         sources.map((s) => ({
           id: s.id,
           color: s.color,
-          imageExisting: s.image,
-          imageHoverExisting: s.imageHover,
-          galleryExisting: s.images || [],
+          image: s.image,
+          imageHover: s.imageHover,
+          gallery: s.images || [],
           position: s.position,
         }))
       );
@@ -240,9 +256,12 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
   const update = (field: string, value: string | boolean) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
+  const updateVariant = useCallback((index: number, patch: Partial<Variant>) => {
+    setVariants((prev) => prev.map((v, i) => (i === index ? { ...v, ...patch } : v)));
+  }, []);
+
   const updateVariantColor = (index: number, color: string) => {
-    setVariants((prev) => prev.map((v, i) => (i === index ? { ...v, color } : v)));
-    // Check for duplicate colors
+    updateVariant(index, { color });
     const otherColors = variants
       .filter((_, i) => i !== index)
       .map((v) => v.color.toLowerCase().trim());
@@ -256,7 +275,7 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
   const addVariant = () => {
     setVariants((prev) => [
       ...prev,
-      { id: `new-${Date.now()}`, color: "", galleryExisting: [], position: -1 },
+      { id: `new-${Date.now()}`, color: "", image: "", imageHover: "", gallery: [], position: -1 },
     ]);
     setActiveVariantIndex(variants.length);
   };
@@ -292,15 +311,18 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
         </h1>
       </div>
 
-      <form method="post" encType="multipart/form-data">
+      <form method="post">
         <input type="hidden" name="variants_count" value={variants.length} />
         <input type="hidden" name="deleted_variant_ids" value={JSON.stringify(deletedVariantIds)} />
 
-        {/* Serialize variant hidden fields */}
+        {/* Serialize variant data as hidden fields (URLs only, no files) */}
         {variants.map((variant, i) => (
           <div key={variant.id}>
             <input type="hidden" name={`variant_${i}_id`} value={variant.id} />
             <input type="hidden" name={`variant_${i}_position`} value={variant.position} />
+            <input type="hidden" name={`variant_${i}_image`} value={variant.image} />
+            <input type="hidden" name={`variant_${i}_imageHover`} value={variant.imageHover} />
+            <input type="hidden" name={`variant_${i}_gallery`} value={JSON.stringify(variant.gallery)} />
           </div>
         ))}
 
@@ -338,7 +360,7 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
                 </button>
               </div>
 
-              {/* Variant panels — hidden via CSS to preserve file input state */}
+              {/* Variant panels */}
               {variants.map((variant, i) => (
                 <div
                   key={variant.id}
@@ -374,17 +396,20 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
                     <ImageUpload
                       label="Main Image"
                       name={`variant_${i}_image`}
-                      existingUrl={variant.imageExisting}
+                      existingUrl={variant.image || undefined}
+                      onUploaded={(url) => updateVariant(i, { image: url })}
                     />
                     <ImageUpload
                       label="Hover Image"
                       name={`variant_${i}_imageHover`}
-                      existingUrl={variant.imageHoverExisting}
+                      existingUrl={variant.imageHover || undefined}
+                      onUploaded={(url) => updateVariant(i, { imageHover: url })}
                     />
                   </div>
                   <GalleryUpload
                     namePrefix={`variant_${i}`}
-                    existingUrls={variant.galleryExisting}
+                    existingUrls={variant.gallery}
+                    onUrlsChange={(urls) => updateVariant(i, { gallery: urls })}
                   />
                 </div>
               ))}
@@ -513,10 +538,10 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
             <div className="flex gap-3">
               <button
                 type="submit"
-                disabled={formInvalid}
+                disabled={formInvalid || isSubmitting}
                 className="flex-1 bg-white text-flow-black font-display font-semibold text-sm tracking-wide uppercase rounded-lg px-6 py-3 hover:bg-flow-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isEdit ? "Save Changes" : "Add Product"}
+                {isSubmitting ? "Saving…" : isEdit ? "Save Changes" : "Add Product"}
               </button>
               <Link
                 to="/admin/products"

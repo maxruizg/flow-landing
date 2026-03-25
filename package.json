@@ -9,7 +9,8 @@
     "dev": "remix vite:dev",
     "start": "remix-serve ./build/server/index.js",
     "typecheck": "tsc",
-    "seed": "tsx app/data/seed.ts"
+    "seed": "tsx app/data/seed.ts",
+    "seed:full": "tsx app/data/seed.ts --upload-images"
   },
   "dependencies": {
     "@remix-run/node": "^2.15.0",

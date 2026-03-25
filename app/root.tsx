@@ -4,6 +4,7 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useLoaderData,
 } from "@remix-run/react";
 import { json } from "@remix-run/node";
 import type { LinksFunction, MetaFunction } from "@remix-run/node";
@@ -44,7 +45,13 @@ export const meta: MetaFunction = () => [
 
 export async function loader() {
   const trendingProducts = await getTrendingProducts();
-  return json({ trendingProducts });
+  return json({
+    trendingProducts,
+    ENV: {
+      SUPABASE_URL: process.env.SUPABASE_URL!,
+      SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY!,
+    },
+  });
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -72,13 +79,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  const { ENV } = useLoaderData<typeof loader>();
   return (
     <LocaleProvider>
       <CartProvider>
+        <EnvScript env={ENV} />
         <Outlet />
       </CartProvider>
     </LocaleProvider>
   );
+}
+
+function EnvScript({ env }: { env: Record<string, string> }) {
+  const value = JSON.stringify(env);
+  return <script dangerouslySetInnerHTML={{ __html: `window.ENV=${value}` }} />;
 }
 
 export function ErrorBoundary() {

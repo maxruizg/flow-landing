@@ -1,39 +1,10 @@
 import { redirect } from "@remix-run/node";
 import type { MetaFunction, ActionFunctionArgs } from "@remix-run/node";
-import { uploadImage } from "~/lib/supabase.server";
 import { upsertProduct, getMaxProductPosition } from "~/data/queries.server";
 import { ProductForm } from "~/components/admin/ProductForm";
 import { slugify } from "~/lib/utils";
 
 export const meta: MetaFunction = () => [{ title: "FLOW Admin — New Product" }];
-
-async function resolveImage(
-  formData: FormData,
-  fieldName: string
-): Promise<string> {
-  const file = formData.get(fieldName);
-  const existing = formData.get(`${fieldName}_existing`) as string | null;
-
-  if (file && file instanceof File && file.size > 0) {
-    return uploadImage(file, "products");
-  }
-  return existing || "";
-}
-
-async function resolveGalleryIndexed(
-  formData: FormData,
-  index: number
-): Promise<string[]> {
-  const kept = formData.getAll(`variant_${index}_gallery_existing`) as string[];
-  const newFiles = formData.getAll(`variant_${index}_gallery_new`);
-  const uploaded: string[] = [];
-  for (const file of newFiles) {
-    if (file instanceof File && file.size > 0) {
-      uploaded.push(await uploadImage(file, "products"));
-    }
-  }
-  return [...kept, ...uploaded];
-}
 
 export async function action({ request }: ActionFunctionArgs) {
   const form = await request.formData();
@@ -62,9 +33,11 @@ export async function action({ request }: ActionFunctionArgs) {
     const variantId = form.get(`variant_${i}_id`) as string;
     const color = form.get(`variant_${i}_color`) as string;
 
-    const image = await resolveImage(form, `variant_${i}_image`);
-    const imageHover = await resolveImage(form, `variant_${i}_imageHover`);
-    const images = await resolveGalleryIndexed(form, i);
+    // Images are already uploaded — just read the URLs
+    const image = (form.get(`variant_${i}_image`) as string) || "";
+    const imageHover = (form.get(`variant_${i}_imageHover`) as string) || "";
+    const galleryRaw = (form.get(`variant_${i}_gallery`) as string) || "[]";
+    const images: string[] = JSON.parse(galleryRaw);
 
     const finalId = variantId.startsWith("new-")
       ? `p-${Date.now()}-${i}`
