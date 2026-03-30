@@ -5,6 +5,7 @@ import { cn } from "~/lib/utils";
 import { useLocale } from "~/context/LocaleContext";
 import { QuickAdd } from "./QuickAdd";
 import type { Product } from "~/lib/types";
+import { OptimizedImage } from "~/components/ui/OptimizedImage";
 
 interface ProductCardProps {
   product: Product;
@@ -29,23 +30,25 @@ export function ProductCard({ product, index = 0, variant = "dark" }: ProductCar
       <Link to={`/product/${product.slug}`} prefetch="intent">
         {/* Image */}
         <div className="relative aspect-[3/4] overflow-hidden bg-flow-900 mb-3 rounded-2xl">
-          <img
+          <OptimizedImage
             src={product.image}
             alt={product.name}
+            widths={[320, 480, 640]}
+            sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
             className={cn(
               "absolute inset-0 w-full h-full object-cover transition-opacity duration-500",
               hovered ? "opacity-0" : "opacity-100"
             )}
-            loading="lazy"
           />
-          <img
+          <OptimizedImage
             src={product.imageHover}
             alt={`${product.name} alternate view`}
+            widths={[320, 480, 640]}
+            sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
             className={cn(
               "absolute inset-0 w-full h-full object-cover transition-opacity duration-500",
               hovered ? "opacity-100" : "opacity-0"
             )}
-            loading="lazy"
           />
 
           {/* Badge */}

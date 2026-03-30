@@ -1,6 +1,6 @@
 import { Link, useNavigation } from "@remix-run/react";
 import type { AdminProduct } from "~/lib/types";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { uploadImageClient } from "~/lib/supabase.client";
 
 const inputClass =
@@ -203,7 +203,7 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
     gender: "unisex" as string,
     sizes: "S, M, L, XL",
     material: "",
-    stock: "",
+    sizeStock: {} as Record<string, number>,
     description: "",
     origin: "",
     fit: "",
@@ -230,7 +230,7 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
         gender: first.gender,
         sizes: first.sizes.join(", "),
         material: first.material,
-        stock: String(first.stock),
+        sizeStock: first.sizeStock || {},
         description: first.description,
         origin: first.origin,
         fit: first.fit || "",
@@ -252,6 +252,33 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
       setDeletedVariantIds([]);
     }
   }, [product, siblings]);
+
+  const parsedSizes = useMemo(
+    () => form.sizes.split(",").map((s) => s.trim()).filter(Boolean),
+    [form.sizes]
+  );
+
+  useEffect(() => {
+    setForm((prev) => {
+      const next: Record<string, number> = {};
+      for (const size of parsedSizes) {
+        next[size] = prev.sizeStock[size] ?? 0;
+      }
+      return { ...prev, sizeStock: next };
+    });
+  }, [parsedSizes]);
+
+  const totalStock = useMemo(
+    () => Object.values(form.sizeStock).reduce((a, b) => a + b, 0),
+    [form.sizeStock]
+  );
+
+  const updateSizeStock = (size: string, value: number) => {
+    setForm((prev) => ({
+      ...prev,
+      sizeStock: { ...prev.sizeStock, [size]: value },
+    }));
+  };
 
   const update = (field: string, value: string | boolean) =>
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -501,8 +528,28 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
                   </label>
                 </div>
                 <div>
-                  <label className={labelClass}>Stock</label>
-                  <input className={inputClass} type="number" name="stock" value={form.stock} onChange={(e) => update("stock", e.target.value)} placeholder="0" />
+                  <label className={labelClass}>Stock per Size</label>
+                  {parsedSizes.length > 0 ? (
+                    <div className="space-y-2">
+                      {parsedSizes.map((size) => (
+                        <div key={size} className="flex items-center gap-3">
+                          <span className="text-xs text-flow-400 uppercase tracking-wide w-10 shrink-0">{size}</span>
+                          <input
+                            className={inputClass}
+                            type="number"
+                            min="0"
+                            value={form.sizeStock[size] ?? 0}
+                            onChange={(e) => updateSizeStock(size, Math.max(0, Number(e.target.value) || 0))}
+                            placeholder="0"
+                          />
+                        </div>
+                      ))}
+                      <p className="text-xs text-flow-500 pt-1">Total: {totalStock}</p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-flow-500 py-3">Enter sizes first</p>
+                  )}
+                  <input type="hidden" name="size_stock_json" value={JSON.stringify(form.sizeStock)} />
                 </div>
               </div>
             </div>

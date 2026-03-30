@@ -4,7 +4,7 @@ import { Navbar } from "~/components/layout/Navbar";
 import { Footer } from "~/components/layout/Footer";
 import { Hero } from "~/components/home/Hero";
 import { NewCollection } from "~/components/home/NewCollection";
-import { Editorial } from "~/components/home/Editorial";
+import { DailyFlow } from "~/components/home/DailyFlow";
 import { BestSellers } from "~/components/home/BestSellers";
 import { Manifesto } from "~/components/home/Manifesto";
 import { Newsletter } from "~/components/home/Newsletter";
@@ -15,23 +15,23 @@ import {
 import {
   getCollections,
   getBestSellers,
-  getEditorialImages,
+  getDailyFlowImages,
   getNewArrivals,
 } from "~/data/queries.server";
 
 export async function loader() {
-  const [collections, bestSellers, editorialImages, newArrivals] =
+  const [collections, bestSellers, dailyFlowImages, newArrivals] =
     await Promise.all([
       getCollections(),
       getBestSellers(),
-      getEditorialImages(),
+      getDailyFlowImages(),
       getNewArrivals(),
     ]);
-  return json({ collections, bestSellers, editorialImages, newArrivals });
+  return json({ collections, bestSellers, dailyFlowImages, newArrivals });
 }
 
 export default function Index() {
-  const { collections, bestSellers, editorialImages, newArrivals } =
+  const { collections, bestSellers, dailyFlowImages, newArrivals } =
     useLoaderData<typeof loader>();
 
   return (
@@ -47,7 +47,7 @@ export default function Index() {
           <NewCollection products={newArrivals} />
         </DrawerRevealSection>
         <DrawerRevealSection index={2} total={3}>
-          <Editorial images={editorialImages} />
+          <DailyFlow images={dailyFlowImages} />
         </DrawerRevealSection>
       </DrawerRevealContainer>
 

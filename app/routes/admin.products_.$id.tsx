@@ -22,7 +22,7 @@ export async function loader({ params }: LoaderFunctionArgs) {
   if (!product) {
     throw new Response("Product not found", { status: 404 });
   }
-  const siblings = await getProductSiblingsByName(product.name);
+  const siblings = await getProductSiblingsByName(product.name, product.gender);
   return json({ product, siblings });
 }
 
@@ -43,7 +43,8 @@ export async function action({ request }: ActionFunctionArgs) {
   const badge = (form.get("badge") as string) || null;
   const isNew = form.get("isNew") === "true";
   const status = form.get("status") as string;
-  const stock = Number(form.get("stock"));
+  const sizeStockRaw = (form.get("size_stock_json") as string) || "{}";
+  const sizeStock: Record<string, number> = JSON.parse(sizeStockRaw);
 
   // Delete removed variants
   const deletedRaw = form.get("deleted_variant_ids") as string;
@@ -91,6 +92,7 @@ export async function action({ request }: ActionFunctionArgs) {
       category,
       badge,
       sizes,
+      sizeStock,
       isNew,
       description,
       material,
@@ -98,7 +100,6 @@ export async function action({ request }: ActionFunctionArgs) {
       color,
       fit,
       gender,
-      stock,
       status,
       position,
     });

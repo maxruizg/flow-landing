@@ -2,7 +2,7 @@ import { supabase } from "~/lib/supabase.server";
 import type {
   Product,
   Collection,
-  EditorialImage,
+  DailyFlowImage,
   AdminProduct,
   AdminOrder,
   AdminCustomer,
@@ -25,6 +25,7 @@ function mapProduct(row: any): Product {
     category: row.category,
     badge: row.badge ?? undefined,
     sizes: row.sizes,
+    sizeStock: row.size_stock || {},
     isNew: row.is_new ?? undefined,
     description: row.description,
     material: row.material,
@@ -36,16 +37,26 @@ function mapProduct(row: any): Product {
 }
 
 function attachColorVariants(products: Product[]): Product[] {
-  const byName = new Map<string, Product[]>();
+  const byKey = new Map<string, Product[]>();
   for (const p of products) {
-    const group = byName.get(p.name) || [];
+    const key = `${p.name}::${p.gender}`;
+    const group = byKey.get(key) || [];
     group.push(p);
-    byName.set(p.name, group);
+    byKey.set(key, group);
   }
   for (const p of products) {
-    const siblings = byName.get(p.name)!;
+    const key = `${p.name}::${p.gender}`;
+    const siblings = byKey.get(key)!;
     if (siblings.length >= 1) {
-      p.colorVariants = siblings.map((s) => ({ color: s.color, slug: s.slug }));
+      const seen = new Set<string>();
+      p.colorVariants = siblings
+        .filter((s) => {
+          const lower = s.color.toLowerCase();
+          if (seen.has(lower)) return false;
+          seen.add(lower);
+          return true;
+        })
+        .map((s) => ({ color: s.color, slug: s.slug }));
     }
   }
   return products;
@@ -71,7 +82,7 @@ function mapCollection(row: any): Collection {
   };
 }
 
-function mapEditorialImage(row: any): EditorialImage {
+function mapDailyFlowImage(row: any): DailyFlowImage {
   return {
     id: row.id,
     src: row.src,
@@ -138,17 +149,23 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
 
   const product = mapProduct(data);
 
-  // Get color variants (siblings with same name)
+  // Get color variants (siblings with same name + gender)
   const { data: siblings } = await supabase
     .from("products")
     .select("slug, color")
-    .eq("name", product.name);
+    .eq("name", product.name)
+    .eq("gender", product.gender);
 
   if (siblings && siblings.length >= 1) {
-    product.colorVariants = siblings.map((s: any) => ({
-      color: s.color,
-      slug: s.slug,
-    }));
+    const seen = new Set<string>();
+    product.colorVariants = siblings
+      .filter((s: any) => {
+        const lower = s.color.toLowerCase();
+        if (seen.has(lower)) return false;
+        seen.add(lower);
+        return true;
+      })
+      .map((s: any) => ({ color: s.color, slug: s.slug }));
   }
 
   return product;
@@ -182,13 +199,13 @@ export async function getCollections(): Promise<Collection[]> {
   return data.map(mapCollection);
 }
 
-export async function getEditorialImages(): Promise<EditorialImage[]> {
+export async function getDailyFlowImages(): Promise<DailyFlowImage[]> {
   const { data, error } = await supabase
     .from("editorial_images")
     .select("*")
     .order("id");
   if (error) throw error;
-  return data.map(mapEditorialImage);
+  return data.map(mapDailyFlowImage);
 }
 
 export async function getTrendingProducts(): Promise<Product[]> {
@@ -289,11 +306,12 @@ export async function getRevenueData(): Promise<RevenueDataPoint[]> {
   }));
 }
 
-export async function getProductSiblingsByName(name: string): Promise<AdminProduct[]> {
+export async function getProductSiblingsByName(name: string, gender: string): Promise<AdminProduct[]> {
   const { data, error } = await supabase
     .from("products")
     .select("*")
     .eq("name", name)
+    .eq("gender", gender)
     .order("id");
   if (error) throw error;
   return data.map(mapAdminProduct);
@@ -323,6 +341,7 @@ export async function upsertProduct(product: Record<string, any>) {
     category: product.category,
     badge: product.badge || null,
     sizes: product.sizes,
+    size_stock: product.sizeStock || {},
     is_new: product.isNew || false,
     description: product.description,
     material: product.material,
@@ -330,7 +349,7 @@ export async function upsertProduct(product: Record<string, any>) {
     color: product.color,
     fit: product.fit || null,
     gender: product.gender,
-    stock: product.stock,
+    stock: Object.values(product.sizeStock as Record<string, number> || {}).reduce((a: number, b: number) => a + b, 0),
     status: product.status,
     ...(product.position !== undefined && { position: product.position }),
   };
@@ -369,7 +388,7 @@ export async function updateCollectionImage(id: string, imageUrl: string) {
   if (error) throw error;
 }
 
-export async function updateEditorialImage(id: string, srcUrl: string) {
+export async function updateDailyFlowImage(id: string, srcUrl: string) {
   const { error } = await supabase
     .from("editorial_images")
     .update({ src: srcUrl })

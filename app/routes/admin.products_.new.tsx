@@ -23,7 +23,8 @@ export async function action({ request }: ActionFunctionArgs) {
   const badge = (form.get("badge") as string) || null;
   const isNew = form.get("isNew") === "true";
   const status = form.get("status") as string;
-  const stock = Number(form.get("stock"));
+  const sizeStockRaw = (form.get("size_stock_json") as string) || "{}";
+  const sizeStock: Record<string, number> = JSON.parse(sizeStockRaw);
 
   // Process variants
   const variantsCount = Number(form.get("variants_count"));
@@ -57,6 +58,7 @@ export async function action({ request }: ActionFunctionArgs) {
       category,
       badge,
       sizes,
+      sizeStock,
       isNew,
       description,
       material,
@@ -64,7 +66,6 @@ export async function action({ request }: ActionFunctionArgs) {
       color,
       fit,
       gender,
-      stock,
       status,
       position,
     });

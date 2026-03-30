@@ -24,7 +24,7 @@ export interface Collection {
   tags: string[];
 }
 
-export interface EditorialImage {
+export interface DailyFlowImage {
   id: string;
   src: string;
   alt: string;
@@ -839,7 +839,7 @@ export const newArrivals: Product[] = [
   },
 ];
 
-export const editorialImages: EditorialImage[] = [
+export const dailyFlowImages: DailyFlowImage[] = [
   {
     id: "ed-001",
     src: "/images/editorial/editorial-1.jpg",

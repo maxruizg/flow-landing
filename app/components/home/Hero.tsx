@@ -3,6 +3,7 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import { Container } from "~/components/ui/Container";
 import { Button } from "~/components/ui/Button";
 import type { Collection } from "~/lib/types";
+import { OptimizedImage } from "~/components/ui/OptimizedImage";
 
 interface HeroProps {
   collection: Collection;
@@ -20,10 +21,13 @@ export function Hero({ collection }: HeroProps) {
     <div ref={ref} className="relative h-full w-full overflow-hidden bg-flow-black">
       {/* Parallax background */}
       <motion.div className="absolute inset-0" style={{ y }}>
-        <img
+        <OptimizedImage
           src={collection.image}
           alt={collection.name}
+          widths={[960, 1280, 1920]}
+          sizes="100vw"
           className="w-full h-[130%] object-cover"
+          loading="eager"
         />
       </motion.div>
 
@@ -60,7 +64,7 @@ export function Hero({ collection }: HeroProps) {
           {[
             { label: "Men's", gender: "men" },
             { label: "Women's", gender: "women" },
-            { label: "Unisex", gender: "unisex" },
+            { label: "For All", gender: "unisex" },
           ].map(({ label, gender }) => (
             <a
               key={gender}

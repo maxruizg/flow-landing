@@ -5,20 +5,20 @@ import { motion } from "framer-motion";
 import { useRef } from "react";
 import {
   getCollections,
-  getEditorialImages,
+  getDailyFlowImages,
   updateCollectionImage,
-  updateEditorialImage,
+  updateDailyFlowImage,
 } from "~/data/queries.server";
 import { uploadImage } from "~/lib/supabase.server";
 
 export const meta: MetaFunction = () => [{ title: "FLOW Admin — Content" }];
 
 export async function loader() {
-  const [collections, editorialImages] = await Promise.all([
+  const [collections, dailyFlowImages] = await Promise.all([
     getCollections(),
-    getEditorialImages(),
+    getDailyFlowImages(),
   ]);
-  return json({ collections, editorialImages });
+  return json({ collections, dailyFlowImages });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -32,12 +32,12 @@ export async function action({ request }: ActionFunctionArgs) {
       const url = await uploadImage(file, "collections");
       await updateCollectionImage(id, url);
     }
-  } else if (intent === "update-editorial-image") {
+  } else if (intent === "update-daily-flow-image") {
     const id = form.get("id") as string;
     const file = form.get("image");
     if (file && file instanceof File && file.size > 0) {
       const url = await uploadImage(file, "editorial");
-      await updateEditorialImage(id, url);
+      await updateDailyFlowImage(id, url);
     }
   }
 
@@ -101,7 +101,7 @@ function ImageCard({
 }
 
 export default function AdminContent() {
-  const { collections, editorialImages } = useLoaderData<typeof loader>();
+  const { collections, dailyFlowImages } = useLoaderData<typeof loader>();
 
   return (
     <motion.div
@@ -130,38 +130,38 @@ export default function AdminContent() {
         </div>
       </section>
 
-      {/* Editorial Section */}
+      {/* Daily Flow Section */}
       <section>
         <h2 className="text-xs uppercase tracking-[0.15em] text-flow-400 font-medium mb-4">
-          Editorial Images
+          Daily Flow Images
         </h2>
-        {editorialImages.length > 0 ? (
+        {dailyFlowImages.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* First image tall, rest stacked */}
             <div className="md:row-span-2">
               <ImageCard
-                id={editorialImages[0].id}
-                intent="update-editorial-image"
-                imageUrl={editorialImages[0].src}
-                label={editorialImages[0].alt || "Editorial 1"}
-                sublabel={editorialImages[0].caption}
+                id={dailyFlowImages[0].id}
+                intent="update-daily-flow-image"
+                imageUrl={dailyFlowImages[0].src}
+                label={dailyFlowImages[0].alt || "Daily Flow 1"}
+                sublabel={dailyFlowImages[0].caption}
                 tall
               />
             </div>
-            {editorialImages.slice(1).map((img) => (
+            {dailyFlowImages.slice(1).map((img) => (
               <ImageCard
                 key={img.id}
                 id={img.id}
-                intent="update-editorial-image"
+                intent="update-daily-flow-image"
                 imageUrl={img.src}
-                label={img.alt || `Editorial ${img.id}`}
+                label={img.alt || `Daily Flow ${img.id}`}
                 sublabel={img.caption}
               />
             ))}
           </div>
         ) : (
           <div className="bg-flow-900 border border-flow-800/50 rounded-xl p-12 text-center">
-            <p className="text-flow-500 text-sm">No editorial images found.</p>
+            <p className="text-flow-500 text-sm">No daily flow images found.</p>
           </div>
         )}
       </section>

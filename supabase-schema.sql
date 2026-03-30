@@ -19,6 +19,7 @@ create table if not exists products (
   fit text,
   gender text not null check (gender in ('men', 'women', 'unisex')),
   stock integer not null default 0,
+  size_stock jsonb not null default '{}'::jsonb,
   status text not null default 'active' check (status in ('active', 'draft', 'out_of_stock')),
   position integer not null default 0,
   created_at timestamptz not null default now()

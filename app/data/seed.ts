@@ -2,7 +2,7 @@ import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
-import { collections, bestSellers, newArrivals, editorialImages } from "./mock.ts";
+import { collections, bestSellers, newArrivals, dailyFlowImages } from "./mock.ts";
 import { adminOrders, adminCustomers, adminNotifications } from "./admin-mock.ts";
 
 const supabaseUrl = process.env.SUPABASE_URL!;
@@ -61,7 +61,7 @@ function collectLocalPaths(): Set<string> {
   for (const c of collections) {
     paths.add(c.image);
   }
-  for (const e of editorialImages) {
+  for (const e of dailyFlowImages) {
     paths.add(e.src);
   }
   return paths;
@@ -191,9 +191,9 @@ async function seed() {
   if (collErr) throw collErr;
   console.log("  Done.\n");
 
-  // 3. Editorial images
-  console.log(`Inserting ${editorialImages.length} editorial images...`);
-  const editRows = editorialImages.map((e) => ({
+  // 3. Daily Flow images
+  console.log(`Inserting ${dailyFlowImages.length} daily flow images...`);
+  const editRows = dailyFlowImages.map((e) => ({
     id: e.id,
     src: rewrite(urlMap, e.src),
     alt: e.alt,

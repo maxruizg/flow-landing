@@ -3,6 +3,7 @@ import { useRouteLoaderData } from "@remix-run/react";
 import { SlidePanel } from "./SlidePanel";
 import { useLocale } from "~/context/LocaleContext";
 import type { Product } from "~/lib/types";
+import { OptimizedImage } from "~/components/ui/OptimizedImage";
 
 const popularSearches = ["Oversized Tee", "Cargo Pants", "Bomber Jacket", "New Arrivals"];
 
@@ -66,9 +67,11 @@ export function SearchPanel({ isOpen, onClose }: SearchPanelProps) {
           {trendingProducts.map((product) => (
             <div key={product.id} className="flex items-center gap-4 group cursor-pointer">
               <div className="w-16 h-16 bg-flow-900 overflow-hidden flex-shrink-0">
-                <img
+                <OptimizedImage
                   src={product.image}
                   alt={product.name}
+                  widths={[160, 320]}
+                  sizes="64px"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
               </div>

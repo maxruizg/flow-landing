@@ -9,6 +9,7 @@ export interface Product {
   category: string;
   badge?: string;
   sizes: string[];
+  sizeStock: Record<string, number>;
   isNew?: boolean;
   description: string;
   material: string;
@@ -38,7 +39,7 @@ export interface Collection {
   tags: string[];
 }
 
-export interface EditorialImage {
+export interface DailyFlowImage {
   id: string;
   src: string;
   alt: string;

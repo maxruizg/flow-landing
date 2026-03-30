@@ -9,6 +9,7 @@ import { getProductBySlug } from "~/data/queries.server";
 import { cn } from "~/lib/utils";
 import type { MetaFunction, LoaderFunctionArgs } from "@remix-run/node";
 import type { Product } from "~/lib/types";
+import { OptimizedImage } from "~/components/ui/OptimizedImage";
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
   if (!data?.product) return [{ title: "Product Not Found — FLOW URBAN WEAR" }];
@@ -25,8 +26,8 @@ export async function loader({ params }: LoaderFunctionArgs) {
 
 const COLOR_MAP: Record<string, string> = {
   Black: "bg-flow-900 border-flow-600",
-  Brown: "bg-amber-800 border-amber-600",
-  "Off White": "bg-amber-50 border-amber-200",
+  Brown: "bg-stone-700 border-stone-500",
+  "Off White": "bg-stone-200 border-stone-300",
   White: "bg-white border-flow-300",
   Yellow: "bg-yellow-400 border-yellow-500",
 };
@@ -66,7 +67,7 @@ function ProductModal({ product }: { product: Product }) {
 
         {/* Modal */}
         <motion.div
-          className="relative w-full max-w-4xl max-h-[90vh] bg-flow-950 border border-flow-800/50 rounded-2xl overflow-hidden flex flex-col"
+          className="relative w-full max-w-6xl max-h-[92vh] bg-flow-950 border border-flow-800/50 rounded-2xl overflow-hidden flex flex-col"
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -89,10 +90,13 @@ function ProductModal({ product }: { product: Product }) {
               {/* Left — Image */}
               <div className="relative bg-flow-900">
                 <div className="aspect-square sticky top-0">
-                  <img
+                  <OptimizedImage
                     src={product.images[selectedImage]}
                     alt={product.name}
+                    widths={[640, 960, 1280]}
+                    sizes="(min-width: 768px) 50vw, 100vw"
                     className="w-full h-full object-cover"
+                    loading="eager"
                   />
 
                   {/* Badge overlay */}
