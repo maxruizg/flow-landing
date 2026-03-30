@@ -82,9 +82,9 @@ export function Hero({ collection }: HeroProps) {
           </a>
         </motion.div>
 
-        {/* Scroll indicator */}
+        {/* Scroll indicator — hidden on mobile to avoid overlapping the CTA */}
         <motion.div
-          className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
+          className="hidden md:flex absolute bottom-8 left-1/2 -translate-x-1/2 flex-col items-center gap-2"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.5 }}
