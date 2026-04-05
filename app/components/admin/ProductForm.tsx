@@ -199,6 +199,7 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
   const [form, setForm] = useState({
     name: "",
     price: "",
+    priceMxn: "",
     category: "Tops",
     gender: "unisex" as string,
     sizes: "S, M, L, XL",
@@ -210,6 +211,7 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
     badge: "",
     isNew: false,
     status: "active" as string,
+    displayPosition: "last" as string,
   });
 
   const [variants, setVariants] = useState<Variant[]>([
@@ -226,6 +228,7 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
       setForm({
         name: first.name,
         price: String(first.price),
+        priceMxn: String(first.priceMxn || ""),
         category: first.category,
         gender: first.gender,
         sizes: first.sizes.join(", "),
@@ -237,6 +240,7 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
         badge: first.badge || "",
         isNew: first.isNew || false,
         status: first.status,
+        displayPosition: "last",
       });
       setVariants(
         sources.map((s) => ({
@@ -455,6 +459,10 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
                     <label className={labelClass}>Price (USD)</label>
                     <input className={inputClass} type="number" name="price" value={form.price} onChange={(e) => update("price", e.target.value)} placeholder="0" />
                   </div>
+                  <div>
+                    <label className={labelClass}>Price (MXN)</label>
+                    <input className={inputClass} type="number" name="price_mxn" value={form.priceMxn} onChange={(e) => update("priceMxn", e.target.value)} placeholder="0" />
+                  </div>
                 </div>
                 <div>
                   <label className={labelClass}>Description</label>
@@ -578,6 +586,16 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
                   <label className={labelClass}>Sizes (comma-separated)</label>
                   <input className={inputClass} name="sizes_raw" value={form.sizes} onChange={(e) => update("sizes", e.target.value)} placeholder="S, M, L, XL" />
                 </div>
+                {!isEdit && (
+                  <div>
+                    <label className={labelClass}>Display Position</label>
+                    <select className={inputClass} name="display_position" value={form.displayPosition} onChange={(e) => update("displayPosition", e.target.value)}>
+                      <option value="first">First (top of page)</option>
+                      <option value="last">Last (bottom of page)</option>
+                    </select>
+                    <p className="text-[10px] text-flow-500 mt-1">You can reorder products later from the Products page.</p>
+                  </div>
+                )}
               </div>
             </div>
 

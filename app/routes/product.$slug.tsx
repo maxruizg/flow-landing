@@ -112,7 +112,33 @@ function ProductModal({ product }: { product: Product }) {
                   )}
                 </div>
 
-                {/* Thumbnails — bottom of image area */}
+                {/* Navigation arrows */}
+                {product.images.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedImage((prev) => (prev - 1 + product.images.length) % product.images.length)}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-flow-black/50 backdrop-blur-sm border border-flow-700/40 flex items-center justify-center text-white/70 hover:text-white hover:bg-flow-black/70 transition-colors"
+                      aria-label="Previous image"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedImage((prev) => (prev + 1) % product.images.length)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-flow-black/50 backdrop-blur-sm border border-flow-700/40 flex items-center justify-center text-white/70 hover:text-white hover:bg-flow-black/70 transition-colors"
+                      aria-label="Next image"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </>
+                )}
+
+                {/* Dot indicators */}
                 {product.images.length > 1 && (
                   <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
                     {product.images.map((_, i) => (
@@ -140,7 +166,7 @@ function ProductModal({ product }: { product: Product }) {
                 </h1>
 
                 <p className="text-xl text-flow-200 font-display font-medium mb-4">
-                  {formatLocalPrice(product.price)}
+                  {formatLocalPrice(product.price, product.priceMxn)}
                 </p>
 
                 <p className="text-flow-400 text-sm leading-relaxed mb-5">
@@ -221,6 +247,7 @@ function ProductModal({ product }: { product: Product }) {
                       productImage: product.images[0],
                       size: selectedSize,
                       price: product.price,
+                      priceMxn: product.priceMxn,
                     });
                     setAddedFeedback(true);
                     setTimeout(() => setAddedFeedback(false), 1500);

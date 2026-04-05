@@ -1,6 +1,6 @@
 import { redirect } from "@remix-run/node";
 import type { MetaFunction, ActionFunctionArgs } from "@remix-run/node";
-import { upsertProduct, getMaxProductPosition } from "~/data/queries.server";
+import { upsertProduct, getMaxProductPosition, getAdminProducts, updateProductPositions } from "~/data/queries.server";
 import { ProductForm } from "~/components/admin/ProductForm";
 import { slugify } from "~/lib/utils";
 
@@ -12,6 +12,7 @@ export async function action({ request }: ActionFunctionArgs) {
   // Shared fields
   const name = form.get("name") as string;
   const price = Number(form.get("price"));
+  const priceMxn = Number(form.get("price_mxn"));
   const category = form.get("category") as string;
   const gender = form.get("gender") as string;
   const sizesRaw = (form.get("sizes_raw") as string) || "";
@@ -28,7 +29,15 @@ export async function action({ request }: ActionFunctionArgs) {
 
   // Process variants
   const variantsCount = Number(form.get("variants_count"));
+  const displayPosition = (form.get("display_position") as string) || "last";
   const maxPos = await getMaxProductPosition();
+
+  // If placing at the beginning, shift all existing products down
+  if (displayPosition === "first") {
+    const existing = await getAdminProducts();
+    const shifted = existing.map((p) => ({ id: p.id, position: p.position + variantsCount }));
+    await updateProductPositions(shifted);
+  }
 
   for (let i = 0; i < variantsCount; i++) {
     const variantId = form.get(`variant_${i}_id`) as string;
@@ -45,13 +54,14 @@ export async function action({ request }: ActionFunctionArgs) {
       : variantId;
 
     const slug = slugify(name, color, gender);
-    const position = maxPos + 1 + i;
+    const position = displayPosition === "first" ? i + 1 : maxPos + 1 + i;
 
     await upsertProduct({
       id: finalId,
       slug,
       name,
       price,
+      priceMxn,
       image,
       imageHover,
       images,

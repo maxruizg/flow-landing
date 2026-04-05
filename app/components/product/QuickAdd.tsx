@@ -11,6 +11,7 @@ interface QuickAddProps {
   productName: string;
   productImage: string;
   productPrice: number;
+  productPriceMxn: number;
 }
 
 export function QuickAdd({
@@ -21,6 +22,7 @@ export function QuickAdd({
   productName,
   productImage,
   productPrice,
+  productPriceMxn,
 }: QuickAddProps) {
   const { addItem } = useCart();
   const [activeSize, setActiveSize] = useState<string | null>(null);
@@ -35,6 +37,7 @@ export function QuickAdd({
       productImage,
       size,
       price: productPrice,
+      priceMxn: productPriceMxn,
     });
     setActiveSize(size);
     setTimeout(() => setActiveSize(null), 800);

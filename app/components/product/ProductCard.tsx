@@ -76,6 +76,7 @@ export function ProductCard({ product, index = 0, variant = "dark" }: ProductCar
             productName={product.name}
             productImage={product.image}
             productPrice={product.price}
+            productPriceMxn={product.priceMxn}
           />
         </div>
 
@@ -90,7 +91,7 @@ export function ProductCard({ product, index = 0, variant = "dark" }: ProductCar
             {product.name}
           </h3>
           <p className={cn("text-sm", variant === "light" ? "text-flow-600" : "text-flow-500")}>
-            {formatLocalPrice(product.price)}
+            {formatLocalPrice(product.price, product.priceMxn)}
           </p>
         </div>
       </Link>

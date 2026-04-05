@@ -49,7 +49,7 @@ function isValidEmail(email: string) {
 }
 
 export default function Checkout() {
-  const { items, subtotal, clearCart, itemCount } = useCart();
+  const { items, subtotal, subtotalMxn, clearCart, itemCount } = useCart();
   const { formatLocalPrice } = useLocale();
   const [form, setForm] = useState<FormData>(initialForm);
   const [submitted, setSubmitted] = useState(false);
@@ -302,7 +302,7 @@ export default function Checkout() {
                       </p>
                     </div>
                     <p className="text-sm text-flow-200 shrink-0">
-                      {formatLocalPrice(item.price * item.quantity)}
+                      {formatLocalPrice(item.price * item.quantity, (item.priceMxn || 0) * item.quantity)}
                     </p>
                   </div>
                 ))}
@@ -312,7 +312,7 @@ export default function Checkout() {
                 <div className="flex justify-between text-sm">
                   <span className="text-flow-500">Subtotal</span>
                   <span className="text-flow-200">
-                    {formatLocalPrice(subtotal)}
+                    {formatLocalPrice(subtotal, subtotalMxn)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
@@ -322,7 +322,7 @@ export default function Checkout() {
                 <div className="flex justify-between text-base font-display font-semibold pt-2 border-t border-flow-800/50">
                   <span className="text-white">Total</span>
                   <span className="text-white">
-                    {formatLocalPrice(subtotal)}
+                    {formatLocalPrice(subtotal, subtotalMxn)}
                   </span>
                 </div>
               </div>

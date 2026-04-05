@@ -17,21 +17,23 @@ import {
   getBestSellers,
   getDailyFlowImages,
   getNewArrivals,
+  getActiveBanner,
 } from "~/data/queries.server";
 
 export async function loader() {
-  const [collections, bestSellers, dailyFlowImages, newArrivals] =
+  const [collections, bestSellers, dailyFlowImages, newArrivals, banner] =
     await Promise.all([
       getCollections(),
       getBestSellers(),
       getDailyFlowImages(),
       getNewArrivals(),
+      getActiveBanner(),
     ]);
-  return json({ collections, bestSellers, dailyFlowImages, newArrivals });
+  return json({ collections, bestSellers, dailyFlowImages, newArrivals, banner });
 }
 
 export default function Index() {
-  const { collections, bestSellers, dailyFlowImages, newArrivals } =
+  const { collections, bestSellers, dailyFlowImages, newArrivals, banner } =
     useLoaderData<typeof loader>();
 
   return (
@@ -41,7 +43,7 @@ export default function Index() {
       {/* Drawer reveal sections */}
       <DrawerRevealContainer>
         <DrawerRevealSection index={0} total={3}>
-          <Hero collection={collections[0]} />
+          <Hero collection={collections[0]} banner={banner} />
         </DrawerRevealSection>
         <DrawerRevealSection index={1} total={3}>
           <NewCollection products={newArrivals} />

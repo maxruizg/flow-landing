@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { Container } from "~/components/ui/Container";
 import { AnimatedText } from "~/components/ui/AnimatedText";
 import type { DailyFlowImage } from "~/lib/types";
-import { OptimizedImage } from "~/components/ui/OptimizedImage";
+import { MediaBackground } from "~/components/ui/MediaBackground";
 
 interface DailyFlowProps {
   images: DailyFlowImage[];
@@ -35,8 +35,9 @@ export function DailyFlow({ images }: DailyFlowProps) {
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
           >
-            <OptimizedImage
+            <MediaBackground
               src={images[0]?.src}
+              video={images[0]?.video}
               alt={images[0]?.alt}
               widths={[640, 960, 1280, 1920]}
               sizes="50vw"
@@ -61,8 +62,9 @@ export function DailyFlow({ images }: DailyFlowProps) {
                 viewport={{ once: true }}
                 transition={{ delay: 0.15 * (i + 1), duration: 0.6 }}
               >
-                <OptimizedImage
+                <MediaBackground
                   src={img.src}
+                  video={img.video}
                   alt={img.alt}
                   widths={[640, 960, 1280, 1920]}
                   sizes="50vw"

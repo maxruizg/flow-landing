@@ -80,7 +80,7 @@ export function SearchPanel({ isOpen, onClose }: SearchPanelProps) {
                   {product.name}
                 </p>
                 <p className="text-xs text-flow-500 mt-0.5">
-                  {formatLocalPrice(product.price)}
+                  {formatLocalPrice(product.price, product.priceMxn)}
                 </p>
               </div>
             </div>

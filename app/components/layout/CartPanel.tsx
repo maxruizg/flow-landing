@@ -11,7 +11,7 @@ interface CartPanelProps {
 }
 
 export function CartPanel({ isOpen, onClose }: CartPanelProps) {
-  const { items, removeItem, updateQuantity, itemCount, subtotal } = useCart();
+  const { items, removeItem, updateQuantity, itemCount, subtotal, subtotalMxn } = useCart();
   const { formatLocalPrice } = useLocale();
 
   return (
@@ -125,7 +125,7 @@ export function CartPanel({ isOpen, onClose }: CartPanelProps) {
                           </button>
                         </div>
                         <p className="text-sm text-flow-200 font-medium">
-                          {formatLocalPrice(item.price * item.quantity)}
+                          {formatLocalPrice(item.price * item.quantity, item.priceMxn * item.quantity)}
                         </p>
                       </div>
                     </div>
@@ -142,7 +142,7 @@ export function CartPanel({ isOpen, onClose }: CartPanelProps) {
                 Subtotal
               </span>
               <span className="text-xl font-display font-semibold text-white">
-                {formatLocalPrice(subtotal)}
+                {formatLocalPrice(subtotal, subtotalMxn)}
               </span>
             </div>
             <div className="flex flex-col gap-3">

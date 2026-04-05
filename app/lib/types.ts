@@ -3,6 +3,7 @@ export interface Product {
   slug: string;
   name: string;
   price: number;
+  priceMxn: number;
   image: string;
   imageHover: string;
   images: string[];
@@ -27,6 +28,7 @@ export interface CartItem {
   productImage: string;
   size: string;
   price: number;
+  priceMxn: number;
   quantity: number;
 }
 
@@ -36,6 +38,7 @@ export interface Collection {
   season: string;
   description: string;
   image: string;
+  video?: string;
   tags: string[];
 }
 
@@ -44,6 +47,7 @@ export interface DailyFlowImage {
   src: string;
   alt: string;
   caption: string;
+  video?: string;
 }
 
 export interface AdminProduct extends Product {
@@ -92,6 +96,22 @@ export interface DashboardStats {
 export interface RevenueDataPoint {
   month: string;
   revenue: number;
+}
+
+export interface Banner {
+  id: string;
+  title: string;
+  description: string;
+  active: boolean;
+  startDate: string | null;
+  endDate: string | null;
+}
+
+export interface Subscriber {
+  id: string;
+  email: string;
+  subscribedAt: string;
+  active: boolean;
 }
 
 export interface AdminNotification {

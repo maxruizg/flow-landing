@@ -11,6 +11,66 @@ import {
 } from "~/data/queries.server";
 import { AdminEmptyState } from "~/components/admin/AdminEmptyState";
 import type { AdminProduct } from "~/lib/types";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import type { DragEndEvent } from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+
+function SortableItem({ product, index }: { product: AdminProduct; index: number }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: product.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : undefined,
+    position: "relative" as const,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "flex items-center gap-3 px-5 py-3",
+        isDragging && "bg-flow-800 shadow-lg rounded-lg"
+      )}
+    >
+      <button
+        type="button"
+        className="text-flow-500 hover:text-flow-300 cursor-grab active:cursor-grabbing touch-none p-1"
+        {...attributes}
+        {...listeners}
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+        </svg>
+      </button>
+      <span className="text-xs text-flow-500 w-6 text-center">{index + 1}</span>
+      <div className="w-10 h-10 rounded-lg bg-flow-800 overflow-hidden flex-shrink-0">
+        <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-white font-medium truncate">{product.name}</p>
+        <p className="text-xs text-flow-500">{product.color} &middot; {product.gender}</p>
+      </div>
+    </div>
+  );
+}
 
 export const meta: MetaFunction = () => [{ title: "FLOW Admin — Products" }];
 
@@ -62,12 +122,20 @@ export default function AdminProducts() {
     setArrangeMode(!arrangeMode);
   };
 
-  const moveProduct = (index: number, direction: -1 | 1) => {
-    const target = index + direction;
-    if (target < 0 || target >= orderedProducts.length) return;
-    const updated = [...orderedProducts];
-    [updated[index], updated[target]] = [updated[target], updated[index]];
-    setOrderedProducts(updated);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setOrderedProducts((items) => {
+        const oldIndex = items.findIndex((p) => p.id === active.id);
+        const newIndex = items.findIndex((p) => p.id === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
   };
 
   const inputClass =
@@ -122,45 +190,18 @@ export default function AdminProducts() {
         </div>
       </div>
 
-      {/* Arrange mode */}
+      {/* Arrange mode — drag and drop */}
       {arrangeMode ? (
         <div className="bg-flow-900 border border-flow-800/50 rounded-xl overflow-hidden">
-          <div className="divide-y divide-flow-800/30">
-            {orderedProducts.map((product, index) => (
-              <div key={product.id} className="flex items-center gap-3 px-5 py-3">
-                <div className="flex flex-col gap-0.5">
-                  <button
-                    type="button"
-                    onClick={() => moveProduct(index, -1)}
-                    disabled={index === 0}
-                    className="text-flow-400 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition-colors p-0.5"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => moveProduct(index, 1)}
-                    disabled={index === orderedProducts.length - 1}
-                    className="text-flow-400 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition-colors p-0.5"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-                </div>
-                <span className="text-xs text-flow-500 w-6 text-center">{index + 1}</span>
-                <div className="w-10 h-10 rounded-lg bg-flow-800 overflow-hidden flex-shrink-0">
-                  <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-white font-medium truncate">{product.name}</p>
-                  <p className="text-xs text-flow-500">{product.color}</p>
-                </div>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={orderedProducts.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+              <div className="divide-y divide-flow-800/30">
+                {orderedProducts.map((product, index) => (
+                  <SortableItem key={product.id} product={product} index={index} />
+                ))}
               </div>
-            ))}
-          </div>
+            </SortableContext>
+          </DndContext>
           <div className="px-5 py-4 border-t border-flow-800/30">
             <Form method="post">
               <input type="hidden" name="intent" value="reorder" />

@@ -10,6 +10,7 @@ interface CartContextValue {
   clearCart: () => void;
   itemCount: number;
   subtotal: number;
+  subtotalMxn: number;
 }
 
 const STORAGE_KEY = "flow-cart";
@@ -84,9 +85,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
     [items]
   );
 
+  const subtotalMxn = useMemo(
+    () => items.reduce((sum, i) => sum + (i.priceMxn || 0) * i.quantity, 0),
+    [items]
+  );
+
   return (
     <CartContext.Provider
-      value={{ items, addItem, removeItem, updateQuantity, clearCart, itemCount, subtotal }}
+      value={{ items, addItem, removeItem, updateQuantity, clearCart, itemCount, subtotal, subtotalMxn }}
     >
       {children}
     </CartContext.Provider>

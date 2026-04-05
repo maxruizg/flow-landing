@@ -32,6 +32,7 @@ export async function action({ request }: ActionFunctionArgs) {
   // Shared fields
   const name = form.get("name") as string;
   const price = Number(form.get("price"));
+  const priceMxn = Number(form.get("price_mxn"));
   const category = form.get("category") as string;
   const gender = form.get("gender") as string;
   const sizesRaw = (form.get("sizes_raw") as string) || "";
@@ -86,6 +87,7 @@ export async function action({ request }: ActionFunctionArgs) {
       slug,
       name,
       price,
+      priceMxn,
       image,
       imageHover,
       images,

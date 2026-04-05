@@ -5,8 +5,6 @@ type Currency = "USD" | "MXN";
 type Language = "en" | "es";
 type Country = "US" | "MX";
 
-const MXN_PER_USD = 17;
-
 interface LocaleContextValue {
   currency: Currency;
   setCurrency: (c: Currency) => void;
@@ -14,7 +12,7 @@ interface LocaleContextValue {
   setLanguage: (l: Language) => void;
   country: Country;
   setCountry: (c: Country) => void;
-  formatLocalPrice: (amount: number) => string;
+  formatLocalPrice: (usdAmount: number, mxnAmount?: number) => string;
 }
 
 const LocaleContext = createContext<LocaleContextValue | null>(null);
@@ -25,22 +23,22 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   const [country, setCountry] = useState<Country>("MX");
 
   const formatLocalPrice = useCallback(
-    (amount: number) => {
+    (usdAmount: number, mxnAmount?: number) => {
       if (currency === "MXN") {
-        const converted = Math.round(amount * MXN_PER_USD);
+        const amount = mxnAmount && mxnAmount > 0 ? mxnAmount : Math.round(usdAmount * 17);
         return new Intl.NumberFormat("es-MX", {
           style: "currency",
           currency: "MXN",
           minimumFractionDigits: 0,
           maximumFractionDigits: 0,
-        }).format(converted);
+        }).format(amount);
       }
       return new Intl.NumberFormat("en-US", {
         style: "currency",
         currency: "USD",
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
-      }).format(amount);
+      }).format(usdAmount);
     },
     [currency]
   );

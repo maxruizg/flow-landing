@@ -7,6 +7,8 @@ import type {
   AdminOrder,
   AdminCustomer,
   AdminNotification,
+  Banner,
+  Subscriber,
   DashboardStats,
   RevenueDataPoint,
 } from "~/lib/types";
@@ -19,6 +21,7 @@ function mapProduct(row: any): Product {
     slug: row.slug,
     name: row.name,
     price: row.price,
+    priceMxn: row.price_mxn || 0,
     image: row.image,
     imageHover: row.image_hover,
     images: row.images,
@@ -78,6 +81,7 @@ function mapCollection(row: any): Collection {
     season: row.season,
     description: row.description,
     image: row.image,
+    video: row.video ?? undefined,
     tags: row.tags,
   };
 }
@@ -88,6 +92,7 @@ function mapDailyFlowImage(row: any): DailyFlowImage {
     src: row.src,
     alt: row.alt,
     caption: row.caption,
+    video: row.video ?? undefined,
   };
 }
 
@@ -134,7 +139,7 @@ export async function getAllProducts(): Promise<Product[]> {
   const { data, error } = await supabase
     .from("products")
     .select("*")
-    .order("id");
+    .order("position");
   if (error) throw error;
   return attachColorVariants(data.map(mapProduct));
 }
@@ -176,7 +181,7 @@ export async function getBestSellers(): Promise<Product[]> {
     .from("products")
     .select("*")
     .eq("is_new", false)
-    .order("id");
+    .order("position");
   if (error) throw error;
   return attachColorVariants(data.map(mapProduct));
 }
@@ -185,7 +190,8 @@ export async function getNewArrivals(): Promise<Product[]> {
   const { data, error } = await supabase
     .from("products")
     .select("*")
-    .eq("is_new", true);
+    .eq("is_new", true)
+    .order("position");
   if (error) throw error;
   return attachColorVariants(data.map(mapProduct));
 }
@@ -224,7 +230,7 @@ export async function getAdminProducts(): Promise<AdminProduct[]> {
   const { data, error } = await supabase
     .from("products")
     .select("*")
-    .order("id");
+    .order("position");
   if (error) throw error;
   return attachColorVariants(data.map(mapAdminProduct)) as AdminProduct[];
 }
@@ -335,6 +341,7 @@ export async function upsertProduct(product: Record<string, any>) {
     slug: product.slug,
     name: product.name,
     price: product.price,
+    price_mxn: product.priceMxn || 0,
     image: product.image,
     image_hover: product.imageHover,
     images: product.images,
@@ -388,10 +395,26 @@ export async function updateCollectionImage(id: string, imageUrl: string) {
   if (error) throw error;
 }
 
+export async function updateCollectionVideo(id: string, videoUrl: string | null) {
+  const { error } = await supabase
+    .from("collections")
+    .update({ video: videoUrl })
+    .eq("id", id);
+  if (error) throw error;
+}
+
 export async function updateDailyFlowImage(id: string, srcUrl: string) {
   const { error } = await supabase
     .from("editorial_images")
     .update({ src: srcUrl })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function updateDailyFlowVideo(id: string, videoUrl: string | null) {
+  const { error } = await supabase
+    .from("editorial_images")
+    .update({ video: videoUrl })
     .eq("id", id);
   if (error) throw error;
 }
@@ -417,4 +440,100 @@ export async function getMaxProductPosition(): Promise<number> {
     .single();
   if (error || !data) return 0;
   return data.position;
+}
+
+// ─── Subscriber queries ──────────────────────────────────────
+
+export async function addSubscriber(email: string): Promise<{ success: boolean; error?: string }> {
+  const id = `sub-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const { error } = await supabase
+    .from("subscribers")
+    .upsert({ id, email, active: true }, { onConflict: "email" });
+  if (error) {
+    if (error.code === "23505") return { success: true }; // already subscribed
+    return { success: false, error: error.message };
+  }
+  return { success: true };
+}
+
+export async function getActiveSubscribers(): Promise<Subscriber[]> {
+  const { data, error } = await supabase
+    .from("subscribers")
+    .select("*")
+    .eq("active", true)
+    .order("subscribed_at", { ascending: false });
+  if (error) throw error;
+  return data.map((row: any) => ({
+    id: row.id,
+    email: row.email,
+    subscribedAt: row.subscribed_at,
+    active: row.active,
+  }));
+}
+
+export async function getSubscriberCount(): Promise<number> {
+  const { count, error } = await supabase
+    .from("subscribers")
+    .select("*", { count: "exact", head: true })
+    .eq("active", true);
+  if (error) throw error;
+  return count || 0;
+}
+
+// ─── Banner queries ──────────────────────────────────────
+
+function mapBanner(row: any): Banner {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    active: row.active,
+    startDate: row.start_date,
+    endDate: row.end_date,
+  };
+}
+
+export async function getActiveBanner(): Promise<Banner | null> {
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("banners")
+    .select("*")
+    .eq("active", true)
+    .or(`start_date.is.null,start_date.lte.${now}`)
+    .or(`end_date.is.null,end_date.gte.${now}`)
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return null;
+  return mapBanner(data);
+}
+
+export async function getBanner(): Promise<Banner | null> {
+  const { data, error } = await supabase
+    .from("banners")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return null;
+  return mapBanner(data);
+}
+
+export async function upsertBanner(banner: {
+  id: string;
+  title: string;
+  description: string;
+  active: boolean;
+  startDate: string | null;
+  endDate: string | null;
+}) {
+  const row = {
+    id: banner.id,
+    title: banner.title,
+    description: banner.description,
+    active: banner.active,
+    start_date: banner.startDate || null,
+    end_date: banner.endDate || null,
+  };
+  const { error } = await supabase.from("banners").upsert(row);
+  if (error) throw error;
 }
