@@ -24,8 +24,6 @@ export async function action({ request }: ActionFunctionArgs) {
   const badge = (form.get("badge") as string) || null;
   const isNew = form.get("isNew") === "true";
   const status = form.get("status") as string;
-  const sizeStockRaw = (form.get("size_stock_json") as string) || "{}";
-  const sizeStock: Record<string, number> = JSON.parse(sizeStockRaw);
 
   // Process variants
   const variantsCount = Number(form.get("variants_count"));
@@ -48,6 +46,8 @@ export async function action({ request }: ActionFunctionArgs) {
     const imageHover = (form.get(`variant_${i}_imageHover`) as string) || "";
     const galleryRaw = (form.get(`variant_${i}_gallery`) as string) || "[]";
     const images: string[] = JSON.parse(galleryRaw);
+    const sizeStockRaw = (form.get(`variant_${i}_size_stock`) as string) || "{}";
+    const sizeStock: Record<string, number> = JSON.parse(sizeStockRaw);
 
     const finalId = variantId.startsWith("new-")
       ? `p-${Date.now()}-${i}`

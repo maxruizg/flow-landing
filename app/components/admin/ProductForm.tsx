@@ -184,6 +184,7 @@ interface Variant {
   imageHover: string;
   gallery: string[];
   position: number;
+  sizeStock: Record<string, number>;
 }
 
 interface ProductFormProps {
@@ -204,7 +205,6 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
     gender: "unisex" as string,
     sizes: "S, M, L, XL",
     material: "",
-    sizeStock: {} as Record<string, number>,
     description: "",
     origin: "",
     fit: "",
@@ -215,46 +215,54 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
   });
 
   const [variants, setVariants] = useState<Variant[]>([
-    { id: `new-${Date.now()}`, color: "", image: "", imageHover: "", gallery: [], position: -1 },
+    { id: "new-initial", color: "", image: "", imageHover: "", gallery: [], position: -1, sizeStock: {} },
   ]);
   const [activeVariantIndex, setActiveVariantIndex] = useState(0);
   const [deletedVariantIds, setDeletedVariantIds] = useState<string[]>([]);
   const [colorError, setColorError] = useState<string | null>(null);
+  const loadedRef = useRef<string | null>(null);
 
   useEffect(() => {
     const sources = siblings && siblings.length > 0 ? siblings : product ? [product] : null;
-    if (sources && sources.length > 0) {
-      const first = sources[0];
-      setForm({
-        name: first.name,
-        price: String(first.price),
-        priceMxn: String(first.priceMxn || ""),
-        category: first.category,
-        gender: first.gender,
-        sizes: first.sizes.join(", "),
-        material: first.material,
-        sizeStock: first.sizeStock || {},
-        description: first.description,
-        origin: first.origin,
-        fit: first.fit || "",
-        badge: first.badge || "",
-        isNew: first.isNew || false,
-        status: first.status,
-        displayPosition: "last",
-      });
-      setVariants(
-        sources.map((s) => ({
-          id: s.id,
-          color: s.color,
-          image: s.image,
-          imageHover: s.imageHover,
-          gallery: s.images || [],
-          position: s.position,
-        }))
-      );
-      setActiveVariantIndex(0);
-      setDeletedVariantIds([]);
-    }
+    if (!sources || sources.length === 0) return;
+
+    // Only load once per product id — prevents re-runs when useLoaderData
+    // returns new object refs (e.g., under v3_singleFetch) which would reset
+    // any stock values the user has typed.
+    const loadKey = product?.id ?? sources[0].id;
+    if (loadedRef.current === loadKey) return;
+    loadedRef.current = loadKey;
+
+    const first = sources[0];
+    setForm({
+      name: first.name,
+      price: String(first.price),
+      priceMxn: String(first.priceMxn || ""),
+      category: first.category,
+      gender: first.gender,
+      sizes: first.sizes.join(", "),
+      material: first.material,
+      description: first.description,
+      origin: first.origin,
+      fit: first.fit || "",
+      badge: first.badge || "",
+      isNew: first.isNew || false,
+      status: first.status,
+      displayPosition: "last",
+    });
+    setVariants(
+      sources.map((s) => ({
+        id: s.id,
+        color: s.color,
+        image: s.image,
+        imageHover: s.imageHover,
+        gallery: s.images || [],
+        position: s.position,
+        sizeStock: s.sizeStock || {},
+      }))
+    );
+    setActiveVariantIndex(0);
+    setDeletedVariantIds([]);
   }, [product, siblings]);
 
   const parsedSizes = useMemo(
@@ -262,26 +270,30 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
     [form.sizes]
   );
 
+  // Sync sizeStock keys for all variants when sizes change
   useEffect(() => {
-    setForm((prev) => {
-      const next: Record<string, number> = {};
-      for (const size of parsedSizes) {
-        next[size] = prev.sizeStock[size] ?? 0;
-      }
-      return { ...prev, sizeStock: next };
-    });
+    setVariants((prev) =>
+      prev.map((v) => {
+        const next: Record<string, number> = {};
+        for (const size of parsedSizes) {
+          next[size] = v.sizeStock[size] ?? 0;
+        }
+        return { ...v, sizeStock: next };
+      })
+    );
   }, [parsedSizes]);
 
-  const totalStock = useMemo(
-    () => Object.values(form.sizeStock).reduce((a, b) => a + b, 0),
-    [form.sizeStock]
-  );
+  const activeVariantStock = variants[activeVariantIndex]?.sizeStock || {};
+  const activeVariantTotal = Object.values(activeVariantStock).reduce((a, b) => a + b, 0);
 
-  const updateSizeStock = (size: string, value: number) => {
-    setForm((prev) => ({
-      ...prev,
-      sizeStock: { ...prev.sizeStock, [size]: value },
-    }));
+  const updateVariantSizeStock = (size: string, value: number) => {
+    setVariants((prev) =>
+      prev.map((v, i) =>
+        i === activeVariantIndex
+          ? { ...v, sizeStock: { ...v.sizeStock, [size]: value } }
+          : v
+      )
+    );
   };
 
   const update = (field: string, value: string | boolean) =>
@@ -306,7 +318,7 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
   const addVariant = () => {
     setVariants((prev) => [
       ...prev,
-      { id: `new-${Date.now()}`, color: "", image: "", imageHover: "", gallery: [], position: -1 },
+      { id: `new-${Date.now()}`, color: "", image: "", imageHover: "", gallery: [], position: -1, sizeStock: {} },
     ]);
     setActiveVariantIndex(variants.length);
   };
@@ -354,6 +366,7 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
             <input type="hidden" name={`variant_${i}_image`} value={variant.image} />
             <input type="hidden" name={`variant_${i}_imageHover`} value={variant.imageHover} />
             <input type="hidden" name={`variant_${i}_gallery`} value={JSON.stringify(variant.gallery)} />
+            <input type="hidden" name={`variant_${i}_size_stock`} value={JSON.stringify(variant.sizeStock)} />
           </div>
         ))}
 
@@ -536,7 +549,14 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
                   </label>
                 </div>
                 <div>
-                  <label className={labelClass}>Stock per Size</label>
+                  <label className={labelClass}>
+                    Stock per Size
+                    {variants[activeVariantIndex]?.color && (
+                      <span className="text-flow-600 normal-case tracking-normal ml-1">
+                        — {variants[activeVariantIndex].color}
+                      </span>
+                    )}
+                  </label>
                   {parsedSizes.length > 0 ? (
                     <div className="space-y-2">
                       {parsedSizes.map((size) => (
@@ -546,18 +566,17 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
                             className={inputClass}
                             type="number"
                             min="0"
-                            value={form.sizeStock[size] ?? 0}
-                            onChange={(e) => updateSizeStock(size, Math.max(0, Number(e.target.value) || 0))}
+                            value={activeVariantStock[size] ?? 0}
+                            onChange={(e) => updateVariantSizeStock(size, Math.max(0, Number(e.target.value) || 0))}
                             placeholder="0"
                           />
                         </div>
                       ))}
-                      <p className="text-xs text-flow-500 pt-1">Total: {totalStock}</p>
+                      <p className="text-xs text-flow-500 pt-1">Total ({variants[activeVariantIndex]?.color || "this color"}): {activeVariantTotal}</p>
                     </div>
                   ) : (
                     <p className="text-xs text-flow-500 py-3">Enter sizes first</p>
                   )}
-                  <input type="hidden" name="size_stock_json" value={JSON.stringify(form.sizeStock)} />
                 </div>
               </div>
             </div>
