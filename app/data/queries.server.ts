@@ -494,17 +494,22 @@ function mapBanner(row: any): Banner {
 }
 
 export async function getActiveBanner(): Promise<Banner | null> {
-  const now = new Date().toISOString();
+  // Fetch all active banners and filter schedule in JS — avoids fragile
+  // Supabase .or() chaining and handles null dates cleanly.
   const { data, error } = await supabase
     .from("banners")
     .select("*")
     .eq("active", true)
-    .or(`start_date.is.null,start_date.lte.${now}`)
-    .or(`end_date.is.null,end_date.gte.${now}`)
-    .limit(1)
-    .maybeSingle();
-  if (error || !data) return null;
-  return mapBanner(data);
+    .order("created_at", { ascending: false });
+  if (error || !data || data.length === 0) return null;
+
+  const now = Date.now();
+  const valid = data.find((row: any) => {
+    if (row.start_date && new Date(row.start_date).getTime() > now) return false;
+    if (row.end_date && new Date(row.end_date).getTime() < now) return false;
+    return true;
+  });
+  return valid ? mapBanner(valid) : null;
 }
 
 export async function getBanner(): Promise<Banner | null> {
