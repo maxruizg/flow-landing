@@ -2,15 +2,14 @@ import { useRef } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { Container } from "~/components/ui/Container";
 import { Button } from "~/components/ui/Button";
-import type { Collection, Banner } from "~/lib/types";
+import type { Collection } from "~/lib/types";
 import { MediaBackground } from "~/components/ui/MediaBackground";
 
 interface HeroProps {
   collection: Collection;
-  banner?: Banner | null;
 }
 
-export function Hero({ collection, banner }: HeroProps) {
+export function Hero({ collection }: HeroProps) {
   const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: ref,
@@ -36,46 +35,6 @@ export function Hero({ collection, banner }: HeroProps) {
       {/* Dark gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-flow-black via-flow-black/40 to-transparent" />
       <div className="absolute inset-0 bg-gradient-to-r from-flow-black/60 to-transparent" />
-
-      {/* Banner */}
-      {banner && (
-        <motion.div
-          className="absolute top-0 left-0 right-0 z-10 overflow-hidden"
-          initial={{ y: -100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.2, duration: 0.7, ease: [0.33, 1, 0.68, 1] }}
-        >
-          <div className="relative bg-flow-black/70 backdrop-blur-md border-b border-white/10">
-            {/* Shimmer effect */}
-            <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
-              animate={{ x: ["-100%", "100%"] }}
-              transition={{ duration: 3, repeat: Infinity, repeatDelay: 2, ease: "linear" }}
-            />
-
-            <div className="relative px-4 py-3 md:py-4 text-center">
-              <motion.p
-                className="text-[11px] md:text-xs font-display font-semibold uppercase tracking-[0.25em] text-white"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5, duration: 0.5 }}
-              >
-                {banner.title}
-              </motion.p>
-              {banner.description && (
-                <motion.p
-                  className="text-[10px] md:text-[11px] text-flow-400 mt-1 tracking-wide"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.7, duration: 0.5 }}
-                >
-                  {banner.description}
-                </motion.p>
-              )}
-            </div>
-          </div>
-        </motion.div>
-      )}
 
       {/* Content */}
       <Container className="relative h-full flex flex-col justify-end pt-24 pb-16 md:pb-24">

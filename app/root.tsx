@@ -8,7 +8,7 @@ import {
 } from "@remix-run/react";
 import { json } from "@remix-run/node";
 import type { LinksFunction, MetaFunction } from "@remix-run/node";
-import { getTrendingProducts } from "~/data/queries.server";
+import { getTrendingProducts, getActiveBanner } from "~/data/queries.server";
 import { LocaleProvider } from "~/context/LocaleContext";
 import { CartProvider } from "~/context/CartContext";
 
@@ -44,9 +44,13 @@ export const meta: MetaFunction = () => [
 ];
 
 export async function loader() {
-  const trendingProducts = await getTrendingProducts();
+  const [trendingProducts, banner] = await Promise.all([
+    getTrendingProducts(),
+    getActiveBanner(),
+  ]);
   return json({
     trendingProducts,
+    banner,
     ENV: {
       SUPABASE_URL: process.env.SUPABASE_URL!,
       SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY!,

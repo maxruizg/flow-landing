@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useRouteLoaderData } from "@remix-run/react";
 import { cn } from "~/lib/utils";
 import { useLocale } from "~/context/LocaleContext";
 import { useCart } from "~/context/CartContext";
@@ -8,6 +9,8 @@ import { SearchPanel } from "./SearchPanel";
 import { AccountPanel } from "./AccountPanel";
 import { CartPanel } from "./CartPanel";
 import { LocalePanel } from "./LocalePanel";
+import { TopBanner } from "./TopBanner";
+import type { Banner } from "~/lib/types";
 
 const navLinks = [
   { label: "Shop", href: "/showroom" },
@@ -17,6 +20,8 @@ const navLinks = [
 export function Navbar() {
   const { currency } = useLocale();
   const { itemCount } = useCart();
+  const rootData = useRouteLoaderData("root") as { banner?: Banner | null } | undefined;
+  const banner = rootData?.banner || null;
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activePanel, setActivePanel] = useState<"search" | "account" | "cart" | "locale" | null>(null);
@@ -35,14 +40,16 @@ export function Navbar() {
 
   return (
     <>
-      <header
-        className={cn(
-          "fixed top-0 left-0 right-0 z-50 transition-all duration-500",
-          scrolled
-            ? "backdrop-blur-lg bg-flow-black/80"
-            : "bg-transparent"
-        )}
-      >
+      <header className="fixed top-0 left-0 right-0 z-50">
+        {banner && <TopBanner banner={banner} />}
+        <div
+          className={cn(
+            "transition-all duration-500",
+            scrolled
+              ? "backdrop-blur-lg bg-flow-black/80"
+              : "bg-transparent"
+          )}
+        >
         <nav className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16 md:h-20">
           {/* Left nav */}
           <div className="hidden md:flex items-center gap-8">
@@ -120,6 +127,7 @@ export function Navbar() {
             </svg>
           </button>
         </nav>
+        </div>
       </header>
 
       <MobileMenu
