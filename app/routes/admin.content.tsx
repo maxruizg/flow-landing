@@ -28,40 +28,45 @@ export async function action({ request }: ActionFunctionArgs) {
   const form = await request.formData();
   const intent = form.get("intent");
 
-  if (intent === "update-collection-image") {
-    const id = form.get("id") as string;
-    const file = form.get("file");
-    if (file && file instanceof File && file.size > 0) {
-      const url = await uploadImage(file, "collections");
-      await updateCollectionImage(id, url);
+  try {
+    if (intent === "update-collection-image") {
+      const id = form.get("id") as string;
+      const file = form.get("file");
+      if (file && file instanceof File && file.size > 0) {
+        const url = await uploadImage(file, "collections");
+        await updateCollectionImage(id, url);
+      }
+    } else if (intent === "update-collection-video") {
+      const id = form.get("id") as string;
+      const file = form.get("file");
+      if (file && file instanceof File && file.size > 0) {
+        const url = await uploadImage(file, "collections/videos");
+        await updateCollectionVideo(id, url);
+      }
+    } else if (intent === "remove-collection-video") {
+      const id = form.get("id") as string;
+      await updateCollectionVideo(id, null);
+    } else if (intent === "update-daily-flow-image") {
+      const id = form.get("id") as string;
+      const file = form.get("file");
+      if (file && file instanceof File && file.size > 0) {
+        const url = await uploadImage(file, "editorial");
+        await updateDailyFlowImage(id, url);
+      }
+    } else if (intent === "update-daily-flow-video") {
+      const id = form.get("id") as string;
+      const file = form.get("file");
+      if (file && file instanceof File && file.size > 0) {
+        const url = await uploadImage(file, "editorial/videos");
+        await updateDailyFlowVideo(id, url);
+      }
+    } else if (intent === "remove-daily-flow-video") {
+      const id = form.get("id") as string;
+      await updateDailyFlowVideo(id, null);
     }
-  } else if (intent === "update-collection-video") {
-    const id = form.get("id") as string;
-    const file = form.get("file");
-    if (file && file instanceof File && file.size > 0) {
-      const url = await uploadImage(file, "collections/videos");
-      await updateCollectionVideo(id, url);
-    }
-  } else if (intent === "remove-collection-video") {
-    const id = form.get("id") as string;
-    await updateCollectionVideo(id, null);
-  } else if (intent === "update-daily-flow-image") {
-    const id = form.get("id") as string;
-    const file = form.get("file");
-    if (file && file instanceof File && file.size > 0) {
-      const url = await uploadImage(file, "editorial");
-      await updateDailyFlowImage(id, url);
-    }
-  } else if (intent === "update-daily-flow-video") {
-    const id = form.get("id") as string;
-    const file = form.get("file");
-    if (file && file instanceof File && file.size > 0) {
-      const url = await uploadImage(file, "editorial/videos");
-      await updateDailyFlowVideo(id, url);
-    }
-  } else if (intent === "remove-daily-flow-video") {
-    const id = form.get("id") as string;
-    await updateDailyFlowVideo(id, null);
+  } catch (err) {
+    console.error("Content upload failed:", err);
+    return json({ error: "Upload failed" }, { status: 500 });
   }
 
   return redirect("/admin/content");

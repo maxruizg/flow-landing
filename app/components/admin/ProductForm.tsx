@@ -20,10 +20,12 @@ function ImageUpload({
 }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setPreview(null);
+    setError(null);
   }, [existingUrl]);
 
   const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -31,14 +33,17 @@ function ImageUpload({
     if (!file) return;
     setPreview(URL.createObjectURL(file));
     setUploading(true);
+    setError(null);
     try {
       const url = await uploadImageClient(file, "products");
       onUploaded(url);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Upload failed:", err);
+      setError(err?.message || "Upload failed");
       setPreview(null);
     } finally {
       setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
     }
   };
 
@@ -85,6 +90,9 @@ function ImageUpload({
           )}
         </div>
       )}
+      {error && (
+        <p className="text-xs text-red-400 mt-1">{error}</p>
+      )}
     </div>
   );
 }
@@ -100,16 +108,19 @@ function GalleryUpload({
 }) {
   const [urls, setUrls] = useState<string[]>(existingUrls);
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setUrls(existingUrls);
+    setError(null);
   }, [existingUrls]);
 
   const handleFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
     setUploading(true);
+    setError(null);
     try {
       const uploaded = await Promise.all(
         files.map((file) => uploadImageClient(file, "products"))
@@ -117,8 +128,9 @@ function GalleryUpload({
       const next = [...urls, ...uploaded];
       setUrls(next);
       onUrlsChange(next);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Gallery upload failed:", err);
+      setError(err?.message || "Upload failed");
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -173,6 +185,9 @@ function GalleryUpload({
         onChange={handleFiles}
         className="hidden"
       />
+      {error && (
+        <p className="text-xs text-red-400 mt-1">{error}</p>
+      )}
     </div>
   );
 }
@@ -566,8 +581,17 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
                             className={inputClass}
                             type="number"
                             min="0"
-                            value={activeVariantStock[size] ?? 0}
-                            onChange={(e) => updateVariantSizeStock(size, Math.max(0, Number(e.target.value) || 0))}
+                            value={activeVariantStock[size] ?? ""}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              updateVariantSizeStock(
+                                size,
+                                raw === "" ? 0 : Math.max(0, parseInt(raw, 10) || 0)
+                              );
+                            }}
+                            onFocus={(e) => {
+                              if (e.target.value === "0") e.target.select();
+                            }}
                             placeholder="0"
                           />
                         </div>
