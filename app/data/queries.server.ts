@@ -138,6 +138,7 @@ export async function getAllProducts(): Promise<Product[]> {
   const { data, error } = await supabase
     .from("products")
     .select("*")
+    .eq("status", "active")
     .order("position");
   if (error) throw error;
   return attachColorVariants(data.map(mapProduct));
@@ -148,6 +149,7 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
     .from("products")
     .select("*")
     .eq("slug", slug)
+    .eq("status", "active")
     .single();
   if (error) return null;
 
@@ -179,6 +181,7 @@ export async function getBestSellers(): Promise<Product[]> {
     .from("products")
     .select("*")
     .eq("is_new", false)
+    .eq("status", "active")
     .order("position");
   if (error) throw error;
   return attachColorVariants(data.map(mapProduct));
@@ -189,6 +192,7 @@ export async function getNewArrivals(): Promise<Product[]> {
     .from("products")
     .select("*")
     .eq("is_new", true)
+    .eq("status", "active")
     .order("position");
   if (error) throw error;
   return attachColorVariants(data.map(mapProduct));
@@ -217,6 +221,7 @@ export async function getTrendingProducts(): Promise<Product[]> {
     .from("products")
     .select("*")
     .eq("badge", "Best Seller")
+    .eq("status", "active")
     .limit(3);
   if (error) throw error;
   return data.map(mapProduct);

@@ -22,7 +22,10 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     const amount = items.reduce((sum, item) => {
-      const unitPrice = currency === "mxn" ? item.priceMxn : item.price;
+      const unitPrice =
+        currency === "mxn" && item.priceMxn
+          ? item.priceMxn
+          : item.price;
       return sum + unitPrice * item.quantity;
     }, 0);
 
