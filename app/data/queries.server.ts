@@ -40,16 +40,15 @@ function mapProduct(row: any): Product {
 }
 
 function attachColorVariants(products: Product[]): Product[] {
-  const byKey = new Map<string, Product[]>();
+  // Group by name only — unisex products share color variants with all genders
+  const byName = new Map<string, Product[]>();
   for (const p of products) {
-    const key = `${p.name}::${p.gender}`;
-    const group = byKey.get(key) || [];
+    const group = byName.get(p.name) || [];
     group.push(p);
-    byKey.set(key, group);
+    byName.set(p.name, group);
   }
   for (const p of products) {
-    const key = `${p.name}::${p.gender}`;
-    const siblings = byKey.get(key)!;
+    const siblings = byName.get(p.name)!;
     if (siblings.length >= 1) {
       const seen = new Set<string>();
       p.colorVariants = siblings
@@ -154,12 +153,11 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
 
   const product = mapProduct(data);
 
-  // Get color variants (siblings with same name + gender)
+  // Get color variants (siblings with same name, any gender)
   const { data: siblings } = await supabase
     .from("products")
     .select("slug, color")
-    .eq("name", product.name)
-    .eq("gender", product.gender);
+    .eq("name", product.name);
 
   if (siblings && siblings.length >= 1) {
     const seen = new Set<string>();
@@ -251,6 +249,78 @@ export async function getAdminCustomers(): Promise<AdminCustomer[]> {
     .order("last_order_date", { ascending: false });
   if (error) throw error;
   return data.map(mapCustomer);
+}
+
+export async function createOrder(order: {
+  id: string;
+  customerName: string;
+  customerEmail: string;
+  items: { productName: string; size: string; quantity: number; price: number }[];
+  total: number;
+  currency: string;
+  shippingAddress: string;
+  stripeSessionId: string;
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const { error } = await supabase.from("orders").insert({
+    id: order.id,
+    customer_name: order.customerName,
+    customer_email: order.customerEmail,
+    date: today,
+    items: order.items,
+    total: order.total,
+    currency: order.currency,
+    status: "processing",
+    shipping_address: order.shippingAddress,
+    stripe_session_id: order.stripeSessionId,
+  });
+  if (error) throw error;
+}
+
+export async function createOrUpdateCustomer(customer: {
+  name: string;
+  email: string;
+  orderTotal: number;
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: existing } = await supabase
+    .from("customers")
+    .select("id, total_orders, total_spent")
+    .eq("email", customer.email)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase
+      .from("customers")
+      .update({
+        name: customer.name,
+        total_orders: existing.total_orders + 1,
+        total_spent: existing.total_spent + customer.orderTotal,
+        last_order_date: today,
+      })
+      .eq("id", existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from("customers").insert({
+      id: crypto.randomUUID(),
+      name: customer.name,
+      email: customer.email,
+      total_orders: 1,
+      total_spent: customer.orderTotal,
+      joined_date: today,
+      last_order_date: today,
+    });
+    if (error) throw error;
+  }
+}
+
+export async function getOrderByStripeSession(sessionId: string): Promise<AdminOrder | null> {
+  const { data } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("stripe_session_id", sessionId)
+    .maybeSingle();
+  return data ? mapOrder(data) : null;
 }
 
 export async function getAdminNotifications(): Promise<AdminNotification[]> {

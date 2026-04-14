@@ -64,8 +64,10 @@ create table if not exists orders (
   date text not null,
   items jsonb not null default '[]',
   total numeric not null default 0,
+  currency text not null default 'usd',
   status text not null check (status in ('processing', 'shipped', 'delivered', 'cancelled')),
   shipping_address text not null default '',
+  stripe_session_id text,
   created_at timestamptz not null default now()
 );
 
