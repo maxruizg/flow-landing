@@ -12,6 +12,7 @@ import {
 } from "~/data/queries.server";
 import { AdminEmptyState } from "~/components/admin/AdminEmptyState";
 import type { AdminProduct } from "~/lib/types";
+import { colorSwatch } from "~/lib/color-map";
 import {
   DndContext,
   closestCenter,
@@ -139,36 +140,16 @@ export default function AdminProducts() {
   const categories = ["All", ...new Set(adminProducts.map((p) => p.category))];
   const genders = ["All", "men", "women", "unisex"];
 
-  // Group rows by name+gender so color variants show as a single row
-  // (editing any variant opens the grouped editor anyway). Keep a colorCount
-  // so the UI can surface "N colors".
-  const groupedProducts = useMemo(() => {
-    type Grouped = AdminProduct & { colorCount: number };
-    const groups = new Map<string, Grouped>();
-    for (const p of adminProducts) {
-      const key = `${p.name}::${p.gender}`.toLowerCase();
-      const existing = groups.get(key);
-      if (!existing) {
-        groups.set(key, { ...p, colorCount: 1 });
-        continue;
-      }
-      existing.colorCount += 1;
-      // Prefer an "active" representative so the row reflects what the shop shows.
-      if (existing.status !== "active" && p.status === "active") {
-        groups.set(key, { ...p, colorCount: existing.colorCount });
-      }
-    }
-    return Array.from(groups.values());
-  }, [adminProducts]);
-
+  // Backend already returns one row per base product. `colorCount` is the
+  // variant count from the hydrated Product.
   const filtered = useMemo(() => {
-    return groupedProducts.filter((p) => {
+    return adminProducts.filter((p) => {
       const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
       const matchCat = category === "All" || p.category === category;
       const matchGender = gender === "All" || p.gender === gender;
       return matchSearch && matchCat && matchGender;
     });
-  }, [groupedProducts, search, category, gender]);
+  }, [adminProducts, search, category, gender]);
 
   const toggleArrange = () => {
     if (!arrangeMode) {
@@ -315,10 +296,27 @@ export default function AdminProducts() {
                               <p className="text-sm text-white font-medium">{product.name}</p>
                               <p className="text-xs text-flow-500 capitalize">
                                 {product.gender}
-                                {(product as any).colorCount > 1 && (
-                                  <span className="ml-2 text-flow-400 normal-case">· {(product as any).colorCount} colors</span>
+                                {product.variants.length > 1 && (
+                                  <span className="ml-2 text-flow-400 normal-case">
+                                    · {product.variants.length} colors
+                                  </span>
                                 )}
                               </p>
+                              {product.variants.length > 0 && (
+                                <div className="flex gap-1 mt-1">
+                                  {product.variants.slice(0, 5).map((v) => (
+                                    <span
+                                      key={v.id}
+                                      className={cn(
+                                        "w-2.5 h-2.5 rounded-full border border-flow-700",
+                                        !v.colorHex && colorSwatch(v.colorName),
+                                      )}
+                                      style={v.colorHex ? { backgroundColor: v.colorHex } : undefined}
+                                      title={v.colorName}
+                                    />
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -381,8 +379,8 @@ export default function AdminProducts() {
                         <p className="text-sm text-white font-medium truncate">{product.name}</p>
                         <p className="text-xs text-flow-500">
                           {product.category} &middot; {formatPrice(product.price)}
-                          {(product as any).colorCount > 1 && (
-                            <span className="ml-2 text-flow-400">· {(product as any).colorCount} colors</span>
+                          {product.variants.length > 1 && (
+                            <span className="ml-2 text-flow-400">· {product.variants.length} colors</span>
                           )}
                         </p>
                       </div>

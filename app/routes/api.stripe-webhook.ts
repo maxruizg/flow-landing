@@ -5,7 +5,29 @@ import { stripe } from "~/lib/stripe.server";
 import {
   createOrder,
   createOrUpdateCustomer,
+  decrementVariantStock,
 } from "~/data/queries.server";
+
+interface WebhookOrderItem {
+  productId?: string;
+  variantId?: string | null;
+  productName: string;
+  colorName?: string | null;
+  size: string;
+  quantity: number;
+  price: number;
+}
+
+async function decrementStockForItems(items: WebhookOrderItem[]) {
+  for (const it of items) {
+    if (!it.variantId) continue;
+    try {
+      await decrementVariantStock(it.variantId, it.size, it.quantity);
+    } catch (err) {
+      console.error(`Stock decrement failed for ${it.variantId} (${it.size}):`, err);
+    }
+  }
+}
 
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== "POST") {
@@ -64,6 +86,7 @@ export async function action({ request }: ActionFunctionArgs) {
         orderTotal: total,
       });
 
+      await decrementStockForItems(items as WebhookOrderItem[]);
       console.log(`Order ${orderId} created for PaymentIntent ${pi.id}`);
     } catch (err) {
       console.error("Failed to create order:", err);
@@ -102,6 +125,7 @@ export async function action({ request }: ActionFunctionArgs) {
         email: metadata.customer_email || session.customer_email || "",
         orderTotal: total,
       });
+      await decrementStockForItems(items as WebhookOrderItem[]);
     } catch (err) {
       console.error("Failed to create order:", err);
       return json({ error: "Order creation failed" }, { status: 500 });

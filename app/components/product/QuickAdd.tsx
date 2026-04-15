@@ -12,6 +12,10 @@ interface QuickAddProps {
   productImage: string;
   productPrice: number;
   productPriceMxn: number;
+  variantId?: string;
+  variantSlug?: string;
+  colorName?: string;
+  sizeStock?: Record<string, number>;
 }
 
 export function QuickAdd({
@@ -23,6 +27,10 @@ export function QuickAdd({
   productImage,
   productPrice,
   productPriceMxn,
+  variantId,
+  variantSlug,
+  colorName,
+  sizeStock,
 }: QuickAddProps) {
   const { addItem } = useCart();
   const [activeSize, setActiveSize] = useState<string | null>(null);
@@ -32,8 +40,11 @@ export function QuickAdd({
     e.stopPropagation();
     addItem({
       productId,
+      variantId,
       productSlug,
+      variantSlug,
       productName,
+      colorName,
       productImage,
       size,
       price: productPrice,
@@ -53,24 +64,28 @@ export function QuickAdd({
           exit={{ y: "100%" }}
           transition={{ duration: 0.25, ease: "easeOut" }}
         >
-          <p className="text-[10px] uppercase tracking-[0.2em] text-flow-400 mb-2">
-            Quick Add
-          </p>
+          <p className="text-[10px] uppercase tracking-[0.2em] text-flow-400 mb-2">Quick Add</p>
           <div className="flex gap-1.5">
-            {sizes.map((size) => (
-              <button
-                key={size}
-                onClick={(e) => handleAdd(e, size)}
-                className={cn(
-                  "flex-1 py-1.5 text-xs font-medium rounded-full border transition-all duration-200",
-                  activeSize === size
-                    ? "bg-green-500 text-white border-green-500"
-                    : "text-flow-200 border-flow-700 hover:bg-white hover:text-flow-black hover:border-white"
-                )}
-              >
-                {activeSize === size ? "✓" : size}
-              </button>
-            ))}
+            {sizes.map((size) => {
+              const unavailable = sizeStock ? (sizeStock[size] ?? 0) <= 0 : false;
+              return (
+                <button
+                  key={size}
+                  disabled={unavailable}
+                  onClick={(e) => handleAdd(e, size)}
+                  className={cn(
+                    "flex-1 py-1.5 text-xs font-medium rounded-full border transition-all duration-200",
+                    unavailable && "opacity-30 line-through cursor-not-allowed border-flow-700 text-flow-500",
+                    !unavailable && activeSize === size
+                      ? "bg-green-500 text-white border-green-500"
+                      : !unavailable &&
+                          "text-flow-200 border-flow-700 hover:bg-white hover:text-flow-black hover:border-white",
+                  )}
+                >
+                  {activeSize === size ? "✓" : size}
+                </button>
+              );
+            })}
           </div>
         </motion.div>
       )}

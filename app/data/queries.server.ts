@@ -1,6 +1,7 @@
 import { supabase } from "~/lib/supabase.server";
 import type {
   Product,
+  ProductVariant,
   Collection,
   DailyFlowImage,
   AdminProduct,
@@ -15,62 +16,126 @@ import type {
 
 // ─── Helpers ──────────────────────────────────────────────
 
-function mapProduct(row: any): Product {
+function mapVariant(row: any): ProductVariant {
   return {
     id: row.id,
     slug: row.slug,
-    name: row.name,
-    price: row.price,
-    priceMxn: row.price_mxn || 0,
-    image: row.image,
-    imageHover: row.image_hover,
-    images: row.images,
-    category: row.category,
-    badge: row.badge ?? undefined,
-    sizes: row.sizes,
-    sizeStock: row.size_stock || {},
-    isNew: row.is_new ?? undefined,
-    description: row.description,
-    material: row.material,
-    origin: row.origin,
-    color: row.color,
-    fit: row.fit ?? undefined,
-    gender: row.gender,
-  };
-}
-
-function attachColorVariants(products: Product[]): Product[] {
-  // Group by name only — unisex products share color variants with all genders
-  const byName = new Map<string, Product[]>();
-  for (const p of products) {
-    const group = byName.get(p.name) || [];
-    group.push(p);
-    byName.set(p.name, group);
-  }
-  for (const p of products) {
-    const siblings = byName.get(p.name)!;
-    if (siblings.length >= 1) {
-      const seen = new Set<string>();
-      p.colorVariants = siblings
-        .filter((s) => {
-          const lower = s.color.toLowerCase();
-          if (seen.has(lower)) return false;
-          seen.add(lower);
-          return true;
-        })
-        .map((s) => ({ color: s.color, slug: s.slug }));
-    }
-  }
-  return products;
-}
-
-function mapAdminProduct(row: any): AdminProduct {
-  return {
-    ...mapProduct(row),
-    stock: row.stock,
+    productId: row.product_id,
+    colorName: row.color_name,
+    colorHex: row.color_hex ?? null,
+    sku: row.sku,
+    price: Number(row.price),
+    priceMxn: Number(row.price_mxn ?? 0),
+    compareAtPrice:
+      row.compare_at_price !== null && row.compare_at_price !== undefined
+        ? Number(row.compare_at_price)
+        : null,
+    sizeStock: row.size_stock ?? {},
+    stock: row.stock ?? 0,
     status: row.status,
-    position: row.position ?? 0,
+    image: row.image,
+    imageHover: row.image_hover ?? "",
+    images: row.images ?? [],
+    badge: row.badge ?? null,
+    isNew: !!row.is_new,
+    sortOrder: row.sort_order ?? 0,
   };
+}
+
+function pickDefaultVariant(
+  variants: ProductVariant[],
+  defaultVariantId: string | null,
+): ProductVariant | undefined {
+  if (defaultVariantId) {
+    const byId = variants.find((v) => v.id === defaultVariantId);
+    if (byId) return byId;
+  }
+  const activeSorted = variants
+    .filter((v) => v.status === "active")
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+  return activeSorted[0] ?? variants[0];
+}
+
+/** Build a Product with `variants` attached and legacy-shaped fields derived
+ *  from the default (or first active) variant. PR 2 replaces consumers that
+ *  read the legacy fields with direct `variants` access. */
+function hydrateProduct(productRow: any, variantRows: any[]): Product {
+  const variants = variantRows.map(mapVariant).sort((a, b) => a.sortOrder - b.sortOrder);
+  const dflt = pickDefaultVariant(variants, productRow.default_variant_id ?? null);
+  const colorVariants = variants
+    .filter((v) => v.status === "active")
+    .map((v) => ({ color: v.colorName, slug: v.slug }));
+  return {
+    id: productRow.id,
+    slug: productRow.slug,
+    name: productRow.name,
+    description: productRow.description ?? "",
+    category: productRow.category,
+    gender: productRow.gender,
+    material: productRow.material ?? "",
+    origin: productRow.origin ?? "",
+    fit: productRow.fit ?? undefined,
+    sizes: productRow.sizes ?? [],
+    tags: productRow.tags ?? [],
+    brand: productRow.brand ?? undefined,
+    defaultVariantId: productRow.default_variant_id ?? null,
+    variants,
+    position: productRow.position ?? 0,
+
+    // Legacy-shaped derived fields (PR 1 compat).
+    price: dflt?.price ?? 0,
+    priceMxn: dflt?.priceMxn ?? 0,
+    image: dflt?.image ?? "",
+    imageHover: dflt?.imageHover ?? "",
+    images: dflt?.images ?? [],
+    badge: dflt?.badge ?? undefined,
+    isNew: dflt?.isNew ?? false,
+    color: dflt?.colorName ?? "",
+    sizeStock: dflt?.sizeStock ?? {},
+    colorVariants,
+  };
+}
+
+async function fetchProductsWithVariants(productIds?: string[]): Promise<Product[]> {
+  let q = supabase.from("products").select("*").order("position");
+  if (productIds) q = q.in("id", productIds);
+  const { data: productRows, error: pErr } = await q;
+  if (pErr) throw pErr;
+  if (!productRows || productRows.length === 0) return [];
+
+  const ids = productRows.map((p) => p.id);
+  const { data: variantRows, error: vErr } = await supabase
+    .from("product_variants")
+    .select("*")
+    .in("product_id", ids);
+  if (vErr) throw vErr;
+
+  const byProduct = new Map<string, any[]>();
+  for (const v of variantRows ?? []) {
+    const arr = byProduct.get(v.product_id) ?? [];
+    arr.push(v);
+    byProduct.set(v.product_id, arr);
+  }
+
+  return productRows.map((p) => hydrateProduct(p, byProduct.get(p.id) ?? []));
+}
+
+function visibleForShop(p: Product): boolean {
+  return p.variants.some((v) => v.status === "active");
+}
+
+function toAdminProduct(p: Product): AdminProduct {
+  const totalStock = p.variants.reduce((sum, v) => sum + (v.stock ?? 0), 0);
+  const anyDraft = p.variants.some((v) => v.status === "draft");
+  const noActive = !p.variants.some((v) => v.status === "active");
+  const status: AdminProduct["status"] = noActive
+    ? "draft"
+    : totalStock === 0
+      ? "out_of_stock"
+      : anyDraft
+        ? "draft"
+        : "active";
+  return { ...p, stock: totalStock, status };
 }
 
 function mapCollection(row: any): Collection {
@@ -135,67 +200,54 @@ function mapNotification(row: any): AdminNotification {
 // ─── Public queries ──────────────────────────────────────
 
 export async function getAllProducts(): Promise<Product[]> {
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .eq("status", "active")
-    .order("position");
-  if (error) throw error;
-  return attachColorVariants(data.map(mapProduct));
+  const products = await fetchProductsWithVariants();
+  return products.filter(visibleForShop);
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {
-  const { data, error } = await supabase
+  const { data: base } = await supabase
     .from("products")
     .select("*")
     .eq("slug", slug)
-    .eq("status", "active")
-    .single();
-  if (error) return null;
+    .maybeSingle();
+  if (!base) return null;
 
-  const product = mapProduct(data);
+  const { data: variantRows } = await supabase
+    .from("product_variants")
+    .select("*")
+    .eq("product_id", base.id);
+  const product = hydrateProduct(base, variantRows ?? []);
+  return visibleForShop(product) ? product : null;
+}
 
-  // Get color variants (siblings with same name, any gender)
-  const { data: siblings } = await supabase
+/** Look up a legacy per-color slug. Returns the new base slug + the matching
+ *  variant id so the PDP loader can 301-redirect. */
+export async function findProductByVariantSlug(
+  slug: string,
+): Promise<{ productSlug: string; variantId: string } | null> {
+  const { data: variant } = await supabase
+    .from("product_variants")
+    .select("id, product_id")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (!variant) return null;
+  const { data: parent } = await supabase
     .from("products")
-    .select("slug, color")
-    .eq("name", product.name);
-
-  if (siblings && siblings.length >= 1) {
-    const seen = new Set<string>();
-    product.colorVariants = siblings
-      .filter((s: any) => {
-        const lower = s.color.toLowerCase();
-        if (seen.has(lower)) return false;
-        seen.add(lower);
-        return true;
-      })
-      .map((s: any) => ({ color: s.color, slug: s.slug }));
-  }
-
-  return product;
+    .select("slug")
+    .eq("id", variant.product_id)
+    .maybeSingle();
+  if (!parent) return null;
+  return { productSlug: parent.slug, variantId: variant.id };
 }
 
 export async function getBestSellers(): Promise<Product[]> {
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .eq("is_new", false)
-    .eq("status", "active")
-    .order("position");
-  if (error) throw error;
-  return attachColorVariants(data.map(mapProduct));
+  const all = await getAllProducts();
+  return all.filter((p) => !p.variants.some((v) => v.isNew));
 }
 
 export async function getNewArrivals(): Promise<Product[]> {
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .eq("is_new", true)
-    .eq("status", "active")
-    .order("position");
-  if (error) throw error;
-  return attachColorVariants(data.map(mapProduct));
+  const all = await getAllProducts();
+  return all.filter((p) => p.variants.some((v) => v.isNew));
 }
 
 export async function getCollections(): Promise<Collection[]> {
@@ -217,25 +269,15 @@ export async function getDailyFlowImages(): Promise<DailyFlowImage[]> {
 }
 
 export async function getTrendingProducts(): Promise<Product[]> {
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .eq("badge", "Best Seller")
-    .eq("status", "active")
-    .limit(3);
-  if (error) throw error;
-  return data.map(mapProduct);
+  const all = await getAllProducts();
+  return all.filter((p) => p.variants.some((v) => v.badge === "Best Seller")).slice(0, 3);
 }
 
 // ─── Admin queries ──────────────────────────────────────
 
 export async function getAdminProducts(): Promise<AdminProduct[]> {
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .order("position");
-  if (error) throw error;
-  return attachColorVariants(data.map(mapAdminProduct)) as AdminProduct[];
+  const products = await fetchProductsWithVariants();
+  return products.map(toAdminProduct);
 }
 
 export async function getAdminOrders(): Promise<AdminOrder[]> {
@@ -416,56 +458,178 @@ export async function getRevenueData(): Promise<RevenueDataPoint[]> {
 }
 
 export async function getProductSiblingsByName(name: string, gender: string): Promise<AdminProduct[]> {
-  const { data, error } = await supabase
+  const { data: products } = await supabase
     .from("products")
     .select("*")
     .eq("name", name)
-    .eq("gender", gender)
-    .order("id");
-  if (error) throw error;
-  return data.map(mapAdminProduct);
+    .eq("gender", gender);
+  if (!products || products.length === 0) return [];
+  const productIds = products.map((p) => p.id);
+  const { data: variantRows } = await supabase
+    .from("product_variants")
+    .select("*")
+    .in("product_id", productIds);
+  const byProduct = new Map<string, any[]>();
+  for (const v of variantRows ?? []) {
+    const arr = byProduct.get(v.product_id) ?? [];
+    arr.push(v);
+    byProduct.set(v.product_id, arr);
+  }
+  return products.map((p) => toAdminProduct(hydrateProduct(p, byProduct.get(p.id) ?? [])));
 }
 
 export async function getAdminProductById(id: string): Promise<AdminProduct | null> {
-  const { data, error } = await supabase
-    .from("products")
+  // `id` can be either a base product id or (legacy) a variant id.
+  let baseRow: any | null = null;
+  const byBase = await supabase.from("products").select("*").eq("id", id).maybeSingle();
+  if (byBase.data) {
+    baseRow = byBase.data;
+  } else {
+    const byVariant = await supabase
+      .from("product_variants")
+      .select("product_id")
+      .eq("id", id)
+      .maybeSingle();
+    if (byVariant.data) {
+      const parent = await supabase
+        .from("products")
+        .select("*")
+        .eq("id", byVariant.data.product_id)
+        .maybeSingle();
+      baseRow = parent.data;
+    }
+  }
+  if (!baseRow) return null;
+  const { data: variantRows } = await supabase
+    .from("product_variants")
     .select("*")
-    .eq("id", id)
-    .single();
-  if (error || !data) return null;
-  return mapAdminProduct(data);
+    .eq("product_id", baseRow.id);
+  return toAdminProduct(hydrateProduct(baseRow, variantRows ?? []));
 }
 
 // ─── Admin mutations ──────────────────────────────────────
 
-export async function upsertProduct(product: Record<string, any>) {
-  const row = {
-    id: product.id,
-    slug: product.slug,
-    name: product.name,
-    price: product.price,
-    price_mxn: product.priceMxn || 0,
-    image: product.image,
-    image_hover: product.imageHover,
-    images: product.images,
-    category: product.category,
-    badge: product.badge || null,
-    sizes: product.sizes,
-    size_stock: product.sizeStock || {},
-    is_new: product.isNew || false,
-    description: product.description,
-    material: product.material,
-    origin: product.origin,
-    color: product.color,
-    fit: product.fit || null,
-    gender: product.gender,
-    stock: Object.values(product.sizeStock as Record<string, number> || {}).reduce((a: number, b: number) => a + b, 0),
-    status: product.status,
-    ...(product.position !== undefined && { position: product.position }),
+export interface BaseProductInput {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  category: string;
+  gender: "men" | "women" | "unisex";
+  material: string;
+  origin: string;
+  fit: string | null;
+  sizes: string[];
+  tags?: string[];
+  brand?: string | null;
+  position?: number;
+}
+
+export interface VariantInput {
+  id: string;
+  productId: string;
+  slug: string;
+  colorName: string;
+  colorHex: string | null;
+  sku: string;
+  price: number;
+  priceMxn: number;
+  compareAtPrice: number | null;
+  sizeStock: Record<string, number>;
+  status: "active" | "draft" | "archived";
+  image: string;
+  imageHover: string;
+  images: string[];
+  badge: string | null;
+  isNew: boolean;
+  sortOrder: number;
+}
+
+export async function upsertBaseProduct(p: BaseProductInput): Promise<void> {
+  const row: Record<string, any> = {
+    id: p.id,
+    slug: p.slug,
+    name: p.name,
+    description: p.description,
+    category: p.category,
+    gender: p.gender,
+    material: p.material,
+    origin: p.origin,
+    fit: p.fit,
+    sizes: p.sizes,
+    tags: p.tags ?? [],
+    brand: p.brand ?? null,
+    updated_at: new Date().toISOString(),
   };
+  if (p.position !== undefined) row.position = p.position;
   const { error } = await supabase.from("products").upsert(row);
   if (error) throw error;
 }
+
+export async function upsertVariants(variants: VariantInput[]): Promise<void> {
+  if (variants.length === 0) return;
+  const rows = variants.map((v) => ({
+    id: v.id,
+    product_id: v.productId,
+    slug: v.slug,
+    color_name: v.colorName,
+    color_hex: v.colorHex,
+    sku: v.sku,
+    price: v.price,
+    price_mxn: v.priceMxn,
+    compare_at_price: v.compareAtPrice,
+    size_stock: v.sizeStock,
+    status: v.status,
+    image: v.image,
+    image_hover: v.imageHover,
+    images: v.images,
+    badge: v.badge,
+    is_new: v.isNew,
+    sort_order: v.sortOrder,
+    updated_at: new Date().toISOString(),
+  }));
+  const { error } = await supabase.from("product_variants").upsert(rows);
+  if (error) throw error;
+}
+
+export async function deleteVariants(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await supabase.from("product_variants").delete().in("id", ids);
+  if (error) throw error;
+}
+
+/** Decrement per-size stock on a variant after an order is paid. If a requested
+ *  size has less stock than ordered, it clamps to 0 (defensive — webhook runs
+ *  after payment, so we accept the sale and log the shortfall). */
+export async function decrementVariantStock(
+  variantId: string,
+  size: string,
+  qty: number,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from("product_variants")
+    .select("size_stock")
+    .eq("id", variantId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return;
+  const current = (data.size_stock ?? {}) as Record<string, number>;
+  const next = { ...current, [size]: Math.max(0, (current[size] ?? 0) - qty) };
+  const { error: uErr } = await supabase
+    .from("product_variants")
+    .update({ size_stock: next })
+    .eq("id", variantId);
+  if (uErr) throw uErr;
+}
+
+export async function setDefaultVariant(productId: string, variantId: string | null): Promise<void> {
+  const { error } = await supabase
+    .from("products")
+    .update({ default_variant_id: variantId })
+    .eq("id", productId);
+  if (error) throw error;
+}
+
 
 export async function deleteProduct(id: string) {
   const { error } = await supabase.from("products").delete().eq("id", id);

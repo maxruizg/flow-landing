@@ -12,7 +12,11 @@
     "seed": "tsx app/data/seed.ts",
     "seed:full": "tsx app/data/seed.ts --upload-images",
     "reconcile": "tsx app/data/reconcile.ts",
-    "reconcile:apply": "tsx app/data/reconcile.ts --apply"
+    "reconcile:apply": "tsx app/data/reconcile.ts --apply",
+    "seed:catalog": "tsx app/data/seed-catalog-html.ts",
+    "seed:catalog:apply": "tsx app/data/seed-catalog-html.ts --apply",
+    "backfill:variants": "tsx app/data/backfill-variants.ts",
+    "backfill:variants:apply": "tsx app/data/backfill-variants.ts --apply"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

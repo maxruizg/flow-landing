@@ -1,8 +1,9 @@
 import { Link, useNavigation } from "@remix-run/react";
-import type { AdminProduct } from "~/lib/types";
+import type { AdminProduct, ProductVariant } from "~/lib/types";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { uploadImageClient, uploadBlobClient } from "~/lib/supabase.client";
 import { ImageAdjuster } from "~/components/admin/ImageAdjuster";
+import { COLOR_HEX_MAP } from "~/lib/color-hex-map";
 
 const inputClass =
   "w-full bg-flow-950 border border-flow-700 rounded-lg px-4 py-3 text-sm text-flow-100 placeholder:text-flow-500 focus:border-accent-500 focus:outline-none transition-colors";
@@ -10,14 +11,12 @@ const labelClass = "block text-xs text-flow-400 mb-1.5 uppercase tracking-wide";
 
 function ImageUpload({
   label,
-  name,
   existingUrl,
   onUploaded,
   aspect = 3 / 4,
   folder = "products",
 }: {
   label: string;
-  name: string;
   existingUrl?: string;
   onUploaded: (url: string) => void;
   aspect?: number;
@@ -44,7 +43,6 @@ function ImageUpload({
       const url = await uploadImageClient(file, folder);
       onUploaded(url);
     } catch (err: any) {
-      console.error("Upload failed:", err);
       setError(err?.message || "Upload failed");
       setPreview(null);
     } finally {
@@ -72,13 +70,7 @@ function ImageUpload({
   return (
     <div>
       <label className={labelClass}>{label}</label>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleChange}
-        className="hidden"
-      />
+      <input ref={inputRef} type="file" accept="image/*" onChange={handleChange} className="hidden" />
       {displayUrl ? (
         <div className="relative group w-full h-40 rounded-lg overflow-hidden bg-flow-950 border border-flow-700">
           <img src={displayUrl} alt="" className="w-full h-full object-contain" />
@@ -122,9 +114,7 @@ function ImageUpload({
           )}
         </div>
       )}
-      {error && (
-        <p className="text-xs text-red-400 mt-1">{error}</p>
-      )}
+      {error && <p className="text-xs text-red-400 mt-1">{error}</p>}
       {displayUrl && (
         <ImageAdjuster
           open={adjustOpen}
@@ -140,12 +130,10 @@ function ImageUpload({
 }
 
 function GalleryUpload({
-  namePrefix,
   existingUrls,
   onUrlsChange,
   aspect = 3 / 4,
 }: {
-  namePrefix: string;
   existingUrls: string[];
   onUrlsChange: (urls: string[]) => void;
   aspect?: number;
@@ -167,14 +155,11 @@ function GalleryUpload({
     setUploading(true);
     setError(null);
     try {
-      const uploaded = await Promise.all(
-        files.map((file) => uploadImageClient(file, "products"))
-      );
+      const uploaded = await Promise.all(files.map((file) => uploadImageClient(file, "products")));
       const next = [...urls, ...uploaded];
       setUrls(next);
       onUrlsChange(next);
     } catch (err: any) {
-      console.error("Gallery upload failed:", err);
       setError(err?.message || "Upload failed");
     } finally {
       setUploading(false);
@@ -248,17 +233,8 @@ function GalleryUpload({
           )}
         </div>
       </div>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        multiple
-        onChange={handleFiles}
-        className="hidden"
-      />
-      {error && (
-        <p className="text-xs text-red-400 mt-1">{error}</p>
-      )}
+      <input ref={inputRef} type="file" accept="image/*" multiple onChange={handleFiles} className="hidden" />
+      {error && <p className="text-xs text-red-400 mt-1">{error}</p>}
       {adjustIndex !== null && urls[adjustIndex] && (
         <ImageAdjuster
           open
@@ -273,138 +249,164 @@ function GalleryUpload({
   );
 }
 
-interface Variant {
+interface VariantDraft {
   id: string;
-  color: string;
+  colorName: string;
+  colorHex: string | null;
+  sku: string;
+  price: string;
+  priceMxn: string;
+  compareAtPrice: string;
   image: string;
   imageHover: string;
   gallery: string[];
-  position: number;
   sizeStock: Record<string, number>;
-  status: string;
+  status: "active" | "draft" | "archived";
   badge: string | null;
   isNew: boolean;
+  sortOrder: number;
 }
 
 interface ProductFormProps {
   product: AdminProduct | null;
-  siblings?: AdminProduct[] | null;
+  siblings?: AdminProduct[] | null; // unused in variants era — kept for loader compat
 }
 
-export function ProductForm({ product, siblings }: ProductFormProps) {
+function kebab(s: string): string {
+  return s.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+}
+
+function hexForColor(name: string): string {
+  return COLOR_HEX_MAP[name.toLowerCase().trim()] ?? "#888888";
+}
+
+function variantFromProductVariant(v: ProductVariant): VariantDraft {
+  return {
+    id: v.id,
+    colorName: v.colorName,
+    colorHex: v.colorHex ?? null,
+    sku: v.sku,
+    price: String(v.price),
+    priceMxn: v.priceMxn ? String(v.priceMxn) : "",
+    compareAtPrice: v.compareAtPrice !== null ? String(v.compareAtPrice) : "",
+    image: v.image,
+    imageHover: v.imageHover,
+    gallery: v.images ?? [],
+    sizeStock: v.sizeStock ?? {},
+    status: v.status,
+    badge: v.badge,
+    isNew: v.isNew,
+    sortOrder: v.sortOrder,
+  };
+}
+
+function emptyVariant(index: number): VariantDraft {
+  return {
+    id: `new-${Date.now()}-${index}`,
+    colorName: "",
+    colorHex: null,
+    sku: "",
+    price: "",
+    priceMxn: "",
+    compareAtPrice: "",
+    image: "",
+    imageHover: "",
+    gallery: [],
+    sizeStock: {},
+    status: "active",
+    badge: null,
+    isNew: false,
+    sortOrder: index + 1,
+  };
+}
+
+export function ProductForm({ product }: ProductFormProps) {
   const isEdit = !!product;
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
 
   const [form, setForm] = useState({
     name: "",
-    price: "",
-    priceMxn: "",
     category: "Tops",
-    gender: "unisex" as string,
+    gender: "unisex" as "men" | "women" | "unisex",
     sizes: "S, M, L, XL",
     material: "",
     description: "",
     origin: "",
     fit: "",
-    displayPosition: "last" as string,
+    brand: "",
+    tags: "",
+    displayPosition: "last" as "first" | "last",
   });
 
-  const [variants, setVariants] = useState<Variant[]>([
-    { id: "new-initial", color: "", image: "", imageHover: "", gallery: [], position: -1, sizeStock: {}, status: "active", badge: null, isNew: false },
-  ]);
-  const [activeVariantIndex, setActiveVariantIndex] = useState(0);
-  const [deletedVariantIds, setDeletedVariantIds] = useState<string[]>([]);
+  const [variants, setVariants] = useState<VariantDraft[]>([emptyVariant(0)]);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [deletedIds, setDeletedIds] = useState<string[]>([]);
+  const [defaultIndex, setDefaultIndex] = useState(0);
+  const [pendingDelete, setPendingDelete] = useState<number | null>(null);
   const [colorError, setColorError] = useState<string | null>(null);
   const loadedRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const sources = siblings && siblings.length > 0 ? siblings : product ? [product] : null;
-    if (!sources || sources.length === 0) return;
+    if (!product) return;
+    if (loadedRef.current === product.id) return;
+    loadedRef.current = product.id;
 
-    // Only load once per product id — prevents re-runs when useLoaderData
-    // returns new object refs (e.g., under v3_singleFetch) which would reset
-    // any stock values the user has typed.
-    const loadKey = product?.id ?? sources[0].id;
-    if (loadedRef.current === loadKey) return;
-    loadedRef.current = loadKey;
-
-    const first = sources[0];
     setForm({
-      name: first.name,
-      price: String(first.price),
-      priceMxn: String(first.priceMxn || ""),
-      category: first.category,
-      gender: first.gender,
-      sizes: first.sizes.join(", "),
-      material: first.material,
-      description: first.description,
-      origin: first.origin,
-      fit: first.fit || "",
+      name: product.name,
+      category: product.category,
+      gender: product.gender,
+      sizes: product.sizes.join(", "),
+      material: product.material,
+      description: product.description,
+      origin: product.origin,
+      fit: product.fit || "",
+      brand: product.brand ?? "",
+      tags: (product.tags ?? []).join(", "),
       displayPosition: "last",
     });
-    setVariants(
-      sources.map((s) => ({
-        id: s.id,
-        color: s.color,
-        image: s.image,
-        imageHover: s.imageHover,
-        gallery: s.images || [],
-        position: s.position,
-        sizeStock: s.sizeStock || {},
-        status: s.status || "active",
-        badge: s.badge ?? null,
-        isNew: s.isNew || false,
-      }))
-    );
-    setActiveVariantIndex(0);
-    setDeletedVariantIds([]);
-  }, [product, siblings]);
+
+    const sorted = [...product.variants].sort((a, b) => a.sortOrder - b.sortOrder);
+    const drafts = sorted.map(variantFromProductVariant);
+    setVariants(drafts.length > 0 ? drafts : [emptyVariant(0)]);
+    setActiveIndex(0);
+    setDeletedIds([]);
+    const idx = drafts.findIndex((d) => d.id === product.defaultVariantId);
+    setDefaultIndex(idx >= 0 ? idx : 0);
+  }, [product]);
 
   const parsedSizes = useMemo(
     () => form.sizes.split(",").map((s) => s.trim()).filter(Boolean),
-    [form.sizes]
+    [form.sizes],
   );
 
-  // Sync sizeStock keys for all variants when sizes change
+  // Sync sizeStock keys when the sizes list changes.
   useEffect(() => {
     setVariants((prev) =>
       prev.map((v) => {
         const next: Record<string, number> = {};
-        for (const size of parsedSizes) {
-          next[size] = v.sizeStock[size] ?? 0;
-        }
+        for (const size of parsedSizes) next[size] = v.sizeStock[size] ?? 0;
         return { ...v, sizeStock: next };
-      })
+      }),
     );
   }, [parsedSizes]);
 
-  const activeVariantStock = variants[activeVariantIndex]?.sizeStock || {};
-  const activeVariantTotal = Object.values(activeVariantStock).reduce((a, b) => a + b, 0);
-
-  const updateVariantSizeStock = (size: string, value: number) => {
-    setVariants((prev) =>
-      prev.map((v, i) =>
-        i === activeVariantIndex
-          ? { ...v, sizeStock: { ...v.sizeStock, [size]: value } }
-          : v
-      )
-    );
-  };
-
-  const update = (field: string, value: string | boolean) =>
+  const updateForm = (field: keyof typeof form, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
-  const updateVariant = useCallback((index: number, patch: Partial<Variant>) => {
-    setVariants((prev) => prev.map((v, i) => (i === index ? { ...v, ...patch } : v)));
-  }, []);
+  const updateVariant = useCallback(
+    (index: number, patch: Partial<VariantDraft>) =>
+      setVariants((prev) => prev.map((v, i) => (i === index ? { ...v, ...patch } : v))),
+    [],
+  );
 
-  const updateVariantColor = (index: number, color: string) => {
-    updateVariant(index, { color });
+  const updateVariantColor = (index: number, colorName: string) => {
+    const hex = COLOR_HEX_MAP[colorName.toLowerCase().trim()] ?? variants[index].colorHex;
+    updateVariant(index, { colorName, colorHex: hex ?? null });
     const otherColors = variants
       .filter((_, i) => i !== index)
-      .map((v) => v.color.toLowerCase().trim());
-    if (color.trim() && otherColors.includes(color.toLowerCase().trim())) {
+      .map((v) => v.colorName.toLowerCase().trim());
+    if (colorName.trim() && otherColors.includes(colorName.toLowerCase().trim())) {
       setColorError("Duplicate color name");
     } else {
       setColorError(null);
@@ -412,37 +414,44 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
   };
 
   const addVariant = () => {
-    setVariants((prev) => [
-      ...prev,
-      { id: `new-${Date.now()}`, color: "", image: "", imageHover: "", gallery: [], position: -1, sizeStock: {}, status: "active", badge: null, isNew: false },
-    ]);
-    setActiveVariantIndex(variants.length);
+    const next = emptyVariant(variants.length);
+    setVariants((prev) => [...prev, next]);
+    setActiveIndex(variants.length);
   };
 
-  const activeVariant = variants[activeVariantIndex];
-
-  const removeVariant = (index: number) => {
-    const variant = variants[index];
-    if (!variant.id.startsWith("new-")) {
-      setDeletedVariantIds((prev) => [...prev, variant.id]);
+  const requestRemove = (index: number) => {
+    const total = Object.values(variants[index].sizeStock).reduce((a, b) => a + b, 0);
+    if (total > 0) {
+      setPendingDelete(index);
+    } else {
+      doRemove(index);
     }
+  };
+
+  const doRemove = (index: number) => {
+    const variant = variants[index];
+    if (!variant.id.startsWith("new-")) setDeletedIds((prev) => [...prev, variant.id]);
     const next = variants.filter((_, i) => i !== index);
-    setVariants(next);
-    setActiveVariantIndex(Math.min(activeVariantIndex, next.length - 1));
+    setVariants(next.length > 0 ? next : [emptyVariant(0)]);
+    setActiveIndex(Math.min(index, next.length - 1));
+    if (defaultIndex >= next.length) setDefaultIndex(0);
+    else if (defaultIndex === index) setDefaultIndex(0);
+    else if (defaultIndex > index) setDefaultIndex(defaultIndex - 1);
+    setPendingDelete(null);
     setColorError(null);
   };
 
-  const hasEmptyColor = variants.some((v) => !v.color.trim());
-  const formInvalid = !!colorError || hasEmptyColor;
+  const activeVariant = variants[activeIndex];
+  const activeStockTotal = Object.values(activeVariant?.sizeStock ?? {}).reduce((a, b) => a + b, 0);
+
+  const hasEmptyColor = variants.some((v) => !v.colorName.trim());
+  const hasEmptyPrice = variants.some((v) => !v.price.trim() || Number(v.price) <= 0);
+  const formInvalid = !!colorError || hasEmptyColor || hasEmptyPrice;
 
   return (
     <div>
-      {/* Header */}
       <div className="flex items-center gap-4 mb-8">
-        <Link
-          to="/admin/products"
-          className="text-flow-400 hover:text-white transition-colors p-1"
-        >
+        <Link to="/admin/products" className="text-flow-400 hover:text-white transition-colors p-1">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
@@ -454,129 +463,218 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
 
       <form method="post">
         <input type="hidden" name="variants_count" value={variants.length} />
-        <input type="hidden" name="deleted_variant_ids" value={JSON.stringify(deletedVariantIds)} />
+        <input type="hidden" name="default_variant_index" value={defaultIndex} />
+        <input type="hidden" name="deleted_variant_ids" value={JSON.stringify(deletedIds)} />
 
-        {/* Serialize variant data as hidden fields (URLs only, no files) */}
-        {variants.map((variant, i) => (
-          <div key={variant.id}>
-            <input type="hidden" name={`variant_${i}_id`} value={variant.id} />
-            <input type="hidden" name={`variant_${i}_position`} value={variant.position} />
-            <input type="hidden" name={`variant_${i}_image`} value={variant.image} />
-            <input type="hidden" name={`variant_${i}_imageHover`} value={variant.imageHover} />
-            <input type="hidden" name={`variant_${i}_gallery`} value={JSON.stringify(variant.gallery)} />
-            <input type="hidden" name={`variant_${i}_size_stock`} value={JSON.stringify(variant.sizeStock)} />
-            <input type="hidden" name={`variant_${i}_status`} value={variant.status} />
-            <input type="hidden" name={`variant_${i}_badge`} value={variant.badge ?? ""} />
-            <input type="hidden" name={`variant_${i}_isNew`} value={variant.isNew ? "true" : "false"} />
+        {variants.map((v, i) => (
+          <div key={v.id}>
+            <input type="hidden" name={`variant_${i}_id`} value={v.id} />
+            <input type="hidden" name={`variant_${i}_color`} value={v.colorName} />
+            <input type="hidden" name={`variant_${i}_color_hex`} value={v.colorHex ?? ""} />
+            <input type="hidden" name={`variant_${i}_sku`} value={v.sku} />
+            <input type="hidden" name={`variant_${i}_price`} value={v.price} />
+            <input type="hidden" name={`variant_${i}_price_mxn`} value={v.priceMxn} />
+            <input type="hidden" name={`variant_${i}_compare_at_price`} value={v.compareAtPrice} />
+            <input type="hidden" name={`variant_${i}_image`} value={v.image} />
+            <input type="hidden" name={`variant_${i}_imageHover`} value={v.imageHover} />
+            <input type="hidden" name={`variant_${i}_gallery`} value={JSON.stringify(v.gallery)} />
+            <input type="hidden" name={`variant_${i}_size_stock`} value={JSON.stringify(v.sizeStock)} />
+            <input type="hidden" name={`variant_${i}_status`} value={v.status} />
+            <input type="hidden" name={`variant_${i}_badge`} value={v.badge ?? ""} />
+            <input type="hidden" name={`variant_${i}_isNew`} value={v.isNew ? "true" : "false"} />
           </div>
         ))}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left column (2/3) */}
+          {/* Left column */}
           <div className="lg:col-span-2 space-y-6">
             {/* Color Variants */}
             <div className="bg-flow-900 border border-flow-800/50 rounded-xl p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-display font-semibold text-white uppercase tracking-wide">Color Variants</h2>
+                <h2 className="text-sm font-display font-semibold text-white uppercase tracking-wide">
+                  Color Variants
+                </h2>
+                <span className="text-[11px] text-flow-500">
+                  {variants.length} {variants.length === 1 ? "color" : "colors"}
+                </span>
               </div>
 
               {/* Tabs */}
               <div className="flex items-center gap-2 mb-4 flex-wrap">
-                {variants.map((variant, i) => (
+                {variants.map((v, i) => (
                   <button
-                    key={variant.id}
+                    key={v.id}
                     type="button"
-                    onClick={() => setActiveVariantIndex(i)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      i === activeVariantIndex
+                    onClick={() => setActiveIndex(i)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      i === activeIndex
                         ? "bg-white text-flow-black"
                         : "bg-flow-800 text-flow-300 hover:bg-flow-700"
                     }`}
                   >
-                    {variant.color || "Untitled"}
+                    <span
+                      className="w-3 h-3 rounded-full border border-white/20"
+                      style={{ backgroundColor: v.colorHex ?? hexForColor(v.colorName) }}
+                    />
+                    {v.colorName || "Untitled"}
+                    {defaultIndex === i && (
+                      <span className="text-[9px] uppercase tracking-wider opacity-70 ml-1">
+                        default
+                      </span>
+                    )}
                   </button>
                 ))}
                 <button
                   type="button"
                   onClick={addVariant}
-                  className="px-4 py-2 rounded-lg text-sm font-medium bg-flow-800 text-flow-400 hover:bg-flow-700 hover:text-flow-200 transition-colors border border-dashed border-flow-600"
+                  className="px-3 py-2 rounded-lg text-sm font-medium bg-flow-800 text-flow-400 hover:bg-flow-700 hover:text-flow-200 transition-colors border border-dashed border-flow-600"
                 >
                   + Add Color
                 </button>
               </div>
 
-              {/* Variant panels */}
-              {variants.map((variant, i) => (
-                <div
-                  key={variant.id}
-                  className={i === activeVariantIndex ? "" : "hidden"}
-                >
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="flex-1">
-                      <label className={labelClass}>Color</label>
+              {variants.map((v, i) => (
+                <div key={v.id} className={i === activeIndex ? "" : "hidden"}>
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className={labelClass}>Color Name</label>
                       <input
                         className={inputClass}
-                        name={`variant_${i}_color`}
-                        value={variant.color}
+                        value={v.colorName}
                         onChange={(e) => updateVariantColor(i, e.target.value)}
                         placeholder="Black"
                       />
                     </div>
-                    {variants.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeVariant(i)}
-                        className="mt-5 px-3 py-2.5 text-xs text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/10 transition-colors uppercase tracking-wide"
-                      >
-                        Remove Color
-                      </button>
-                    )}
+                    <div>
+                      <label className={labelClass}>Color Hex</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={v.colorHex ?? hexForColor(v.colorName)}
+                          onChange={(e) => updateVariant(i, { colorHex: e.target.value })}
+                          className="h-11 w-14 rounded-lg bg-flow-950 border border-flow-700 cursor-pointer"
+                        />
+                        <input
+                          className={inputClass}
+                          value={v.colorHex ?? ""}
+                          onChange={(e) => updateVariant(i, { colorHex: e.target.value || null })}
+                          placeholder="#000000"
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  {colorError && i === activeVariantIndex && (
+                  {colorError && i === activeIndex && (
                     <p className="text-red-400 text-xs mb-3">{colorError}</p>
                   )}
 
                   <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className={labelClass}>SKU</label>
+                      <input
+                        className={inputClass}
+                        value={v.sku}
+                        onChange={(e) => updateVariant(i, { sku: e.target.value })}
+                        placeholder={`${kebab(form.name)}-${kebab(v.colorName) || "color"}`}
+                      />
+                    </div>
+                    <div className="flex items-end gap-3 pb-0.5">
+                      <label className="flex items-center gap-2 cursor-pointer text-sm text-flow-300">
+                        <input
+                          type="radio"
+                          name="_default_variant_radio"
+                          checked={defaultIndex === i}
+                          onChange={() => setDefaultIndex(i)}
+                          className="w-4 h-4 text-accent-500 bg-flow-950 border-flow-700 focus:ring-accent-500"
+                        />
+                        Set as default
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4 mb-4">
+                    <div>
+                      <label className={labelClass}>Price (USD)</label>
+                      <input
+                        className={inputClass}
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={v.price}
+                        onChange={(e) => updateVariant(i, { price: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Price (MXN)</label>
+                      <input
+                        className={inputClass}
+                        type="number"
+                        min="0"
+                        value={v.priceMxn}
+                        onChange={(e) => updateVariant(i, { priceMxn: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Compare At</label>
+                      <input
+                        className={inputClass}
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={v.compareAtPrice}
+                        onChange={(e) => updateVariant(i, { compareAtPrice: e.target.value })}
+                        placeholder="—"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mb-4">
                     <ImageUpload
                       label="Main Image"
-                      name={`variant_${i}_image`}
-                      existingUrl={variant.image || undefined}
+                      existingUrl={v.image || undefined}
                       onUploaded={(url) => updateVariant(i, { image: url })}
                     />
                     <ImageUpload
                       label="Hover Image"
-                      name={`variant_${i}_imageHover`}
-                      existingUrl={variant.imageHover || undefined}
+                      existingUrl={v.imageHover || undefined}
                       onUploaded={(url) => updateVariant(i, { imageHover: url })}
                     />
                   </div>
                   <GalleryUpload
-                    namePrefix={`variant_${i}`}
-                    existingUrls={variant.gallery}
+                    existingUrls={v.gallery}
                     onUrlsChange={(urls) => updateVariant(i, { gallery: urls })}
                   />
+
+                  {variants.length > 1 && (
+                    <div className="mt-4 pt-4 border-t border-flow-800/50">
+                      <button
+                        type="button"
+                        onClick={() => requestRemove(i)}
+                        className="text-xs text-red-400 border border-red-500/30 rounded-lg px-3 py-2 hover:bg-red-500/10 transition-colors uppercase tracking-wide"
+                      >
+                        Remove This Color
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
 
             {/* Basic Info */}
             <div className="bg-flow-900 border border-flow-800/50 rounded-xl p-6">
-              <h2 className="text-sm font-display font-semibold text-white uppercase tracking-wide mb-4">Basic Info</h2>
+              <h2 className="text-sm font-display font-semibold text-white uppercase tracking-wide mb-4">
+                Basic Info
+              </h2>
               <div className="space-y-4">
                 <div>
                   <label className={labelClass}>Name</label>
-                  <input className={inputClass} name="name" value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="Product name" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className={labelClass}>Price (USD)</label>
-                    <input className={inputClass} type="number" name="price" value={form.price} onChange={(e) => update("price", e.target.value)} placeholder="0" />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Price (MXN)</label>
-                    <input className={inputClass} type="number" name="price_mxn" value={form.priceMxn} onChange={(e) => update("priceMxn", e.target.value)} placeholder="0" />
-                  </div>
+                  <input
+                    className={inputClass}
+                    name="name"
+                    value={form.name}
+                    onChange={(e) => updateForm("name", e.target.value)}
+                    placeholder="Product name"
+                  />
                 </div>
                 <div>
                   <label className={labelClass}>Description</label>
@@ -585,41 +683,86 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
                     rows={4}
                     name="description"
                     value={form.description}
-                    onChange={(e) => update("description", e.target.value)}
+                    onChange={(e) => updateForm("description", e.target.value)}
                     placeholder="Product description..."
                   />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClass}>Brand</label>
+                    <input
+                      className={inputClass}
+                      name="brand"
+                      value={form.brand}
+                      onChange={(e) => updateForm("brand", e.target.value)}
+                      placeholder="Brand (optional)"
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Tags (comma-separated)</label>
+                    <input
+                      className={inputClass}
+                      name="tags_raw"
+                      value={form.tags}
+                      onChange={(e) => updateForm("tags", e.target.value)}
+                      placeholder="summer, graphic"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Product Details */}
             <div className="bg-flow-900 border border-flow-800/50 rounded-xl p-6">
-              <h2 className="text-sm font-display font-semibold text-white uppercase tracking-wide mb-4">Product Details</h2>
+              <h2 className="text-sm font-display font-semibold text-white uppercase tracking-wide mb-4">
+                Product Details
+              </h2>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={labelClass}>Material</label>
-                  <input className={inputClass} name="material" value={form.material} onChange={(e) => update("material", e.target.value)} placeholder="100% Cotton" />
+                  <input
+                    className={inputClass}
+                    name="material"
+                    value={form.material}
+                    onChange={(e) => updateForm("material", e.target.value)}
+                    placeholder="100% Cotton"
+                  />
                 </div>
                 <div>
                   <label className={labelClass}>Origin</label>
-                  <input className={inputClass} name="origin" value={form.origin} onChange={(e) => update("origin", e.target.value)} placeholder="Made in Mexico" />
+                  <input
+                    className={inputClass}
+                    name="origin"
+                    value={form.origin}
+                    onChange={(e) => updateForm("origin", e.target.value)}
+                    placeholder="Made in Mexico"
+                  />
                 </div>
                 <div>
                   <label className={labelClass}>Fit</label>
-                  <input className={inputClass} name="fit" value={form.fit} onChange={(e) => update("fit", e.target.value)} placeholder="Regular" />
+                  <input
+                    className={inputClass}
+                    name="fit"
+                    value={form.fit}
+                    onChange={(e) => updateForm("fit", e.target.value)}
+                    placeholder="Regular"
+                  />
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Right column (1/3) */}
+          {/* Right column */}
           <div className="space-y-6">
-            {/* Status & Meta */}
             <div className="bg-flow-900 border border-flow-800/50 rounded-xl p-6">
               <div className="mb-4">
-                <h2 className="text-sm font-display font-semibold text-white uppercase tracking-wide">Status & Meta</h2>
+                <h2 className="text-sm font-display font-semibold text-white uppercase tracking-wide">
+                  Status & Meta
+                </h2>
                 <p className="text-[11px] text-flow-500 mt-0.5">
-                  Per color{activeVariant?.color ? <> — <span className="text-flow-300">{activeVariant.color}</span></> : null}
+                  Per color{activeVariant?.colorName ? (
+                    <> — <span className="text-flow-300">{activeVariant.colorName}</span></>
+                  ) : null}
                 </p>
               </div>
               <div className="space-y-4">
@@ -627,20 +770,24 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
                   <label className={labelClass}>Status</label>
                   <select
                     className={inputClass}
-                    value={activeVariant?.status || "active"}
-                    onChange={(e) => updateVariant(activeVariantIndex, { status: e.target.value })}
+                    value={activeVariant?.status ?? "active"}
+                    onChange={(e) =>
+                      updateVariant(activeIndex, {
+                        status: e.target.value as VariantDraft["status"],
+                      })
+                    }
                   >
                     <option value="active">Active</option>
                     <option value="draft">Draft</option>
-                    <option value="out_of_stock">Out of Stock</option>
+                    <option value="archived">Archived</option>
                   </select>
                 </div>
                 <div>
                   <label className={labelClass}>Badge</label>
                   <select
                     className={inputClass}
-                    value={activeVariant?.badge || ""}
-                    onChange={(e) => updateVariant(activeVariantIndex, { badge: e.target.value || null })}
+                    value={activeVariant?.badge ?? ""}
+                    onChange={(e) => updateVariant(activeIndex, { badge: e.target.value || null })}
                   >
                     <option value="">None</option>
                     <option value="New">New</option>
@@ -653,8 +800,8 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
                   <label className="flex items-center gap-2 h-[46px] cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={activeVariant?.isNew || false}
-                      onChange={(e) => updateVariant(activeVariantIndex, { isNew: e.target.checked })}
+                      checked={activeVariant?.isNew ?? false}
+                      onChange={(e) => updateVariant(activeIndex, { isNew: e.target.checked })}
                       className="w-4 h-4 rounded border-flow-700 bg-flow-950 text-accent-500 focus:ring-accent-500"
                     />
                     <span className="text-sm text-flow-300">Is New</span>
@@ -663,9 +810,9 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
                 <div>
                   <label className={labelClass}>
                     Stock per Size
-                    {variants[activeVariantIndex]?.color && (
+                    {activeVariant?.colorName && (
                       <span className="text-flow-600 normal-case tracking-normal ml-1">
-                        — {variants[activeVariantIndex].color}
+                        — {activeVariant.colorName}
                       </span>
                     )}
                   </label>
@@ -673,27 +820,33 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
                     <div className="space-y-2">
                       {parsedSizes.map((size) => (
                         <div key={size} className="flex items-center gap-3">
-                          <span className="text-xs text-flow-400 uppercase tracking-wide w-10 shrink-0">{size}</span>
+                          <span className="text-xs text-flow-400 uppercase tracking-wide w-10 shrink-0">
+                            {size}
+                          </span>
                           <input
                             className={inputClass}
                             type="number"
                             min="0"
-                            value={activeVariantStock[size] ?? ""}
+                            value={
+                              activeVariant?.sizeStock[size]
+                                ? String(activeVariant.sizeStock[size])
+                                : ""
+                            }
                             onChange={(e) => {
                               const raw = e.target.value;
-                              updateVariantSizeStock(
-                                size,
-                                raw === "" ? 0 : Math.max(0, parseInt(raw, 10) || 0)
-                              );
+                              const qty = raw === "" ? 0 : Math.max(0, parseInt(raw, 10) || 0);
+                              updateVariant(activeIndex, {
+                                sizeStock: { ...(activeVariant?.sizeStock ?? {}), [size]: qty },
+                              });
                             }}
-                            onFocus={(e) => {
-                              if (e.target.value === "0") e.target.select();
-                            }}
+                            onFocus={(e) => e.currentTarget.select()}
                             placeholder="0"
                           />
                         </div>
                       ))}
-                      <p className="text-xs text-flow-500 pt-1">Total ({variants[activeVariantIndex]?.color || "this color"}): {activeVariantTotal}</p>
+                      <p className="text-xs text-flow-500 pt-1">
+                        Total ({activeVariant?.colorName || "this color"}): {activeStockTotal}
+                      </p>
                     </div>
                   ) : (
                     <p className="text-xs text-flow-500 py-3">Enter sizes first</p>
@@ -702,13 +855,19 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
               </div>
             </div>
 
-            {/* Organization */}
             <div className="bg-flow-900 border border-flow-800/50 rounded-xl p-6">
-              <h2 className="text-sm font-display font-semibold text-white uppercase tracking-wide mb-4">Organization</h2>
+              <h2 className="text-sm font-display font-semibold text-white uppercase tracking-wide mb-4">
+                Organization
+              </h2>
               <div className="space-y-4">
                 <div>
                   <label className={labelClass}>Category</label>
-                  <select className={inputClass} name="category" value={form.category} onChange={(e) => update("category", e.target.value)}>
+                  <select
+                    className={inputClass}
+                    name="category"
+                    value={form.category}
+                    onChange={(e) => updateForm("category", e.target.value)}
+                  >
                     <option value="Tops">Tops</option>
                     <option value="Bottoms">Bottoms</option>
                     <option value="Accessories">Accessories</option>
@@ -716,7 +875,14 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
                 </div>
                 <div>
                   <label className={labelClass}>Gender</label>
-                  <select className={inputClass} name="gender" value={form.gender} onChange={(e) => update("gender", e.target.value)}>
+                  <select
+                    className={inputClass}
+                    name="gender"
+                    value={form.gender}
+                    onChange={(e) =>
+                      updateForm("gender", e.target.value)
+                    }
+                  >
                     <option value="men">Men</option>
                     <option value="women">Women</option>
                     <option value="unisex">Unisex</option>
@@ -724,22 +890,31 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
                 </div>
                 <div>
                   <label className={labelClass}>Sizes (comma-separated)</label>
-                  <input className={inputClass} name="sizes_raw" value={form.sizes} onChange={(e) => update("sizes", e.target.value)} placeholder="S, M, L, XL" />
+                  <input
+                    className={inputClass}
+                    name="sizes_raw"
+                    value={form.sizes}
+                    onChange={(e) => updateForm("sizes", e.target.value)}
+                    placeholder="S, M, L, XL"
+                  />
                 </div>
                 {!isEdit && (
                   <div>
                     <label className={labelClass}>Display Position</label>
-                    <select className={inputClass} name="display_position" value={form.displayPosition} onChange={(e) => update("displayPosition", e.target.value)}>
+                    <select
+                      className={inputClass}
+                      name="display_position"
+                      value={form.displayPosition}
+                      onChange={(e) => updateForm("displayPosition", e.target.value)}
+                    >
                       <option value="first">First (top of page)</option>
                       <option value="last">Last (bottom of page)</option>
                     </select>
-                    <p className="text-[10px] text-flow-500 mt-1">You can reorder products later from the Products page.</p>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Actions */}
             <div className="flex gap-3">
               <button
                 type="submit"
@@ -758,6 +933,36 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
           </div>
         </div>
       </form>
+
+      {/* Confirm-delete-with-stock modal */}
+      {pendingDelete !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setPendingDelete(null)} />
+          <div className="relative bg-flow-900 border border-flow-800/50 rounded-xl p-6 max-w-sm w-full">
+            <h3 className="text-white font-display font-semibold mb-2">
+              Remove "{variants[pendingDelete]?.colorName}"?
+            </h3>
+            <p className="text-sm text-flow-400 mb-6">
+              This color still has stock. Removing it here stages a deletion that
+              runs when you save. The variant row will be deleted from the database.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setPendingDelete(null)}
+                className="flex-1 px-4 py-2.5 border border-flow-700 text-flow-300 rounded-lg text-sm hover:bg-flow-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => pendingDelete !== null && doRemove(pendingDelete)}
+                className="flex-1 px-4 py-2.5 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

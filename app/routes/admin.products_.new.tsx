@@ -1,7 +1,14 @@
 import { redirect } from "@remix-run/node";
 import type { MetaFunction, ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { requireAdmin } from "~/lib/session.server";
-import { upsertProduct, getMaxProductPosition, getAdminProducts, updateProductPositions } from "~/data/queries.server";
+import {
+  getAdminProducts,
+  getMaxProductPosition,
+  setDefaultVariant,
+  updateProductPositions,
+  upsertBaseProduct,
+  upsertVariants,
+} from "~/data/queries.server";
 import { ProductForm } from "~/components/admin/ProductForm";
 import { slugify } from "~/lib/utils";
 
@@ -12,81 +19,122 @@ export async function loader({ request }: LoaderFunctionArgs) {
   return null;
 }
 
+function kebab(s: string): string {
+  return s.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+}
+
 export async function action({ request }: ActionFunctionArgs) {
   const form = await request.formData();
 
-  // Shared fields
   const name = form.get("name") as string;
-  const price = Number(form.get("price"));
-  const priceMxn = Number(form.get("price_mxn"));
-  const category = form.get("category") as string;
-  const gender = form.get("gender") as string;
-  const sizesRaw = (form.get("sizes_raw") as string) || "";
-  const sizes = sizesRaw.split(",").map((s) => s.trim()).filter(Boolean);
-  const material = form.get("material") as string;
   const description = form.get("description") as string;
+  const category = form.get("category") as string;
+  const gender = form.get("gender") as "men" | "women" | "unisex";
+  const sizes = ((form.get("sizes_raw") as string) || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const material = (form.get("material") as string) || "";
   const origin = (form.get("origin") as string) || "Made in Mexico";
   const fit = (form.get("fit") as string) || null;
+  const tags = ((form.get("tags_raw") as string) || "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+  const brand = (form.get("brand") as string) || null;
 
-  // Process variants
-  const variantsCount = Number(form.get("variants_count"));
   const displayPosition = (form.get("display_position") as string) || "last";
-  const maxPos = await getMaxProductPosition();
+  const variantsCount = Number(form.get("variants_count"));
+  const defaultVariantIndexRaw = form.get("default_variant_index") as string | null;
 
-  // If placing at the beginning, shift all existing products down
+  const baseProductId = `p-${kebab(name)}-${gender}`.replace(/-+/g, "-");
+  const baseSlug = `${kebab(name)}-${gender}`.replace(/-+/g, "-");
+
+  // Position: shift existing if inserting at top.
+  const maxPos = await getMaxProductPosition();
+  let productPosition: number;
   if (displayPosition === "first") {
     const existing = await getAdminProducts();
-    const shifted = existing.map((p) => ({ id: p.id, position: p.position + variantsCount }));
+    const shifted = existing.map((p) => ({ id: p.id, position: p.position + 1 }));
     await updateProductPositions(shifted);
+    productPosition = 1;
+  } else {
+    productPosition = maxPos + 1;
   }
+
+  await upsertBaseProduct({
+    id: baseProductId,
+    slug: baseSlug,
+    name,
+    description,
+    category,
+    gender,
+    material,
+    origin,
+    fit,
+    sizes,
+    tags,
+    brand,
+    position: productPosition,
+  });
+
+  const variantInputs = [];
+  let firstVariantId: string | null = null;
+  let defaultVariantId: string | null = null;
 
   for (let i = 0; i < variantsCount; i++) {
-    const variantId = form.get(`variant_${i}_id`) as string;
-    const color = form.get(`variant_${i}_color`) as string;
-
-    // Images are already uploaded — just read the URLs
+    const rawId = form.get(`variant_${i}_id`) as string;
+    const colorName = (form.get(`variant_${i}_color`) as string) || "";
+    const colorHex = (form.get(`variant_${i}_color_hex`) as string) || null;
+    const sku =
+      (form.get(`variant_${i}_sku`) as string) ||
+      `${baseSlug}-${kebab(colorName)}`;
+    const price = Number(form.get(`variant_${i}_price`));
+    const priceMxn = Number(form.get(`variant_${i}_price_mxn`) ?? 0);
+    const compareAtRaw = form.get(`variant_${i}_compare_at_price`) as string | null;
+    const compareAtPrice = compareAtRaw && compareAtRaw !== "" ? Number(compareAtRaw) : null;
     const image = (form.get(`variant_${i}_image`) as string) || "";
     const imageHover = (form.get(`variant_${i}_imageHover`) as string) || "";
-    const galleryRaw = (form.get(`variant_${i}_gallery`) as string) || "[]";
-    const images: string[] = JSON.parse(galleryRaw);
-    const sizeStockRaw = (form.get(`variant_${i}_size_stock`) as string) || "{}";
-    const sizeStock: Record<string, number> = JSON.parse(sizeStockRaw);
-    const variantStatus = (form.get(`variant_${i}_status`) as string) || "active";
-    const variantBadgeRaw = (form.get(`variant_${i}_badge`) as string) || "";
-    const variantBadge = variantBadgeRaw || null;
-    const variantIsNew = form.get(`variant_${i}_isNew`) === "true";
+    const gallery: string[] = JSON.parse((form.get(`variant_${i}_gallery`) as string) || "[]");
+    const sizeStock: Record<string, number> = JSON.parse(
+      (form.get(`variant_${i}_size_stock`) as string) || "{}",
+    );
+    const status = (form.get(`variant_${i}_status`) as "active" | "draft" | "archived") || "active";
+    const badgeRaw = form.get(`variant_${i}_badge`) as string;
+    const badge = badgeRaw ? badgeRaw : null;
+    const isNew = form.get(`variant_${i}_isNew`) === "true";
 
-    const finalId = variantId.startsWith("new-")
-      ? `p-${Date.now()}-${i}`
-      : variantId;
+    const finalId = rawId.startsWith("new-") ? `v-${baseProductId}-${kebab(colorName)}` : rawId;
+    const variantSlug = `${baseSlug}-${kebab(colorName)}`;
 
-    const slug = slugify(name, color, gender);
-    const position = displayPosition === "first" ? i + 1 : maxPos + 1 + i;
+    if (firstVariantId === null) firstVariantId = finalId;
+    if (defaultVariantIndexRaw && Number(defaultVariantIndexRaw) === i) {
+      defaultVariantId = finalId;
+    }
 
-    await upsertProduct({
+    variantInputs.push({
       id: finalId,
-      slug,
-      name,
+      productId: baseProductId,
+      slug: variantSlug,
+      colorName,
+      colorHex,
+      sku,
       price,
       priceMxn,
+      compareAtPrice,
+      sizeStock,
+      status,
       image,
       imageHover,
-      images,
-      category,
-      badge: variantBadge,
-      sizes,
-      sizeStock,
-      isNew: variantIsNew,
-      description,
-      material,
-      origin,
-      color,
-      fit,
-      gender,
-      status: variantStatus,
-      position,
+      images: gallery,
+      badge,
+      isNew,
+      sortOrder: i + 1,
     });
   }
+
+  await upsertVariants(variantInputs);
+  await setDefaultVariant(baseProductId, defaultVariantId ?? firstVariantId);
 
   return redirect("/admin/products");
 }

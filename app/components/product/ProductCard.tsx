@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "@remix-run/react";
 import { motion } from "framer-motion";
 import { cn } from "~/lib/utils";
 import { useLocale } from "~/context/LocaleContext";
 import { QuickAdd } from "./QuickAdd";
-import type { Product } from "~/lib/types";
+import type { Product, ProductVariant } from "~/lib/types";
 import { OptimizedImage } from "~/components/ui/OptimizedImage";
+import { colorSwatch } from "~/lib/color-map";
 
 interface ProductCardProps {
   product: Product;
@@ -14,8 +15,29 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, index = 0, variant = "dark" }: ProductCardProps) {
-  const [hovered, setHovered] = useState(false);
   const { formatLocalPrice } = useLocale();
+
+  const activeVariants = useMemo<ProductVariant[]>(
+    () =>
+      product.variants
+        .filter((v) => v.status === "active")
+        .sort((a, b) => a.sortOrder - b.sortOrder),
+    [product.variants],
+  );
+
+  const defaultVariant =
+    activeVariants.find((v) => v.id === product.defaultVariantId) ?? activeVariants[0];
+
+  const [selected, setSelected] = useState<ProductVariant | undefined>(defaultVariant);
+  const [hovered, setHovered] = useState(false);
+
+  const view = selected ?? defaultVariant;
+  if (!view) return null;
+
+  const linkTo =
+    view.id === product.defaultVariantId
+      ? `/product/${product.slug}`
+      : `/product/${product.slug}?variant=${view.id}`;
 
   return (
     <motion.div
@@ -27,72 +49,112 @@ export function ProductCard({ product, index = 0, variant = "dark" }: ProductCar
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <Link to={`/product/${product.slug}`} prefetch="intent">
-        {/* Image */}
+      <Link to={linkTo} prefetch="intent">
         <div className="relative aspect-[3/4] overflow-hidden bg-flow-900 mb-3 rounded-2xl">
           <OptimizedImage
-            src={product.image}
-            alt={product.name}
+            src={view.image}
+            alt={`${product.name} ${view.colorName}`}
             widths={[320, 480, 640]}
             sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
             className={cn(
-              "absolute inset-0 w-full h-full object-contain transition-opacity duration-500",
-              hovered ? "opacity-0" : "opacity-100"
+              "absolute inset-0 w-full h-full object-cover transition-opacity duration-500",
+              hovered && view.imageHover ? "opacity-0" : "opacity-100",
             )}
           />
-          <OptimizedImage
-            src={product.imageHover}
-            alt={`${product.name} alternate view`}
-            widths={[320, 480, 640]}
-            sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
-            className={cn(
-              "absolute inset-0 w-full h-full object-contain transition-opacity duration-500",
-              hovered ? "opacity-100" : "opacity-0"
-            )}
-          />
+          {view.imageHover && (
+            <OptimizedImage
+              src={view.imageHover}
+              alt={`${product.name} ${view.colorName} alternate view`}
+              widths={[320, 480, 640]}
+              sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+              className={cn(
+                "absolute inset-0 w-full h-full object-cover transition-opacity duration-500",
+                hovered ? "opacity-100" : "opacity-0",
+              )}
+            />
+          )}
 
-          {/* Badge */}
-          {product.badge && (
+          {view.badge && (
             <span
               className={cn(
                 "absolute top-3 left-3 text-[10px] uppercase tracking-[0.2em] px-2.5 py-1 font-medium rounded-full",
-                product.badge === "New"
+                view.badge === "New"
                   ? "bg-white text-flow-black"
-                  : product.badge === "Low Stock"
+                  : view.badge === "Low Stock"
                     ? "bg-red-600 text-white"
-                    : "bg-flow-black text-white border border-flow-700"
+                    : "bg-flow-black text-white border border-flow-700",
               )}
             >
-              {product.badge}
+              {view.badge}
             </span>
           )}
 
-          {/* Quick add */}
           <QuickAdd
             sizes={product.sizes}
             visible={hovered}
             productId={product.id}
             productSlug={product.slug}
             productName={product.name}
-            productImage={product.image}
-            productPrice={product.price}
-            productPriceMxn={product.priceMxn}
+            productImage={view.image}
+            productPrice={view.price}
+            productPriceMxn={view.priceMxn}
+            variantId={view.id}
+            variantSlug={view.slug}
+            colorName={view.colorName}
+            sizeStock={view.sizeStock}
           />
         </div>
 
-        {/* Info */}
         <div>
-          <h3 className={cn(
-            "text-sm font-medium mb-1 transition-colors",
-            variant === "light"
-              ? "text-flow-900 group-hover:text-flow-black"
-              : "text-flow-200 group-hover:text-white"
-          )}>
+          <h3
+            className={cn(
+              "text-sm font-medium mb-1 transition-colors",
+              variant === "light"
+                ? "text-flow-900 group-hover:text-flow-black"
+                : "text-flow-200 group-hover:text-white",
+            )}
+          >
             {product.name}
           </h3>
           <p className={cn("text-sm", variant === "light" ? "text-flow-600" : "text-flow-500")}>
-            {formatLocalPrice(product.price, product.priceMxn)}
+            {formatLocalPrice(view.price, view.priceMxn)}
           </p>
+          {activeVariants.length > 1 && (
+            <div
+              className="flex gap-1.5 mt-2"
+              aria-label={`${activeVariants.length} colors available`}
+            >
+              {activeVariants.map((v) => {
+                const isSelected = v.id === view.id;
+                const style = v.colorHex
+                  ? { backgroundColor: v.colorHex }
+                  : undefined;
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setSelected(v);
+                    }}
+                    onMouseEnter={() => setSelected(v)}
+                    className={cn(
+                      "w-3.5 h-3.5 rounded-full border transition-all",
+                      !v.colorHex && colorSwatch(v.colorName),
+                      isSelected
+                        ? "ring-1 ring-offset-1 ring-flow-300 ring-offset-flow-950"
+                        : "hover:scale-110",
+                    )}
+                    style={style}
+                    title={v.colorName}
+                    aria-pressed={isSelected}
+                    aria-label={v.colorName}
+                  />
+                );
+              })}
+            </div>
+          )}
         </div>
       </Link>
     </motion.div>

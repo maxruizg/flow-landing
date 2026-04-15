@@ -90,20 +90,8 @@ export default function Showroom() {
       );
     }
 
-    // Collapse color/gender duplicates to one card per product name.
-    // Prefer gender-specific rows over unisex when both exist.
-    const seen = new Map<string, typeof result[0]>();
-    for (const p of result) {
-      const key = p.name.toLowerCase();
-      const existing = seen.get(key);
-      if (!existing || (existing.gender === "unisex" && p.gender !== "unisex")) {
-        seen.set(key, p);
-      }
-    }
-    result = Array.from(seen.values());
-
     if (showNewOnly) {
-      result = result.filter((p) => p.isNew);
+      result = result.filter((p) => p.variants.some((v) => v.isNew));
     }
 
     switch (sortBy) {
@@ -114,7 +102,11 @@ export default function Showroom() {
         result = [...result].sort((a, b) => b.price - a.price);
         break;
       case "newest":
-        result = [...result].sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
+        result = [...result].sort((a, b) => {
+          const aNew = a.variants.some((v) => v.isNew) ? 1 : 0;
+          const bNew = b.variants.some((v) => v.isNew) ? 1 : 0;
+          return bNew - aNew;
+        });
         break;
       default:
         break;

@@ -1,30 +1,65 @@
+export type VariantStatus = "active" | "draft" | "archived";
+
+export interface ProductVariant {
+  id: string;
+  slug: string;
+  productId: string;
+  colorName: string;
+  colorHex: string | null;
+  sku: string;
+  price: number;
+  priceMxn: number;
+  compareAtPrice: number | null;
+  sizeStock: Record<string, number>;
+  stock: number;
+  status: VariantStatus;
+  image: string;
+  imageHover: string;
+  images: string[];
+  badge: string | null;
+  isNew: boolean;
+  sortOrder: number;
+}
+
 export interface Product {
   id: string;
   slug: string;
   name: string;
+  description: string;
+  category: string;
+  gender: "men" | "women" | "unisex";
+  material: string;
+  origin: string;
+  fit?: string;
+  sizes: string[];
+  tags: string[];
+  brand?: string;
+  defaultVariantId: string | null;
+  variants: ProductVariant[];
+  position: number;
+
+  // Legacy-shaped fields, derived from the default (or first) variant.
+  // Kept for PR 1 so existing UI renders unchanged; PR 2 migrates consumers
+  // to read `variants` / the selected variant directly.
   price: number;
   priceMxn: number;
   image: string;
   imageHover: string;
   images: string[];
-  category: string;
   badge?: string;
-  sizes: string[];
-  sizeStock: Record<string, number>;
   isNew?: boolean;
-  description: string;
-  material: string;
-  origin: string;
   color: string;
-  fit?: string;
-  gender: "men" | "women" | "unisex";
+  sizeStock: Record<string, number>;
   colorVariants?: { color: string; slug: string }[];
 }
 
 export interface CartItem {
   productId: string;
+  variantId?: string; // optional during transition; required after PR 4
   productSlug: string;
+  variantSlug?: string;
   productName: string;
+  colorName?: string;
   productImage: string;
   size: string;
   price: number;
@@ -53,7 +88,6 @@ export interface DailyFlowImage {
 export interface AdminProduct extends Product {
   stock: number;
   status: "active" | "draft" | "out_of_stock";
-  position: number;
 }
 
 export interface OrderItem {

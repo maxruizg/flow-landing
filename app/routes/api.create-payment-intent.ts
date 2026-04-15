@@ -42,7 +42,10 @@ export async function action({ request }: ActionFunctionArgs) {
       metadata: {
         items_json: JSON.stringify(
           items.map((i) => ({
+            productId: i.productId,
+            variantId: i.variantId ?? null,
             productName: i.productName,
+            colorName: i.colorName ?? null,
             size: i.size,
             quantity: i.quantity,
             price: currency === "mxn" ? i.priceMxn : i.price,

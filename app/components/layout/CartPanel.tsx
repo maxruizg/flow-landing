@@ -81,7 +81,7 @@ export function CartPanel({ isOpen, onClose }: CartPanelProps) {
                         </div>
                         {/* Remove button */}
                         <button
-                          onClick={() => removeItem(item.productId, item.size)}
+                          onClick={() => removeItem(item.variantId ?? item.productId, item.size)}
                           className="text-flow-600 hover:text-white transition-colors shrink-0"
                           aria-label={`Remove ${item.productName}`}
                         >
@@ -97,7 +97,7 @@ export function CartPanel({ isOpen, onClose }: CartPanelProps) {
                           <button
                             onClick={() =>
                               updateQuantity(
-                                item.productId,
+                                item.variantId ?? item.productId,
                                 item.size,
                                 item.quantity - 1
                               )
@@ -113,7 +113,7 @@ export function CartPanel({ isOpen, onClose }: CartPanelProps) {
                           <button
                             onClick={() =>
                               updateQuantity(
-                                item.productId,
+                                item.variantId ?? item.productId,
                                 item.size,
                                 item.quantity + 1
                               )
