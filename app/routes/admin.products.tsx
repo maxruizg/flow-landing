@@ -139,14 +139,36 @@ export default function AdminProducts() {
   const categories = ["All", ...new Set(adminProducts.map((p) => p.category))];
   const genders = ["All", "men", "women", "unisex"];
 
+  // Group rows by name+gender so color variants show as a single row
+  // (editing any variant opens the grouped editor anyway). Keep a colorCount
+  // so the UI can surface "N colors".
+  const groupedProducts = useMemo(() => {
+    type Grouped = AdminProduct & { colorCount: number };
+    const groups = new Map<string, Grouped>();
+    for (const p of adminProducts) {
+      const key = `${p.name}::${p.gender}`.toLowerCase();
+      const existing = groups.get(key);
+      if (!existing) {
+        groups.set(key, { ...p, colorCount: 1 });
+        continue;
+      }
+      existing.colorCount += 1;
+      // Prefer an "active" representative so the row reflects what the shop shows.
+      if (existing.status !== "active" && p.status === "active") {
+        groups.set(key, { ...p, colorCount: existing.colorCount });
+      }
+    }
+    return Array.from(groups.values());
+  }, [adminProducts]);
+
   const filtered = useMemo(() => {
-    return adminProducts.filter((p) => {
+    return groupedProducts.filter((p) => {
       const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
       const matchCat = category === "All" || p.category === category;
       const matchGender = gender === "All" || p.gender === gender;
       return matchSearch && matchCat && matchGender;
     });
-  }, [adminProducts, search, category, gender]);
+  }, [groupedProducts, search, category, gender]);
 
   const toggleArrange = () => {
     if (!arrangeMode) {
@@ -291,7 +313,12 @@ export default function AdminProducts() {
                             </div>
                             <div>
                               <p className="text-sm text-white font-medium">{product.name}</p>
-                              <p className="text-xs text-flow-500 capitalize">{product.gender}</p>
+                              <p className="text-xs text-flow-500 capitalize">
+                                {product.gender}
+                                {(product as any).colorCount > 1 && (
+                                  <span className="ml-2 text-flow-400 normal-case">· {(product as any).colorCount} colors</span>
+                                )}
+                              </p>
                             </div>
                           </div>
                         </td>
@@ -352,7 +379,12 @@ export default function AdminProducts() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-white font-medium truncate">{product.name}</p>
-                        <p className="text-xs text-flow-500">{product.category} &middot; {formatPrice(product.price)}</p>
+                        <p className="text-xs text-flow-500">
+                          {product.category} &middot; {formatPrice(product.price)}
+                          {(product as any).colorCount > 1 && (
+                            <span className="ml-2 text-flow-400">· {(product as any).colorCount} colors</span>
+                          )}
+                        </p>
                       </div>
                       <div className="flex gap-2">
                         <Link to={product.id} className="text-flow-400 hover:text-white p-1">
