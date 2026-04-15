@@ -3,10 +3,10 @@ import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from "framer-m
 import { Container } from "~/components/ui/Container";
 import { Button } from "~/components/ui/Button";
 import { ProductCard } from "~/components/product/ProductCard";
-import type { Product } from "~/lib/types";
+import type { VariantCard } from "~/lib/variant-cards";
 
 interface ShowroomGridProps {
-  products: Product[];
+  cards: VariantCard[];
   onClearFilters: () => void;
 }
 
@@ -36,7 +36,7 @@ const reducedVariants = {
   exit: { opacity: 0, transition: { duration: 0 } },
 };
 
-export function ShowroomGrid({ products, onClearFilters }: ShowroomGridProps) {
+export function ShowroomGrid({ cards, onClearFilters }: ShowroomGridProps) {
   const prefersReducedMotion = useReducedMotion();
   const [showBackToTop, setShowBackToTop] = useState(false);
   const variants = prefersReducedMotion ? reducedVariants : cardVariants;
@@ -51,7 +51,7 @@ export function ShowroomGrid({ products, onClearFilters }: ShowroomGridProps) {
     window.scrollTo({ top: 0, behavior: prefersReducedMotion ? "auto" : "smooth" });
   };
 
-  if (products.length === 0) {
+  if (cards.length === 0) {
     return (
       <Container className="py-32">
         <motion.div
@@ -93,9 +93,9 @@ export function ShowroomGrid({ products, onClearFilters }: ShowroomGridProps) {
             transition={{ duration: 0.4, ease: [0.33, 1, 0.68, 1] }}
           >
             <AnimatePresence mode="popLayout">
-              {products.map((product, i) => (
+              {cards.map(({ product, variant: v }, i) => (
                 <motion.div
-                  key={product.id}
+                  key={`${product.id}-${v.id}`}
                   custom={i}
                   variants={variants}
                   initial="hidden"
@@ -104,7 +104,7 @@ export function ShowroomGrid({ products, onClearFilters }: ShowroomGridProps) {
                   layout={!prefersReducedMotion}
                   transition={{ layout: { duration: 0.4, ease: [0.33, 1, 0.68, 1] } }}
                 >
-                  <ProductCard product={product} index={0} variant="dark" />
+                  <ProductCard product={product} initialVariant={v} index={0} variant="dark" />
                 </motion.div>
               ))}
             </AnimatePresence>

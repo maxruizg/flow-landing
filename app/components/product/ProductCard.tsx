@@ -12,9 +12,10 @@ interface ProductCardProps {
   product: Product;
   index?: number;
   variant?: "light" | "dark";
+  initialVariant?: ProductVariant;
 }
 
-export function ProductCard({ product, index = 0, variant = "dark" }: ProductCardProps) {
+export function ProductCard({ product, index = 0, variant = "dark", initialVariant }: ProductCardProps) {
   const { formatLocalPrice } = useLocale();
 
   const activeVariants = useMemo<ProductVariant[]>(
@@ -25,13 +26,15 @@ export function ProductCard({ product, index = 0, variant = "dark" }: ProductCar
     [product.variants],
   );
 
-  const defaultVariant =
-    activeVariants.find((v) => v.id === product.defaultVariantId) ?? activeVariants[0];
+  const seedVariant =
+    initialVariant ??
+    activeVariants.find((v) => v.id === product.defaultVariantId) ??
+    activeVariants[0];
 
-  const [selected, setSelected] = useState<ProductVariant | undefined>(defaultVariant);
+  const [selected, setSelected] = useState<ProductVariant | undefined>(seedVariant);
   const [hovered, setHovered] = useState(false);
 
-  const view = selected ?? defaultVariant;
+  const view = selected ?? seedVariant;
   if (!view) return null;
 
   const linkTo =

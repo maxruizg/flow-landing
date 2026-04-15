@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Container } from "~/components/ui/Container";
 import { AnimatedText } from "~/components/ui/AnimatedText";
 import { ProductCard } from "~/components/product/ProductCard";
+import { expandToVariantCards } from "~/lib/variant-cards";
 import type { Product } from "~/lib/types";
 
 interface BestSellersProps {
@@ -120,9 +121,11 @@ export function BestSellers({ products }: BestSellersProps) {
           dragConstraints={constraintsRef}
           dragElastic={0.1}
         >
-          {products.map((product, i) => (
-            <div key={product.id} className="w-[200px] sm:w-[280px] md:w-[340px] flex-shrink-0">
-              <ProductCard product={product} index={i} />
+          {expandToVariantCards(products)
+            .filter((c) => c.variant.badge === "Best Seller")
+            .map(({ product, variant: v }, i) => (
+            <div key={`${product.id}-${v.id}`} className="w-[200px] sm:w-[280px] md:w-[340px] flex-shrink-0">
+              <ProductCard product={product} initialVariant={v} index={i} />
             </div>
           ))}
           {/* Spacer */}

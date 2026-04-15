@@ -242,7 +242,7 @@ export async function findProductByVariantSlug(
 
 export async function getBestSellers(): Promise<Product[]> {
   const all = await getAllProducts();
-  return all.filter((p) => !p.variants.some((v) => v.isNew));
+  return all.filter((p) => p.variants.some((v) => v.badge === "Best Seller"));
 }
 
 export async function getNewArrivals(): Promise<Product[]> {

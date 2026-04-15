@@ -7,6 +7,7 @@ import { Newsletter } from "~/components/home/Newsletter";
 import { ShowroomHero } from "~/components/showroom/ShowroomHero";
 import { ShowroomFilters } from "~/components/showroom/ShowroomFilters";
 import { ShowroomGrid } from "~/components/showroom/ShowroomGrid";
+import { expandToVariantCards } from "~/lib/variant-cards";
 import { getAllProducts } from "~/data/queries.server";
 import type { MetaFunction } from "@remix-run/node";
 
@@ -76,43 +77,41 @@ export default function Showroom() {
     [setSearchParams]
   );
 
-  const filteredProducts = useMemo(() => {
-    let result = allProducts;
+  const filteredCards = useMemo(() => {
+    let products = allProducts;
 
     if (activeCategory !== "All") {
-      result = result.filter((p) => p.category === activeCategory);
+      products = products.filter((p) => p.category === activeCategory);
     }
 
     if (activeGender !== "All") {
       const g = activeGender.toLowerCase();
-      result = result.filter(
-        (p) => p.gender === g || p.gender === "unisex"
-      );
+      products = products.filter((p) => p.gender === g || p.gender === "unisex");
     }
 
+    let cards = expandToVariantCards(products);
+
     if (showNewOnly) {
-      result = result.filter((p) => p.variants.some((v) => v.isNew));
+      cards = cards.filter((c) => c.variant.isNew);
     }
 
     switch (sortBy) {
       case "price-asc":
-        result = [...result].sort((a, b) => a.price - b.price);
+        cards = [...cards].sort((a, b) => a.variant.price - b.variant.price);
         break;
       case "price-desc":
-        result = [...result].sort((a, b) => b.price - a.price);
+        cards = [...cards].sort((a, b) => b.variant.price - a.variant.price);
         break;
       case "newest":
-        result = [...result].sort((a, b) => {
-          const aNew = a.variants.some((v) => v.isNew) ? 1 : 0;
-          const bNew = b.variants.some((v) => v.isNew) ? 1 : 0;
-          return bNew - aNew;
-        });
+        cards = [...cards].sort(
+          (a, b) => (b.variant.isNew ? 1 : 0) - (a.variant.isNew ? 1 : 0),
+        );
         break;
       default:
         break;
     }
 
-    return result;
+    return cards;
   }, [allProducts, activeCategory, activeGender, showNewOnly, sortBy]);
 
   // Normalize gender display (URL is lowercase, pills are capitalized)
@@ -130,7 +129,7 @@ export default function Showroom() {
           activeGender={displayGender}
           showNewOnly={showNewOnly}
           sortBy={sortBy}
-          productCount={filteredProducts.length}
+          productCount={filteredCards.length}
           onCategoryChange={onCategoryChange}
           onGenderChange={onGenderChange}
           onNewOnlyChange={onNewOnlyChange}
@@ -138,7 +137,7 @@ export default function Showroom() {
           onClearAll={onClearAll}
         />
         <ShowroomGrid
-          products={filteredProducts}
+          cards={filteredCards}
           onClearFilters={onClearAll}
         />
         <Newsletter />
