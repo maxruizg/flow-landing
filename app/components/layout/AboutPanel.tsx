@@ -45,18 +45,6 @@ export function AboutPanel({ isOpen, onClose }: AboutPanelProps) {
             {brand.origin}
           </p>
         </section>
-
-        <section>
-          <h3 className="text-xs uppercase tracking-[0.2em] text-white mb-3">
-            Contact
-          </h3>
-          <a
-            href="mailto:contact@flowurbanwear.com"
-            className="text-sm text-flow-300 hover:text-white transition-colors underline underline-offset-4 decoration-flow-700 hover:decoration-white"
-          >
-            contact@flowurbanwear.com
-          </a>
-        </section>
       </div>
     </SlidePanel>
   );

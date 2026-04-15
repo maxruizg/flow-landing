@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Container } from "~/components/ui/Container";
 import { brand } from "~/data/brand";
 import { AboutPanel } from "./AboutPanel";
+import { ContactPanel } from "./ContactPanel";
 import { ShippingPanel } from "./ShippingPanel";
 import { PolicyPanel } from "./PolicyPanel";
 
@@ -16,16 +17,17 @@ const socialLinks: { label: string; href: string }[] = [
 
 interface CompanyLink {
   label: string;
-  action: "about" | "link";
+  action: "about" | "contact";
 }
 
 const companyLinks: CompanyLink[] = [
   { label: "About Us", action: "about" },
-  { label: "Contact", action: "about" },
+  { label: "Contact", action: "contact" },
 ];
 
 export function Footer() {
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
   const [shippingOpen, setShippingOpen] = useState(false);
   const [policyOpen, setPolicyOpen] = useState(false);
 
@@ -60,6 +62,7 @@ export function Footer() {
                         type="button"
                         onClick={() => {
                           if (link.action === "about") setAboutOpen(true);
+                          else if (link.action === "contact") setContactOpen(true);
                         }}
                         className="text-sm text-flow-500 hover:text-white transition-colors"
                       >
@@ -132,6 +135,7 @@ export function Footer() {
       </footer>
 
       <AboutPanel isOpen={aboutOpen} onClose={() => setAboutOpen(false)} />
+      <ContactPanel isOpen={contactOpen} onClose={() => setContactOpen(false)} />
       <ShippingPanel isOpen={shippingOpen} onClose={() => setShippingOpen(false)} />
       <PolicyPanel isOpen={policyOpen} onClose={() => setPolicyOpen(false)} />
     </>
