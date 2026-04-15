@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { collections, bestSellers, newArrivals, dailyFlowImages } from "./mock.ts";
-import { adminOrders, adminCustomers, adminNotifications } from "./admin-mock.ts";
+// Mock admin data no longer seeded — only real data from the admin panel
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY!;
@@ -203,50 +203,11 @@ async function seed() {
   if (editErr) throw editErr;
   console.log("  Done.\n");
 
-  // 4. Customers
-  console.log(`Inserting ${adminCustomers.length} customers...`);
-  const customerRows = adminCustomers.map((c) => ({
-    id: c.id,
-    name: c.name,
-    email: c.email,
-    total_orders: c.totalOrders,
-    total_spent: c.totalSpent,
-    joined_date: c.joinedDate,
-    last_order_date: c.lastOrderDate,
-  }));
-  const { error: custErr } = await supabase.from("customers").upsert(customerRows);
-  if (custErr) throw custErr;
-  console.log("  Done.\n");
-
-  // 5. Orders
-  console.log(`Inserting ${adminOrders.length} orders...`);
-  const orderRows = adminOrders.map((o) => ({
-    id: o.id,
-    customer_name: o.customerName,
-    customer_email: o.customerEmail,
-    date: o.date,
-    items: o.items,
-    total: o.total,
-    status: o.status,
-    shipping_address: o.shippingAddress,
-  }));
-  const { error: ordErr } = await supabase.from("orders").upsert(orderRows);
-  if (ordErr) throw ordErr;
-  console.log("  Done.\n");
-
-  // 6. Notifications
-  console.log(`Inserting ${adminNotifications.length} notifications...`);
-  const notifRows = adminNotifications.map((n) => ({
-    id: n.id,
-    type: n.type,
-    title: n.title,
-    message: n.message,
-    date: n.date,
-    read: n.read,
-    link_to: n.linkTo || null,
-  }));
-  const { error: notifErr } = await supabase.from("notifications").upsert(notifRows);
-  if (notifErr) throw notifErr;
+  // 4. Clean mock data from orders, customers, notifications
+  console.log("Cleaning mock orders, customers, notifications...");
+  await supabase.from("orders").delete().neq("id", "");
+  await supabase.from("customers").delete().neq("id", "");
+  await supabase.from("notifications").delete().neq("id", "");
   console.log("  Done.\n");
 
   console.log(`Seed complete! (images: ${uploadImages ? "uploaded" : "deterministic URLs"})`);

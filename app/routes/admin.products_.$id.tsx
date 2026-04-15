@@ -5,6 +5,7 @@ import type {
   LoaderFunctionArgs,
   ActionFunctionArgs,
 } from "@remix-run/node";
+import { requireAdmin } from "~/lib/session.server";
 import {
   getAdminProductById,
   getProductSiblingsByName,
@@ -17,7 +18,8 @@ import { slugify } from "~/lib/utils";
 
 export const meta: MetaFunction = () => [{ title: "FLOW Admin — Edit Product" }];
 
-export async function loader({ params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: LoaderFunctionArgs) {
+  await requireAdmin(request);
   const product = await getAdminProductById(params.id!);
   if (!product) {
     throw new Response("Product not found", { status: 404 });

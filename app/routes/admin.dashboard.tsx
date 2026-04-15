@@ -1,6 +1,7 @@
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
-import type { MetaFunction } from "@remix-run/node";
+import type { MetaFunction, LoaderFunctionArgs } from "@remix-run/node";
+import { requireAdmin } from "~/lib/session.server";
 import { motion } from "framer-motion";
 import { StatCard } from "~/components/admin/StatCard";
 import { RevenueChart } from "~/components/admin/RevenueChart";
@@ -12,7 +13,8 @@ export const meta: MetaFunction = () => [
   { title: "FLOW Admin — Dashboard" },
 ];
 
-export async function loader() {
+export async function loader({ request }: LoaderFunctionArgs) {
+  await requireAdmin(request);
   const [dashboardStats, revenueData, adminOrders] = await Promise.all([
     getDashboardStats(),
     getRevenueData(),

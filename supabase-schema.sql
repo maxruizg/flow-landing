@@ -99,6 +99,14 @@ create table if not exists subscribers (
   active boolean not null default true
 );
 
+create table if not exists admins (
+  id text primary key,
+  name text not null,
+  email text unique not null,
+  password_hash text not null,
+  created_at timestamptz not null default now()
+);
+
 -- Enable RLS (Row Level Security) but allow anon access for now
 alter table products enable row level security;
 alter table collections enable row level security;
@@ -108,6 +116,7 @@ alter table orders enable row level security;
 alter table notifications enable row level security;
 alter table banners enable row level security;
 alter table subscribers enable row level security;
+alter table admins enable row level security;
 
 -- Policies: allow full access via anon key (adjust for production)
 create policy "Allow all on products" on products for all using (true) with check (true);
@@ -118,3 +127,4 @@ create policy "Allow all on orders" on orders for all using (true) with check (t
 create policy "Allow all on notifications" on notifications for all using (true) with check (true);
 create policy "Allow all on banners" on banners for all using (true) with check (true);
 create policy "Allow all on subscribers" on subscribers for all using (true) with check (true);
+create policy "Allow all on admins" on admins for all using (true) with check (true);

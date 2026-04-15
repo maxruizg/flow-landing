@@ -1,6 +1,7 @@
 import { json, redirect } from "@remix-run/node";
 import { useLoaderData, Form, Link } from "@remix-run/react";
-import type { MetaFunction, ActionFunctionArgs } from "@remix-run/node";
+import type { MetaFunction, ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import { requireAdmin } from "~/lib/session.server";
 import { motion } from "framer-motion";
 import { useState, useMemo } from "react";
 import { cn, formatPrice } from "~/lib/utils";
@@ -74,7 +75,8 @@ function SortableItem({ product, index }: { product: AdminProduct; index: number
 
 export const meta: MetaFunction = () => [{ title: "FLOW Admin — Products" }];
 
-export async function loader() {
+export async function loader({ request }: LoaderFunctionArgs) {
+  await requireAdmin(request);
   const adminProducts = await getAdminProducts();
   return json({ adminProducts });
 }

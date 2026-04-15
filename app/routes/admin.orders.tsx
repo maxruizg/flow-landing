@@ -1,6 +1,7 @@
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
-import type { MetaFunction } from "@remix-run/node";
+import type { MetaFunction, LoaderFunctionArgs } from "@remix-run/node";
+import { requireAdmin } from "~/lib/session.server";
 import { motion } from "framer-motion";
 import { useState, useMemo } from "react";
 import { cn, formatPrice } from "~/lib/utils";
@@ -14,7 +15,8 @@ export const meta: MetaFunction = () => [{ title: "FLOW Admin — Orders" }];
 
 const statusTabs = ["all", "processing", "shipped", "delivered", "cancelled"] as const;
 
-export async function loader() {
+export async function loader({ request }: LoaderFunctionArgs) {
+  await requireAdmin(request);
   const adminOrders = await getAdminOrders();
   return json({ adminOrders });
 }

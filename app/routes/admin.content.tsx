@@ -1,6 +1,7 @@
 import { json, redirect } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
-import type { MetaFunction, ActionFunctionArgs } from "@remix-run/node";
+import type { MetaFunction, ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import { requireAdmin } from "~/lib/session.server";
 import { motion } from "framer-motion";
 import { useRef, useState, useCallback } from "react";
 import { cn } from "~/lib/utils";
@@ -16,7 +17,8 @@ import { uploadImage } from "~/lib/supabase.server";
 
 export const meta: MetaFunction = () => [{ title: "FLOW Admin — Content" }];
 
-export async function loader() {
+export async function loader({ request }: LoaderFunctionArgs) {
+  await requireAdmin(request);
   const [collections, dailyFlowImages] = await Promise.all([
     getCollections(),
     getDailyFlowImages(),

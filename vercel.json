@@ -1,3 +1,14 @@
 {
-  "installCommand": "pnpm install"
+  "installCommand": "pnpm install",
+  "functions": {
+    "api/**": {
+      "maxDuration": 30
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/run-scheduled-campaigns",
+      "schedule": "*/5 * * * *"
+    }
+  ]
 }

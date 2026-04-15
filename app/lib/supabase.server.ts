@@ -8,10 +8,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export async function uploadImage(file: File, folder: string): Promise<string> {
   const ext = file.name.split(".").pop();
   const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-  const buffer = Buffer.from(await file.arrayBuffer());
+  const arrayBuffer = await file.arrayBuffer();
   const { error } = await supabase.storage
     .from("images")
-    .upload(fileName, buffer, {
+    .upload(fileName, new Uint8Array(arrayBuffer), {
       contentType: file.type,
       upsert: false,
     });

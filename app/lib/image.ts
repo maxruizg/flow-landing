@@ -1,37 +1,22 @@
-const SUPABASE_STORAGE_PATH = "/storage/v1/object/public/";
-const SUPABASE_RENDER_PATH = "/storage/v1/render/image/public/";
-
 /**
- * Converts a Supabase Storage public URL into a transform URL with resizing.
- * For non-Supabase URLs (local /images/...), returns the original URL unchanged.
+ * Returns the image URL as-is. Supabase render transforms were causing
+ * incorrect cropping, so we serve originals and let CSS handle sizing.
  */
 export function optimizedImageUrl(
   src: string,
-  width: number,
-  quality = 80
+  _width?: number,
+  _quality?: number
 ): string {
-  if (!src || !src.includes(SUPABASE_STORAGE_PATH)) {
-    return src;
-  }
-
-  const base = src.replace(SUPABASE_STORAGE_PATH, SUPABASE_RENDER_PATH);
-  return `${base}?width=${width}&quality=${quality}&resize=cover`;
+  return src;
 }
 
 /**
- * Builds a srcSet string from a list of widths for responsive images.
- * Only generates srcSet for Supabase-hosted images.
+ * Returns undefined — no srcSet needed when serving originals.
  */
 export function buildSrcSet(
-  src: string,
-  widths: number[],
-  quality = 80
+  _src: string,
+  _widths: number[],
+  _quality?: number
 ): string | undefined {
-  if (!src || !src.includes(SUPABASE_STORAGE_PATH)) {
-    return undefined;
-  }
-
-  return widths
-    .map((w) => `${optimizedImageUrl(src, w, quality)} ${w}w`)
-    .join(", ");
+  return undefined;
 }

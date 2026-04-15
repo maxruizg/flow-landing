@@ -1,6 +1,7 @@
 import { json, redirect } from "@remix-run/node";
 import { useLoaderData, Form, useNavigation } from "@remix-run/react";
-import type { MetaFunction, ActionFunctionArgs } from "@remix-run/node";
+import type { MetaFunction, ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import { requireAdmin } from "~/lib/session.server";
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { getActiveSubscribers, getSubscriberCount } from "~/data/queries.server";
@@ -13,7 +14,8 @@ const inputClass =
   "w-full bg-flow-950 border border-flow-700 rounded-lg px-4 py-3 text-sm text-flow-100 placeholder:text-flow-500 focus:border-accent-500 focus:outline-none transition-colors";
 const labelClass = "block text-xs text-flow-400 mb-1.5 uppercase tracking-wide";
 
-export async function loader() {
+export async function loader({ request }: LoaderFunctionArgs) {
+  await requireAdmin(request);
   const [subscribers, count] = await Promise.all([
     getActiveSubscribers(),
     getSubscriberCount(),

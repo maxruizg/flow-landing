@@ -1,10 +1,16 @@
 import { redirect } from "@remix-run/node";
-import type { MetaFunction, ActionFunctionArgs } from "@remix-run/node";
+import type { MetaFunction, ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import { requireAdmin } from "~/lib/session.server";
 import { upsertProduct, getMaxProductPosition, getAdminProducts, updateProductPositions } from "~/data/queries.server";
 import { ProductForm } from "~/components/admin/ProductForm";
 import { slugify } from "~/lib/utils";
 
 export const meta: MetaFunction = () => [{ title: "FLOW Admin — New Product" }];
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  await requireAdmin(request);
+  return null;
+}
 
 export async function action({ request }: ActionFunctionArgs) {
   const form = await request.formData();

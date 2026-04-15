@@ -349,20 +349,48 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   ]);
 
   const allOrders = orders || [];
-  const totalRevenue = allOrders
-    .filter((o: any) => o.status !== "cancelled")
-    .reduce((sum: number, o: any) => sum + o.total, 0);
+  const validOrders = allOrders.filter((o: any) => o.status !== "cancelled");
+  const totalRevenue = validOrders.reduce((sum: number, o: any) => sum + o.total, 0);
 
   const today = new Date().toISOString().slice(0, 10);
   const ordersToday = allOrders.filter((o: any) => o.date === today).length;
+
+  // Calculate month-over-month changes from real data
+  const now = new Date();
+  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`;
+
+  let thisMonthRevenue = 0;
+  let prevMonthRevenue = 0;
+  let thisMonthOrders = 0;
+  let prevMonthOrders = 0;
+
+  for (const o of validOrders) {
+    const orderMonth = (o.date as string).slice(0, 7);
+    if (orderMonth === thisMonth) {
+      thisMonthRevenue += o.total;
+      thisMonthOrders++;
+    } else if (orderMonth === prevMonth) {
+      prevMonthRevenue += o.total;
+      prevMonthOrders++;
+    }
+  }
+
+  const revenueChange = prevMonthRevenue > 0
+    ? ((thisMonthRevenue - prevMonthRevenue) / prevMonthRevenue) * 100
+    : 0;
+  const ordersChange = prevMonthOrders > 0
+    ? ((thisMonthOrders - prevMonthOrders) / prevMonthOrders) * 100
+    : 0;
 
   return {
     totalRevenue,
     ordersToday,
     totalProducts: totalProducts || 0,
     totalCustomers: totalCustomers || 0,
-    revenueChange: 12.5,
-    ordersChange: -3.2,
+    revenueChange: Math.round(revenueChange * 10) / 10,
+    ordersChange: Math.round(ordersChange * 10) / 10,
   };
 }
 
@@ -616,4 +644,304 @@ export async function upsertBanner(banner: {
   };
   const { error } = await supabase.from("banners").upsert(row);
   if (error) throw error;
+}
+
+// ─── Admin Users ────────────────────────────────────────────────
+
+export async function getAdminByEmail(email: string) {
+  const { data } = await supabase
+    .from("admins")
+    .select("*")
+    .eq("email", email.toLowerCase())
+    .maybeSingle();
+  return data;
+}
+
+export async function getAdminById(id: string) {
+  const { data } = await supabase
+    .from("admins")
+    .select("id, name, email")
+    .eq("id", id)
+    .maybeSingle();
+  return data;
+}
+
+export async function getAllAdmins() {
+  const { data, error } = await supabase
+    .from("admins")
+    .select("id, name, email, created_at")
+    .order("created_at");
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createAdmin(name: string, email: string, passwordHash: string) {
+  const { error } = await supabase.from("admins").insert({
+    id: crypto.randomUUID(),
+    name,
+    email: email.toLowerCase(),
+    password_hash: passwordHash,
+  });
+  if (error) throw error;
+}
+
+export async function deleteAdmin(id: string) {
+  const { error } = await supabase.from("admins").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function updateAdminUser(id: string, updates: { name?: string; email?: string; passwordHash?: string }) {
+  const row: Record<string, any> = {};
+  if (updates.name) row.name = updates.name;
+  if (updates.email) row.email = updates.email.toLowerCase();
+  if (updates.passwordHash) row.password_hash = updates.passwordHash;
+  const { error } = await supabase.from("admins").update(row).eq("id", id);
+  if (error) throw error;
+}
+
+export async function getAdminCount() {
+  const { count, error } = await supabase
+    .from("admins")
+    .select("*", { count: "exact", head: true });
+  if (error) throw error;
+  return count || 0;
+}
+
+// ─── Email Templates ────────────────────────────────────────────
+
+export async function getEmailTemplates() {
+  const { data, error } = await supabase
+    .from("email_templates")
+    .select("*")
+    .order("created_at");
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getEmailTemplate(id: string) {
+  const { data } = await supabase
+    .from("email_templates")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  return data;
+}
+
+// ─── Email Campaigns ────────────────────────────────────────────
+
+export async function getCampaigns() {
+  const { data, error } = await supabase
+    .from("email_campaigns")
+    .select("*, email_templates(name, component_name)")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getCampaign(id: string) {
+  const { data } = await supabase
+    .from("email_campaigns")
+    .select("*, email_templates(name, component_name, variables_schema)")
+    .eq("id", id)
+    .maybeSingle();
+  return data;
+}
+
+export async function createCampaign(campaign: {
+  name: string;
+  subject?: string;
+  preheader?: string;
+  templateId: string;
+  status?: string;
+  scheduledAt?: string | null;
+  targetTags?: string[];
+}) {
+  const id = `camp-${Date.now().toString(36)}`;
+  const { error } = await supabase.from("email_campaigns").insert({
+    id,
+    name: campaign.name,
+    subject: campaign.subject || "",
+    preheader: campaign.preheader || "",
+    template_id: campaign.templateId,
+    status: campaign.status || "draft",
+    scheduled_at: campaign.scheduledAt || null,
+    target_tags: campaign.targetTags || [],
+  });
+  if (error) throw error;
+  return id;
+}
+
+export async function updateCampaign(id: string, updates: Record<string, any>) {
+  const row: Record<string, any> = { updated_at: new Date().toISOString() };
+  if (updates.name !== undefined) row.name = updates.name;
+  if (updates.subject !== undefined) row.subject = updates.subject;
+  if (updates.preheader !== undefined) row.preheader = updates.preheader;
+  if (updates.templateId !== undefined) row.template_id = updates.templateId;
+  if (updates.status !== undefined) row.status = updates.status;
+  if (updates.scheduledAt !== undefined) row.scheduled_at = updates.scheduledAt;
+  if (updates.sentAt !== undefined) row.sent_at = updates.sentAt;
+  if (updates.targetTags !== undefined) row.target_tags = updates.targetTags;
+  const { error } = await supabase.from("email_campaigns").update(row).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteCampaign(id: string) {
+  const { error } = await supabase.from("email_campaigns").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ─── Campaign Content ───────────────────────────────────────────
+
+export async function getCampaignContent(campaignId: string) {
+  const { data } = await supabase
+    .from("campaign_content")
+    .select("*")
+    .eq("campaign_id", campaignId)
+    .maybeSingle();
+  return data;
+}
+
+export async function upsertCampaignContent(campaignId: string, variables: Record<string, any>) {
+  const { data: existing } = await supabase
+    .from("campaign_content")
+    .select("id")
+    .eq("campaign_id", campaignId)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase
+      .from("campaign_content")
+      .update({ variables })
+      .eq("id", existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from("campaign_content").insert({
+      id: `cc-${Date.now().toString(36)}`,
+      campaign_id: campaignId,
+      variables,
+    });
+    if (error) throw error;
+  }
+}
+
+// ─── Campaign Images ────────────────────────────────────────────
+
+export async function getCampaignImages(campaignId: string) {
+  const { data, error } = await supabase
+    .from("campaign_images")
+    .select("*")
+    .eq("campaign_id", campaignId)
+    .order("sort_order");
+  if (error) throw error;
+  return data || [];
+}
+
+export async function upsertCampaignImage(image: {
+  campaignId: string;
+  slotName: string;
+  storageUrl: string;
+  altText?: string;
+  sortOrder?: number;
+}) {
+  const { data: existing } = await supabase
+    .from("campaign_images")
+    .select("id")
+    .eq("campaign_id", image.campaignId)
+    .eq("slot_name", image.slotName)
+    .maybeSingle();
+
+  const row = {
+    campaign_id: image.campaignId,
+    slot_name: image.slotName,
+    storage_url: image.storageUrl,
+    alt_text: image.altText || "",
+    sort_order: image.sortOrder || 0,
+  };
+
+  if (existing) {
+    const { error } = await supabase
+      .from("campaign_images")
+      .update(row)
+      .eq("id", existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from("campaign_images").insert({
+      id: `ci-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      ...row,
+    });
+    if (error) throw error;
+  }
+}
+
+// ─── Campaign Logs ──────────────────────────────────────────────
+
+export async function getCampaignLog(campaignId: string) {
+  const { data } = await supabase
+    .from("campaign_logs")
+    .select("*")
+    .eq("campaign_id", campaignId)
+    .maybeSingle();
+  return data;
+}
+
+export async function createCampaignLog(log: {
+  campaignId: string;
+  totalSent: number;
+  totalFailed: number;
+  startedAt: string;
+  finishedAt: string;
+  errorDetails?: string;
+}) {
+  const { error } = await supabase.from("campaign_logs").insert({
+    id: `cl-${Date.now().toString(36)}`,
+    campaign_id: log.campaignId,
+    total_sent: log.totalSent,
+    total_failed: log.totalFailed,
+    started_at: log.startedAt,
+    finished_at: log.finishedAt,
+    error_details: log.errorDetails || null,
+  });
+  if (error) throw error;
+}
+
+// ─── Subscribers (enhanced) ─────────────────────────────────────
+
+export async function getSubscribersWithTags() {
+  const { data, error } = await supabase
+    .from("subscribers")
+    .select("*")
+    .order("subscribed_at", { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getSubscribersByTags(tags: string[]) {
+  if (tags.length === 0) return getActiveSubscribers();
+  const { data, error } = await supabase
+    .from("subscribers")
+    .select("*")
+    .eq("active", true)
+    .overlaps("tags", tags);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function updateSubscriber(id: string, updates: { name?: string; active?: boolean; tags?: string[] }) {
+  const { error } = await supabase.from("subscribers").update(updates).eq("id", id);
+  if (error) throw error;
+}
+
+export async function getCampaignStats() {
+  const { data: campaigns } = await supabase
+    .from("email_campaigns")
+    .select("status");
+  const { data: logs } = await supabase
+    .from("campaign_logs")
+    .select("total_sent");
+
+  const totalSent = (logs || []).reduce((sum, l) => sum + (l.total_sent || 0), 0);
+  const pending = (campaigns || []).filter(c => c.status === "scheduled").length;
+  const total = (campaigns || []).length;
+
+  return { totalSent, pending, total };
 }

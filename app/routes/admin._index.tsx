@@ -1,18 +1,41 @@
-import { Form, redirect } from "@remix-run/react";
-import type { ActionFunctionArgs, MetaFunction } from "@remix-run/node";
+import { json, redirect } from "@remix-run/node";
+import { Form, useActionData } from "@remix-run/react";
+import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { motion } from "framer-motion";
+import { getAdminByEmail } from "~/data/queries.server";
+import { verifyPassword } from "~/lib/auth.server";
+import { createAdminSession, getAdminSession } from "~/lib/session.server";
 
 export const meta: MetaFunction = () => [
   { title: "FLOW Admin — Sign In" },
 ];
 
+export async function loader({ request }: LoaderFunctionArgs) {
+  const { adminId } = await getAdminSession(request);
+  if (adminId) return redirect("/admin/dashboard");
+  return json({});
+}
+
 export async function action({ request }: ActionFunctionArgs) {
-  // Mock authentication — always succeeds
-  await request.formData();
-  return redirect("/admin/dashboard");
+  const form = await request.formData();
+  const email = (form.get("email") as string || "").trim();
+  const password = form.get("password") as string || "";
+
+  if (!email || !password) {
+    return json({ error: "Email and password are required" }, { status: 400 });
+  }
+
+  const admin = await getAdminByEmail(email);
+  if (!admin || !verifyPassword(password, admin.password_hash)) {
+    return json({ error: "Invalid email or password" }, { status: 401 });
+  }
+
+  return createAdminSession(admin.id, admin.name);
 }
 
 export default function AdminLogin() {
+  const actionData = useActionData<typeof action>();
+
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <motion.div
@@ -31,6 +54,12 @@ export default function AdminLogin() {
             </p>
           </div>
 
+          {actionData?.error && (
+            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+              <p className="text-xs text-red-400 text-center">{actionData.error}</p>
+            </div>
+          )}
+
           <Form method="post" className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-xs text-flow-400 mb-1.5 uppercase tracking-wide">
@@ -41,7 +70,8 @@ export default function AdminLogin() {
                 name="email"
                 type="email"
                 required
-                defaultValue="dany@flowurbanwear.com"
+                autoComplete="email"
+                placeholder="admin@flowurbanwear.com"
                 className="w-full bg-flow-950 border border-flow-700 rounded-lg px-4 py-3 text-sm text-flow-100 placeholder:text-flow-500 focus:border-accent-500 focus:outline-none transition-colors"
               />
             </div>
@@ -55,7 +85,8 @@ export default function AdminLogin() {
                 name="password"
                 type="password"
                 required
-                defaultValue="flow2026"
+                autoComplete="current-password"
+                placeholder="••••••••"
                 className="w-full bg-flow-950 border border-flow-700 rounded-lg px-4 py-3 text-sm text-flow-100 placeholder:text-flow-500 focus:border-accent-500 focus:outline-none transition-colors"
               />
             </div>

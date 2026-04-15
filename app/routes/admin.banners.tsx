@@ -1,6 +1,7 @@
 import { json } from "@remix-run/node";
 import { useLoaderData, Form, useNavigation, useActionData } from "@remix-run/react";
-import type { MetaFunction, ActionFunctionArgs } from "@remix-run/node";
+import type { MetaFunction, ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import { requireAdmin } from "~/lib/session.server";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { getBanner, upsertBanner } from "~/data/queries.server";
@@ -31,7 +32,8 @@ function localInputToUtc(local: string): string | null {
   return d.toISOString();
 }
 
-export async function loader() {
+export async function loader({ request }: LoaderFunctionArgs) {
+  await requireAdmin(request);
   const banner = await getBanner();
   return json({ banner });
 }

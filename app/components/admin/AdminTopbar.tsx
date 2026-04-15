@@ -1,12 +1,20 @@
-import { Link, useNavigate } from "@remix-run/react";
+import { Link, Form } from "@remix-run/react";
 
 interface AdminTopbarProps {
   title: string;
   onMenuToggle: () => void;
+  adminName?: string;
 }
 
-export function AdminTopbar({ title, onMenuToggle }: AdminTopbarProps) {
-  const navigate = useNavigate();
+export function AdminTopbar({ title, onMenuToggle, adminName }: AdminTopbarProps) {
+  const initials = adminName
+    ? adminName
+        .split(" ")
+        .map((w) => w[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : "A";
 
   return (
     <header className="h-16 bg-flow-black border-b border-flow-800/50 flex items-center justify-between px-4 lg:px-6">
@@ -37,22 +45,26 @@ export function AdminTopbar({ title, onMenuToggle }: AdminTopbarProps) {
           <span className="absolute -top-1 -right-1 w-2 h-2 bg-accent-500 rounded-full" />
         </Link>
 
-        <div className="hidden sm:flex items-center gap-2 pl-4 border-l border-flow-800/50">
-          <div className="w-7 h-7 rounded-full bg-flow-800 flex items-center justify-center">
-            <span className="text-xs font-medium text-white">DF</span>
+        {adminName && (
+          <div className="hidden sm:flex items-center gap-2 pl-4 border-l border-flow-800/50">
+            <div className="w-7 h-7 rounded-full bg-flow-800 flex items-center justify-center">
+              <span className="text-xs font-medium text-white">{initials}</span>
+            </div>
+            <span className="text-sm text-flow-300">{adminName}</span>
           </div>
-          <span className="text-sm text-flow-300">Dany Flow</span>
-        </div>
+        )}
 
-        <button
-          onClick={() => navigate("/admin")}
-          className="text-flow-400 hover:text-white transition-colors"
-          aria-label="Log out"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
-        </button>
+        <Form method="post" action="/admin/logout">
+          <button
+            type="submit"
+            className="text-flow-400 hover:text-white transition-colors"
+            aria-label="Log out"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+          </button>
+        </Form>
       </div>
     </header>
   );

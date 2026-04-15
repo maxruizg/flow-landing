@@ -1,6 +1,7 @@
 import { json, redirect } from "@remix-run/node";
 import { useLoaderData, useNavigate, useFetcher } from "@remix-run/react";
-import type { MetaFunction, ActionFunctionArgs } from "@remix-run/node";
+import type { MetaFunction, ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import { requireAdmin } from "~/lib/session.server";
 import { motion } from "framer-motion";
 import { useState, useMemo } from "react";
 import { cn } from "~/lib/utils";
@@ -10,7 +11,8 @@ import type { AdminNotification } from "~/lib/types";
 
 export const meta: MetaFunction = () => [{ title: "FLOW Admin — Notifications" }];
 
-export async function loader() {
+export async function loader({ request }: LoaderFunctionArgs) {
+  await requireAdmin(request);
   const adminNotifications = await getAdminNotifications();
   return json({ adminNotifications });
 }

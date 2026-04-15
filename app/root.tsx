@@ -101,6 +101,10 @@ function EnvScript({ env }: { env: Record<string, string> }) {
 }
 
 export function ErrorBoundary() {
+  const isAdmin =
+    typeof window !== "undefined" &&
+    window.location.pathname.startsWith("/admin");
+
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="text-center">
@@ -109,10 +113,10 @@ export function ErrorBoundary() {
         </h1>
         <p className="text-flow-400 mb-6">Something went wrong.</p>
         <a
-          href="/"
+          href={isAdmin ? "/admin/dashboard" : "/"}
           className="inline-flex items-center px-6 py-3 bg-white text-flow-black font-display font-semibold rounded-lg hover:bg-flow-200 transition-colors"
         >
-          Back to Home
+          {isAdmin ? "Back to Dashboard" : "Back to Home"}
         </a>
       </div>
     </div>
