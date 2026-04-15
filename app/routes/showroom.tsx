@@ -88,18 +88,19 @@ export default function Showroom() {
       result = result.filter(
         (p) => p.gender === g || p.gender === "unisex"
       );
-      // Deduplicate: if same name+color exists as both gender-specific and unisex,
-      // prefer the gender-specific one to avoid showing duplicates
-      const seen = new Map<string, typeof result[0]>();
-      for (const p of result) {
-        const key = `${p.name}::${p.color}`.toLowerCase();
-        const existing = seen.get(key);
-        if (!existing || (existing.gender === "unisex" && p.gender !== "unisex")) {
-          seen.set(key, p);
-        }
-      }
-      result = Array.from(seen.values());
     }
+
+    // Collapse color/gender duplicates to one card per product name.
+    // Prefer gender-specific rows over unisex when both exist.
+    const seen = new Map<string, typeof result[0]>();
+    for (const p of result) {
+      const key = p.name.toLowerCase();
+      const existing = seen.get(key);
+      if (!existing || (existing.gender === "unisex" && p.gender !== "unisex")) {
+        seen.set(key, p);
+      }
+    }
+    result = Array.from(seen.values());
 
     if (showNewOnly) {
       result = result.filter((p) => p.isNew);

@@ -1,9 +1,9 @@
 import { json, redirect } from "@remix-run/node";
-import { useLoaderData, Form, Link } from "@remix-run/react";
+import { useLoaderData, Form, Link, useFetcher } from "@remix-run/react";
 import type { MetaFunction, ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { requireAdmin } from "~/lib/session.server";
-import { motion } from "framer-motion";
-import { useState, useMemo } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { useState, useMemo, useEffect } from "react";
 import { cn, formatPrice } from "~/lib/utils";
 import {
   getAdminProducts,
@@ -87,8 +87,22 @@ export async function action({ request }: ActionFunctionArgs) {
 
   if (intent === "delete") {
     const id = form.get("id") as string;
-    await deleteProduct(id);
-  } else if (intent === "reorder") {
+    try {
+      await deleteProduct(id);
+      return json({ ok: true, intent: "delete" as const });
+    } catch (err: any) {
+      return json(
+        {
+          ok: false,
+          intent: "delete" as const,
+          error: err?.message || "Failed to delete product.",
+        },
+        { status: 400 },
+      );
+    }
+  }
+
+  if (intent === "reorder") {
     const payload = JSON.parse(form.get("positions") as string);
     await updateProductPositions(payload);
   }
@@ -104,6 +118,23 @@ export default function AdminProducts() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [arrangeMode, setArrangeMode] = useState(false);
   const [orderedProducts, setOrderedProducts] = useState<AdminProduct[]>([]);
+
+  const deleteFetcher = useFetcher<{ ok: boolean; intent: "delete"; error?: string }>();
+  const isDeleting = deleteFetcher.state !== "idle";
+  const deleteError =
+    deleteFetcher.state === "idle" && deleteFetcher.data && !deleteFetcher.data.ok
+      ? deleteFetcher.data.error
+      : null;
+  const [showDeleteToast, setShowDeleteToast] = useState(false);
+
+  useEffect(() => {
+    if (deleteFetcher.state === "idle" && deleteFetcher.data?.ok) {
+      setDeleteId(null);
+      setShowDeleteToast(true);
+      const t = setTimeout(() => setShowDeleteToast(false), 2500);
+      return () => clearTimeout(t);
+    }
+  }, [deleteFetcher.state, deleteFetcher.data]);
 
   const categories = ["All", ...new Set(adminProducts.map((p) => p.category))];
   const genders = ["All", "men", "women", "unisex"];
@@ -362,7 +393,10 @@ export default function AdminProducts() {
       {/* Delete confirmation */}
       {deleteId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setDeleteId(null)} />
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() => !isDeleting && setDeleteId(null)}
+          />
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -370,28 +404,52 @@ export default function AdminProducts() {
           >
             <h3 className="text-white font-display font-semibold mb-2">Delete Product</h3>
             <p className="text-sm text-flow-400 mb-6">Are you sure you want to delete this product? This action cannot be undone.</p>
+            {deleteError && (
+              <div className="mb-4 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
+                <p className="text-xs text-red-400">{deleteError}</p>
+              </div>
+            )}
             <div className="flex gap-3">
               <button
                 onClick={() => setDeleteId(null)}
-                className="flex-1 px-4 py-2.5 border border-flow-700 text-flow-300 rounded-lg text-sm hover:bg-flow-800 transition-colors"
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2.5 border border-flow-700 text-flow-300 rounded-lg text-sm hover:bg-flow-800 transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
-              <form method="post">
+              <deleteFetcher.Form method="post" className="flex-1">
                 <input type="hidden" name="intent" value="delete" />
                 <input type="hidden" name="id" value={deleteId} />
                 <button
                   type="submit"
-                  onClick={() => setDeleteId(null)}
-                  className="px-4 py-2.5 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors"
+                  disabled={isDeleting}
+                  className="w-full px-4 py-2.5 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  Delete
+                  {isDeleting ? "Deleting..." : "Delete"}
                 </button>
-              </form>
+              </deleteFetcher.Form>
             </div>
           </motion.div>
         </div>
       )}
+
+      {/* Success toast */}
+      <AnimatePresence>
+        {showDeleteToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            transition={{ duration: 0.25, ease: [0.33, 1, 0.68, 1] }}
+            className="fixed top-20 right-6 z-50 bg-green-500/95 backdrop-blur-sm text-white px-5 py-3 rounded-lg shadow-2xl flex items-center gap-3"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="text-sm font-medium">Product deleted</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </motion.div>
   );

@@ -14,6 +14,8 @@ import {
   updateDailyFlowVideo,
 } from "~/data/queries.server";
 import { uploadImage } from "~/lib/supabase.server";
+import { uploadBlobClient } from "~/lib/supabase.client";
+import { ImageAdjuster } from "~/components/admin/ImageAdjuster";
 
 export const meta: MetaFunction = () => [{ title: "FLOW Admin — Content" }];
 
@@ -65,6 +67,14 @@ export async function action({ request }: ActionFunctionArgs) {
     } else if (intent === "remove-daily-flow-video") {
       const id = form.get("id") as string;
       await updateDailyFlowVideo(id, null);
+    } else if (intent === "set-collection-image") {
+      const id = form.get("id") as string;
+      const url = form.get("url") as string;
+      if (url) await updateCollectionImage(id, url);
+    } else if (intent === "set-daily-flow-image") {
+      const id = form.get("id") as string;
+      const url = form.get("url") as string;
+      if (url) await updateDailyFlowImage(id, url);
     }
   } catch (err) {
     console.error("Content upload failed:", err);
@@ -79,28 +89,55 @@ function MediaCard({
   intentImage,
   intentVideo,
   intentRemoveVideo,
+  intentSetImage,
   imageUrl,
   videoUrl,
   label,
   sublabel,
   tall,
+  adjustFolder,
+  adjustAspect,
 }: {
   id: string;
   intentImage: string;
   intentVideo: string;
   intentRemoveVideo: string;
+  intentSetImage: string;
   imageUrl: string;
   videoUrl?: string;
   label: string;
   sublabel?: string;
   tall?: boolean;
+  adjustFolder: string;
+  adjustAspect: number;
 }) {
   const fetcher = useFetcher();
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const [adjustOpen, setAdjustOpen] = useState(false);
+  const [adjustError, setAdjustError] = useState<string | null>(null);
+  const [adjustSaving, setAdjustSaving] = useState(false);
 
-  const isUploading = fetcher.state !== "idle";
+  const isUploading = fetcher.state !== "idle" || adjustSaving;
+
+  const handleAdjust = async (blob: Blob) => {
+    setAdjustSaving(true);
+    setAdjustError(null);
+    try {
+      const url = await uploadBlobClient(blob, adjustFolder);
+      const formData = new FormData();
+      formData.set("intent", intentSetImage);
+      formData.set("id", id);
+      formData.set("url", url);
+      fetcher.submit(formData, { method: "post" });
+      setAdjustOpen(false);
+    } catch (err: any) {
+      setAdjustError(err?.message || "Save failed");
+    } finally {
+      setAdjustSaving(false);
+    }
+  };
 
   const submitFile = useCallback(
     (file: File, intent: string) => {
@@ -201,7 +238,7 @@ function MediaCard({
             className="w-full h-full object-cover"
           />
         ) : (
-          <img src={imageUrl} alt={label} className="w-full h-full object-cover" />
+          <img src={imageUrl} alt={label} className="w-full h-full object-contain bg-flow-950" />
         )}
 
         {/* Drag overlay */}
@@ -237,6 +274,19 @@ function MediaCard({
               </svg>
               <span className="text-xs text-white uppercase tracking-wide font-medium">Change Image</span>
             </button>
+
+            {imageUrl && !videoUrl && (
+              <button
+                type="button"
+                onClick={() => setAdjustOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-white text-flow-black rounded-lg hover:bg-flow-200 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                <span className="text-xs uppercase tracking-wide font-medium">Adjust</span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -281,6 +331,21 @@ function MediaCard({
           {sublabel && <p className="text-xs text-flow-400">{sublabel}</p>}
         </div>
       </div>
+      {adjustError && (
+        <div className="absolute top-2 left-2 right-2 z-30 bg-red-500/90 text-white text-xs px-2.5 py-1.5 rounded">
+          {adjustError}
+        </div>
+      )}
+      {imageUrl && (
+        <ImageAdjuster
+          open={adjustOpen}
+          src={imageUrl}
+          aspect={adjustAspect}
+          title={`Adjust — ${label}`}
+          onCancel={() => setAdjustOpen(false)}
+          onConfirm={handleAdjust}
+        />
+      )}
     </div>
   );
 }
@@ -308,11 +373,14 @@ export default function AdminContent() {
               intentImage="update-collection-image"
               intentVideo="update-collection-video"
               intentRemoveVideo="remove-collection-video"
+              intentSetImage="set-collection-image"
               imageUrl={col.image}
               videoUrl={col.video}
               label={col.name}
               sublabel={col.season}
               tall
+              adjustFolder="collections"
+              adjustAspect={16 / 9}
             />
           ))}
         </div>
@@ -331,11 +399,14 @@ export default function AdminContent() {
                 intentImage="update-daily-flow-image"
                 intentVideo="update-daily-flow-video"
                 intentRemoveVideo="remove-daily-flow-video"
+                intentSetImage="set-daily-flow-image"
                 imageUrl={dailyFlowImages[0].src}
                 videoUrl={dailyFlowImages[0].video}
                 label={dailyFlowImages[0].alt || "Daily Flow 1"}
                 sublabel={dailyFlowImages[0].caption}
                 tall
+                adjustFolder="editorial"
+                adjustAspect={3 / 4}
               />
             </div>
             {dailyFlowImages.slice(1).map((img) => (
@@ -345,10 +416,13 @@ export default function AdminContent() {
                 intentImage="update-daily-flow-image"
                 intentVideo="update-daily-flow-video"
                 intentRemoveVideo="remove-daily-flow-video"
+                intentSetImage="set-daily-flow-image"
                 imageUrl={img.src}
                 videoUrl={img.video}
                 label={img.alt || `Daily Flow ${img.id}`}
                 sublabel={img.caption}
+                adjustFolder="editorial"
+                adjustAspect={3 / 4}
               />
             ))}
           </div>

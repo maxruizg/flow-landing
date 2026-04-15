@@ -36,7 +36,7 @@ export function ProductCard({ product, index = 0, variant = "dark" }: ProductCar
             widths={[320, 480, 640]}
             sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
             className={cn(
-              "absolute inset-0 w-full h-full object-cover transition-opacity duration-500",
+              "absolute inset-0 w-full h-full object-contain transition-opacity duration-500",
               hovered ? "opacity-0" : "opacity-100"
             )}
           />
@@ -46,7 +46,7 @@ export function ProductCard({ product, index = 0, variant = "dark" }: ProductCar
             widths={[320, 480, 640]}
             sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
             className={cn(
-              "absolute inset-0 w-full h-full object-cover transition-opacity duration-500",
+              "absolute inset-0 w-full h-full object-contain transition-opacity duration-500",
               hovered ? "opacity-100" : "opacity-0"
             )}
           />

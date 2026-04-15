@@ -26,3 +26,18 @@ export async function uploadImageClient(
   const { data } = supabase.storage.from("images").getPublicUrl(fileName);
   return data.publicUrl;
 }
+
+export async function uploadBlobClient(
+  blob: Blob,
+  folder: string,
+  ext = "jpg",
+): Promise<string> {
+  const supabase = getClient();
+  const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const { error } = await supabase.storage
+    .from("images")
+    .upload(fileName, blob, { contentType: blob.type || "image/jpeg" });
+  if (error) throw error;
+  const { data } = supabase.storage.from("images").getPublicUrl(fileName);
+  return data.publicUrl;
+}

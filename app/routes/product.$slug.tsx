@@ -95,7 +95,7 @@ function ProductModal({ product }: { product: Product }) {
                     alt={product.name}
                     widths={[640, 960, 1280]}
                     sizes="(min-width: 768px) 50vw, 100vw"
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                     loading="eager"
                   />
 

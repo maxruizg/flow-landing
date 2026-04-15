@@ -1,7 +1,8 @@
 import { Link, useNavigation } from "@remix-run/react";
 import type { AdminProduct } from "~/lib/types";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { uploadImageClient } from "~/lib/supabase.client";
+import { uploadImageClient, uploadBlobClient } from "~/lib/supabase.client";
+import { ImageAdjuster } from "~/components/admin/ImageAdjuster";
 
 const inputClass =
   "w-full bg-flow-950 border border-flow-700 rounded-lg px-4 py-3 text-sm text-flow-100 placeholder:text-flow-500 focus:border-accent-500 focus:outline-none transition-colors";
@@ -12,15 +13,20 @@ function ImageUpload({
   name,
   existingUrl,
   onUploaded,
+  aspect = 3 / 4,
+  folder = "products",
 }: {
   label: string;
   name: string;
   existingUrl?: string;
   onUploaded: (url: string) => void;
+  aspect?: number;
+  folder?: string;
 }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [adjustOpen, setAdjustOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -35,7 +41,7 @@ function ImageUpload({
     setUploading(true);
     setError(null);
     try {
-      const url = await uploadImageClient(file, "products");
+      const url = await uploadImageClient(file, folder);
       onUploaded(url);
     } catch (err: any) {
       console.error("Upload failed:", err);
@@ -49,6 +55,20 @@ function ImageUpload({
 
   const displayUrl = preview || existingUrl;
 
+  const handleAdjust = async (blob: Blob) => {
+    setUploading(true);
+    setError(null);
+    try {
+      const url = await uploadBlobClient(blob, folder);
+      onUploaded(url);
+      setAdjustOpen(false);
+    } catch (err: any) {
+      setError(err?.message || "Save failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <div>
       <label className={labelClass}>{label}</label>
@@ -60,16 +80,28 @@ function ImageUpload({
         className="hidden"
       />
       {displayUrl ? (
-        <div
-          className="relative group w-full h-40 rounded-lg overflow-hidden bg-flow-950 border border-flow-700 cursor-pointer"
-          onClick={() => inputRef.current?.click()}
-        >
-          <img src={displayUrl} alt="" className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+        <div className="relative group w-full h-40 rounded-lg overflow-hidden bg-flow-950 border border-flow-700">
+          <img src={displayUrl} alt="" className="w-full h-full object-contain" />
+          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
             {uploading ? (
               <span className="text-xs text-white uppercase tracking-wide">Uploading…</span>
             ) : (
-              <span className="text-xs text-white uppercase tracking-wide">Change</span>
+              <>
+                <button
+                  type="button"
+                  onClick={() => inputRef.current?.click()}
+                  className="text-[11px] text-white uppercase tracking-wide bg-black/50 hover:bg-black/80 border border-white/30 rounded px-2.5 py-1"
+                >
+                  Change
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdjustOpen(true)}
+                  className="text-[11px] text-flow-black uppercase tracking-wide bg-white hover:bg-flow-200 rounded px-2.5 py-1"
+                >
+                  Adjust
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -93,6 +125,16 @@ function ImageUpload({
       {error && (
         <p className="text-xs text-red-400 mt-1">{error}</p>
       )}
+      {displayUrl && (
+        <ImageAdjuster
+          open={adjustOpen}
+          src={displayUrl}
+          aspect={aspect}
+          title={`Adjust — ${label}`}
+          onCancel={() => setAdjustOpen(false)}
+          onConfirm={handleAdjust}
+        />
+      )}
     </div>
   );
 }
@@ -101,14 +143,17 @@ function GalleryUpload({
   namePrefix,
   existingUrls,
   onUrlsChange,
+  aspect = 3 / 4,
 }: {
   namePrefix: string;
   existingUrls: string[];
   onUrlsChange: (urls: string[]) => void;
+  aspect?: number;
 }) {
   const [urls, setUrls] = useState<string[]>(existingUrls);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [adjustIndex, setAdjustIndex] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -143,13 +188,39 @@ function GalleryUpload({
     onUrlsChange(next);
   };
 
+  const handleAdjustSave = async (blob: Blob) => {
+    if (adjustIndex === null) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const newUrl = await uploadBlobClient(blob, "products");
+      const next = urls.map((u, i) => (i === adjustIndex ? newUrl : u));
+      setUrls(next);
+      onUrlsChange(next);
+      setAdjustIndex(null);
+    } catch (err: any) {
+      setError(err?.message || "Save failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <div>
       <label className={labelClass}>Gallery Images</label>
       <div className="grid grid-cols-4 gap-3 mb-2">
         {urls.map((url, i) => (
           <div key={`${url}-${i}`} className="relative group h-32 rounded-lg overflow-hidden bg-flow-950 border border-flow-700">
-            <img src={url} alt="" className="w-full h-full object-cover" />
+            <img src={url} alt="" className="w-full h-full object-contain" />
+            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <button
+                type="button"
+                onClick={() => setAdjustIndex(i)}
+                className="text-[10px] text-flow-black uppercase tracking-wide bg-white hover:bg-flow-200 rounded px-2 py-1"
+              >
+                Adjust
+              </button>
+            </div>
             <button
               type="button"
               onClick={() => removeUrl(i)}
@@ -188,6 +259,16 @@ function GalleryUpload({
       {error && (
         <p className="text-xs text-red-400 mt-1">{error}</p>
       )}
+      {adjustIndex !== null && urls[adjustIndex] && (
+        <ImageAdjuster
+          open
+          src={urls[adjustIndex]}
+          aspect={aspect}
+          title="Adjust Gallery Image"
+          onCancel={() => setAdjustIndex(null)}
+          onConfirm={handleAdjustSave}
+        />
+      )}
     </div>
   );
 }
@@ -200,6 +281,9 @@ interface Variant {
   gallery: string[];
   position: number;
   sizeStock: Record<string, number>;
+  status: string;
+  badge: string | null;
+  isNew: boolean;
 }
 
 interface ProductFormProps {
@@ -223,14 +307,11 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
     description: "",
     origin: "",
     fit: "",
-    badge: "",
-    isNew: false,
-    status: "active" as string,
     displayPosition: "last" as string,
   });
 
   const [variants, setVariants] = useState<Variant[]>([
-    { id: "new-initial", color: "", image: "", imageHover: "", gallery: [], position: -1, sizeStock: {} },
+    { id: "new-initial", color: "", image: "", imageHover: "", gallery: [], position: -1, sizeStock: {}, status: "active", badge: null, isNew: false },
   ]);
   const [activeVariantIndex, setActiveVariantIndex] = useState(0);
   const [deletedVariantIds, setDeletedVariantIds] = useState<string[]>([]);
@@ -260,9 +341,6 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
       description: first.description,
       origin: first.origin,
       fit: first.fit || "",
-      badge: first.badge || "",
-      isNew: first.isNew || false,
-      status: first.status,
       displayPosition: "last",
     });
     setVariants(
@@ -274,6 +352,9 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
         gallery: s.images || [],
         position: s.position,
         sizeStock: s.sizeStock || {},
+        status: s.status || "active",
+        badge: s.badge ?? null,
+        isNew: s.isNew || false,
       }))
     );
     setActiveVariantIndex(0);
@@ -333,10 +414,12 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
   const addVariant = () => {
     setVariants((prev) => [
       ...prev,
-      { id: `new-${Date.now()}`, color: "", image: "", imageHover: "", gallery: [], position: -1, sizeStock: {} },
+      { id: `new-${Date.now()}`, color: "", image: "", imageHover: "", gallery: [], position: -1, sizeStock: {}, status: "active", badge: null, isNew: false },
     ]);
     setActiveVariantIndex(variants.length);
   };
+
+  const activeVariant = variants[activeVariantIndex];
 
   const removeVariant = (index: number) => {
     const variant = variants[index];
@@ -382,6 +465,9 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
             <input type="hidden" name={`variant_${i}_imageHover`} value={variant.imageHover} />
             <input type="hidden" name={`variant_${i}_gallery`} value={JSON.stringify(variant.gallery)} />
             <input type="hidden" name={`variant_${i}_size_stock`} value={JSON.stringify(variant.sizeStock)} />
+            <input type="hidden" name={`variant_${i}_status`} value={variant.status} />
+            <input type="hidden" name={`variant_${i}_badge`} value={variant.badge ?? ""} />
+            <input type="hidden" name={`variant_${i}_isNew`} value={variant.isNew ? "true" : "false"} />
           </div>
         ))}
 
@@ -530,11 +616,20 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
           <div className="space-y-6">
             {/* Status & Meta */}
             <div className="bg-flow-900 border border-flow-800/50 rounded-xl p-6">
-              <h2 className="text-sm font-display font-semibold text-white uppercase tracking-wide mb-4">Status & Meta</h2>
+              <div className="mb-4">
+                <h2 className="text-sm font-display font-semibold text-white uppercase tracking-wide">Status & Meta</h2>
+                <p className="text-[11px] text-flow-500 mt-0.5">
+                  Per color{activeVariant?.color ? <> — <span className="text-flow-300">{activeVariant.color}</span></> : null}
+                </p>
+              </div>
               <div className="space-y-4">
                 <div>
                   <label className={labelClass}>Status</label>
-                  <select className={inputClass} name="status" value={form.status} onChange={(e) => update("status", e.target.value)}>
+                  <select
+                    className={inputClass}
+                    value={activeVariant?.status || "active"}
+                    onChange={(e) => updateVariant(activeVariantIndex, { status: e.target.value })}
+                  >
                     <option value="active">Active</option>
                     <option value="draft">Draft</option>
                     <option value="out_of_stock">Out of Stock</option>
@@ -542,7 +637,11 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
                 </div>
                 <div>
                   <label className={labelClass}>Badge</label>
-                  <select className={inputClass} name="badge" value={form.badge} onChange={(e) => update("badge", e.target.value)}>
+                  <select
+                    className={inputClass}
+                    value={activeVariant?.badge || ""}
+                    onChange={(e) => updateVariant(activeVariantIndex, { badge: e.target.value || null })}
+                  >
                     <option value="">None</option>
                     <option value="New">New</option>
                     <option value="Best Seller">Best Seller</option>
@@ -554,10 +653,8 @@ export function ProductForm({ product, siblings }: ProductFormProps) {
                   <label className="flex items-center gap-2 h-[46px] cursor-pointer">
                     <input
                       type="checkbox"
-                      name="isNew"
-                      value="true"
-                      checked={form.isNew}
-                      onChange={(e) => update("isNew", e.target.checked)}
+                      checked={activeVariant?.isNew || false}
+                      onChange={(e) => updateVariant(activeVariantIndex, { isNew: e.target.checked })}
                       className="w-4 h-4 rounded border-flow-700 bg-flow-950 text-accent-500 focus:ring-accent-500"
                     />
                     <span className="text-sm text-flow-300">Is New</span>

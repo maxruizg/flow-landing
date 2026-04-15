@@ -43,9 +43,6 @@ export async function action({ request }: ActionFunctionArgs) {
   const description = form.get("description") as string;
   const origin = (form.get("origin") as string) || "Made in Mexico";
   const fit = (form.get("fit") as string) || null;
-  const badge = (form.get("badge") as string) || null;
-  const isNew = form.get("isNew") === "true";
-  const status = form.get("status") as string;
 
   // Delete removed variants
   const deletedRaw = form.get("deleted_variant_ids") as string;
@@ -72,6 +69,10 @@ export async function action({ request }: ActionFunctionArgs) {
     const images: string[] = JSON.parse(galleryRaw);
     const sizeStockRaw = (form.get(`variant_${i}_size_stock`) as string) || "{}";
     const sizeStock: Record<string, number> = JSON.parse(sizeStockRaw);
+    const variantStatus = (form.get(`variant_${i}_status`) as string) || "active";
+    const variantBadgeRaw = (form.get(`variant_${i}_badge`) as string) || "";
+    const variantBadge = variantBadgeRaw || null;
+    const variantIsNew = form.get(`variant_${i}_isNew`) === "true";
 
     const finalId = variantId.startsWith("new-")
       ? `p-${Date.now()}-${i}`
@@ -94,17 +95,17 @@ export async function action({ request }: ActionFunctionArgs) {
       imageHover,
       images,
       category,
-      badge,
+      badge: variantBadge,
       sizes,
       sizeStock,
-      isNew,
+      isNew: variantIsNew,
       description,
       material,
       origin,
       color,
       fit,
       gender,
-      status,
+      status: variantStatus,
       position,
     });
   }
