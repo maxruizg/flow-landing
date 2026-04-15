@@ -5,7 +5,14 @@ import { AboutPanel } from "./AboutPanel";
 import { ShippingPanel } from "./ShippingPanel";
 import { PolicyPanel } from "./PolicyPanel";
 
-const socialLinks = ["Instagram", "TikTok", "Twitter/X", "Pinterest"];
+const socialLinks: { label: string; href: string }[] = [
+  {
+    label: "Instagram",
+    href: "https://www.instagram.com/flow_urbanwear?igsh=NTFuM25waWNkbzhl&utm_source=qr",
+  },
+  { label: "TikTok", href: "https://www.tiktok.com/@flowurbanwear" },
+  { label: "Pinterest", href: "https://pin.it/4kEAnnRjx" },
+];
 
 interface CompanyLink {
   label: string;
@@ -70,9 +77,14 @@ export function Footer() {
                 </h4>
                 <ul className="space-y-2.5">
                   {socialLinks.map((link) => (
-                    <li key={link}>
-                      <a href="#" className="text-sm text-flow-500 hover:text-white transition-colors">
-                        {link}
+                    <li key={link.label}>
+                      <a
+                        href={link.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-flow-500 hover:text-white transition-colors"
+                      >
+                        {link.label}
                       </a>
                     </li>
                   ))}

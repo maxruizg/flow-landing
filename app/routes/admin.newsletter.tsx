@@ -46,7 +46,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const batch = emails.slice(i, i + BATCH_SIZE);
     await resend.batch.send(
       batch.map((to) => ({
-        from: process.env.RESEND_FROM_EMAIL || "Flow Urban Wear <onboarding@resend.dev>",
+        from: process.env.RESEND_FROM_EMAIL || "Flow Urban Wear <contact@flowurbanwear.com>",
         to,
         subject,
         react: NewDropEmail({ subject, body }),

@@ -115,7 +115,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
       for (let i = 0; i < subscribers.length; i += BATCH_SIZE) {
         const batch = subscribers.slice(i, i + BATCH_SIZE).map((sub) => ({
-          from: process.env.RESEND_FROM_EMAIL || "Flow Urban Wear <onboarding@resend.dev>",
+          from: process.env.RESEND_FROM_EMAIL || "Flow Urban Wear <contact@flowurbanwear.com>",
           to: sub.email,
           subject: campaign.subject,
           html: renderedHtml,
