@@ -338,7 +338,7 @@ export default function AdminProducts() {
                               product.status === "out_of_stock" && "bg-red-500/10 text-red-400"
                             )}
                           >
-                            {product.status.replace("_", " ")}
+                            {(product.status || "active").replace("_", " ")}
                           </span>
                         </td>
                         <td className="px-5 py-3 text-right">
@@ -411,7 +411,7 @@ export default function AdminProducts() {
                           product.status === "out_of_stock" && "bg-red-500/10 text-red-400"
                         )}
                       >
-                        {product.status.replace("_", " ")}
+                        {(product.status || "active").replace("_", " ")}
                       </span>
                     </div>
                   </div>
