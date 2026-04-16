@@ -8,6 +8,8 @@ import { cn } from "~/lib/utils";
 import {
   getCollections,
   getDailyFlowImages,
+  getEmailSettings,
+  saveEmailSettings,
   updateCollectionImage,
   updateCollectionVideo,
   updateDailyFlowImage,
@@ -21,11 +23,12 @@ export const meta: MetaFunction = () => [{ title: "FLOW Admin — Content" }];
 
 export async function loader({ request }: LoaderFunctionArgs) {
   await requireAdmin(request);
-  const [collections, dailyFlowImages] = await Promise.all([
+  const [collections, dailyFlowImages, shopSettings] = await Promise.all([
     getCollections(),
     getDailyFlowImages(),
+    getEmailSettings("showroom_hero"),
   ]);
-  return json({ collections, dailyFlowImages });
+  return json({ collections, dailyFlowImages, shopHeroImage: shopSettings.image || "/images/editorial/collection-ltmf.jpg" });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -75,6 +78,15 @@ export async function action({ request }: ActionFunctionArgs) {
       const id = form.get("id") as string;
       const url = form.get("url") as string;
       if (url) await updateDailyFlowImage(id, url);
+    } else if (intent === "update-shop-hero") {
+      const file = form.get("file");
+      if (file && file instanceof File && file.size > 0) {
+        const url = await uploadImage(file, "editorial");
+        await saveEmailSettings("showroom_hero", { image: url });
+      }
+    } else if (intent === "set-shop-hero") {
+      const url = form.get("url") as string;
+      if (url) await saveEmailSettings("showroom_hero", { image: url });
     }
   } catch (err) {
     console.error("Content upload failed:", err);
@@ -351,7 +363,7 @@ function MediaCard({
 }
 
 export default function AdminContent() {
-  const { collections, dailyFlowImages } = useLoaderData<typeof loader>();
+  const { collections, dailyFlowImages, shopHeroImage } = useLoaderData<typeof loader>();
 
   return (
     <motion.div
@@ -360,6 +372,28 @@ export default function AdminContent() {
       transition={{ duration: 0.4 }}
       className="space-y-8"
     >
+      {/* Shop Background */}
+      <section>
+        <h2 className="text-xs uppercase tracking-[0.15em] text-flow-400 font-medium mb-4">
+          Shop Background
+        </h2>
+        <div className="max-w-xl">
+          <MediaCard
+            id="showroom_hero"
+            intentImage="update-shop-hero"
+            intentVideo="update-shop-hero"
+            intentRemoveVideo="update-shop-hero"
+            intentSetImage="set-shop-hero"
+            imageUrl={shopHeroImage}
+            label="Showroom Hero"
+            sublabel="Background image on the shop page"
+            tall
+            adjustFolder="editorial"
+            adjustAspect={16 / 9}
+          />
+        </div>
+      </section>
+
       {/* Hero / Collections Section */}
       <section>
         <h2 className="text-xs uppercase tracking-[0.15em] text-flow-400 font-medium mb-4">

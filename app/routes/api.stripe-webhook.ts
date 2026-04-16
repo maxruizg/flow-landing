@@ -6,7 +6,48 @@ import {
   createOrder,
   createOrUpdateCustomer,
   decrementVariantStock,
+  getEmailSettings,
 } from "~/data/queries.server";
+import { getResend } from "~/lib/resend.server";
+import { render } from "@react-email/render";
+import { OrderConfirmationEmail } from "~/emails/order-confirmation";
+
+async function sendOrderConfirmation(
+  email: string,
+  customerName: string,
+  orderId: string,
+  items: WebhookOrderItem[],
+  total: number,
+  currency: string,
+) {
+  try {
+    const settings = await getEmailSettings("order_confirmation");
+    const resend = getResend();
+    const html = await render(
+      OrderConfirmationEmail({
+        orderId,
+        customerName,
+        items,
+        total,
+        currency,
+        subject: settings.subject || undefined,
+        headerText: settings.headerText || undefined,
+        bodyText: settings.bodyText || undefined,
+        heroImage: settings.heroImage || undefined,
+        ctaText: settings.ctaText || undefined,
+        ctaUrl: settings.ctaUrl || undefined,
+      }),
+    );
+    await resend.emails.send({
+      from: process.env.RESEND_FROM_EMAIL || "Flow Urban Wear <contact@flowurbanwear.com>",
+      to: email,
+      subject: settings.subject || "Order Confirmed — FLOW",
+      html,
+    });
+  } catch (err) {
+    console.error("Order confirmation email failed:", err);
+  }
+}
 
 interface WebhookOrderItem {
   productId?: string;
@@ -87,6 +128,9 @@ export async function action({ request }: ActionFunctionArgs) {
       });
 
       await decrementStockForItems(items as WebhookOrderItem[]);
+      if (customerEmail) {
+        await sendOrderConfirmation(customerEmail, customerName, orderId, items, total, currency);
+      }
       console.log(`Order ${orderId} created for PaymentIntent ${pi.id}`);
     } catch (err) {
       console.error("Failed to create order:", err);
@@ -126,6 +170,17 @@ export async function action({ request }: ActionFunctionArgs) {
         orderTotal: total,
       });
       await decrementStockForItems(items as WebhookOrderItem[]);
+      const confirmEmail = metadata.customer_email || session.customer_email || "";
+      if (confirmEmail) {
+        await sendOrderConfirmation(
+          confirmEmail,
+          metadata.customer_name || "Customer",
+          orderId,
+          items,
+          total,
+          currency,
+        );
+      }
     } catch (err) {
       console.error("Failed to create order:", err);
       return json({ error: "Order creation failed" }, { status: 500 });

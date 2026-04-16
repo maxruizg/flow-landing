@@ -8,20 +8,29 @@ import {
   Heading,
   Hr,
   Link,
+  Img,
   Preview,
 } from "@react-email/components";
 
 interface NewDropEmailProps {
   subject: string;
   body: string;
+  heroImage?: string;
+  ctaText?: string;
+  ctaUrl?: string;
   siteUrl?: string;
 }
 
 export function NewDropEmail({
   subject,
   body,
+  heroImage,
+  ctaText = "Shop Now",
+  ctaUrl,
   siteUrl = "https://flowurbanwear.com",
 }: NewDropEmailProps) {
+  const finalCtaUrl = ctaUrl || `${siteUrl}/showroom`;
+
   return (
     <Html>
       <Head />
@@ -35,14 +44,20 @@ export function NewDropEmail({
 
           <Hr style={divider} />
 
+          {heroImage && (
+            <Section>
+              <Img src={heroImage} alt="" width="100%" style={{ borderRadius: "12px", marginBottom: "24px" }} />
+            </Section>
+          )}
+
           <Section style={content}>
             <Heading style={heading}>{subject}</Heading>
             <Text style={bodyText}>{body}</Text>
           </Section>
 
           <Section style={ctaSection}>
-            <Link href={`${siteUrl}/showroom`} style={ctaButton}>
-              Shop Now
+            <Link href={finalCtaUrl} style={ctaButton}>
+              {ctaText}
             </Link>
           </Section>
 

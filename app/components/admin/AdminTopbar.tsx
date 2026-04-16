@@ -1,4 +1,5 @@
 import { Link, Form } from "@remix-run/react";
+import { AdminBreadcrumb } from "./AdminBreadcrumb";
 
 interface AdminTopbarProps {
   title: string;
@@ -28,9 +29,7 @@ export function AdminTopbar({ title, onMenuToggle, adminName }: AdminTopbarProps
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <h1 className="font-display text-sm font-semibold tracking-wide text-white uppercase">
-          {title}
-        </h1>
+        <AdminBreadcrumb />
       </div>
 
       <div className="flex items-center gap-4">

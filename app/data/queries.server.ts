@@ -1095,6 +1095,24 @@ export async function updateSubscriber(id: string, updates: { name?: string; act
   if (error) throw error;
 }
 
+export async function getEmailSettings(key: string): Promise<Record<string, any>> {
+  const { data } = await supabase
+    .from("email_settings")
+    .select("value")
+    .eq("key", key)
+    .maybeSingle();
+  return (data?.value as Record<string, any>) ?? {};
+}
+
+export async function saveEmailSettings(key: string, value: Record<string, any>): Promise<void> {
+  const { error } = await supabase.from("email_settings").upsert({
+    key,
+    value,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) throw error;
+}
+
 export async function getCampaignStats() {
   const { data: campaigns } = await supabase
     .from("email_campaigns")

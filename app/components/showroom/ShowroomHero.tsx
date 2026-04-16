@@ -3,7 +3,7 @@ import { motion, useScroll, useTransform, useReducedMotion } from "framer-motion
 import { Container } from "~/components/ui/Container";
 import { AnimatedText } from "~/components/ui/AnimatedText";
 
-export function ShowroomHero() {
+export function ShowroomHero({ heroImage, pieceCount }: { heroImage?: string; pieceCount?: number }) {
   const ref = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = useReducedMotion();
   const { scrollYProgress } = useScroll({
@@ -20,7 +20,7 @@ export function ShowroomHero() {
         style={prefersReducedMotion ? undefined : { y }}
       >
         <img
-          src="/images/editorial/collection-ltmf.jpg"
+          src={heroImage || "/images/editorial/collection-ltmf.jpg"}
           alt="FLOW Urban Wear showroom"
           className="w-full h-[130%] object-cover"
         />
@@ -54,7 +54,7 @@ export function ShowroomHero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8, duration: prefersReducedMotion ? 0 : 0.6 }}
         >
-          36 pieces. Made in Mexico. Curated for those who move with intention.
+          {typeof pieceCount === "number" ? pieceCount : 36} {(pieceCount ?? 36) === 1 ? "piece" : "pieces"}. Made in Mexico. Curated for those who move with intention.
         </motion.p>
       </Container>
     </div>

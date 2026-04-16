@@ -13,12 +13,10 @@ const sortOptions = [
 interface ShowroomFiltersProps {
   activeCategory: string;
   activeGender: string;
-  showNewOnly: boolean;
   sortBy: string;
   productCount: number;
   onCategoryChange: (category: string) => void;
   onGenderChange: (gender: string) => void;
-  onNewOnlyChange: (value: boolean) => void;
   onSortChange: (sort: string) => void;
   onClearAll: () => void;
 }
@@ -26,17 +24,14 @@ interface ShowroomFiltersProps {
 export function ShowroomFilters({
   activeCategory,
   activeGender,
-  showNewOnly,
   sortBy,
   productCount,
   onCategoryChange,
   onGenderChange,
-  onNewOnlyChange,
   onSortChange,
   onClearAll,
 }: ShowroomFiltersProps) {
-  const hasActiveFilters =
-    activeCategory !== "All" || activeGender !== "All" || showNewOnly;
+  const hasActiveFilters = activeCategory !== "All" || activeGender !== "All";
 
   return (
     <div className="sticky top-16 md:top-20 z-30 bg-flow-black/90 backdrop-blur-lg border-b border-flow-800/50">
@@ -62,22 +57,11 @@ export function ShowroomFilters({
               onClick={() => onGenderChange(g)}
             />
           ))}
-
-          <div className="w-px h-4 bg-flow-700 flex-shrink-0" />
-
-          <FilterPill
-            label="New Only"
-            active={showNewOnly}
-            onClick={() => onNewOnlyChange(!showNewOnly)}
-          />
         </div>
 
         {/* Sort + count row */}
         <div className="flex items-center justify-between mt-3">
-          <p
-            className="text-xs text-flow-500"
-            aria-live="polite"
-          >
+          <p className="text-xs text-flow-500" aria-live="polite">
             {productCount} {productCount === 1 ? "piece" : "pieces"}
           </p>
 
@@ -107,12 +91,6 @@ export function ShowroomFilters({
               <FilterTag
                 label={activeGender}
                 onRemove={() => onGenderChange("All")}
-              />
-            )}
-            {showNewOnly && (
-              <FilterTag
-                label="New Only"
-                onRemove={() => onNewOnlyChange(false)}
               />
             )}
             <button
@@ -147,7 +125,7 @@ function FilterPill({
         "rounded-full px-4 py-2 text-xs uppercase tracking-[0.15em] whitespace-nowrap flex-shrink-0 transition-colors duration-200",
         active
           ? "bg-white text-flow-black"
-          : "bg-flow-900 text-flow-400 border border-flow-800 hover:border-flow-600"
+          : "bg-flow-900 text-flow-400 border border-flow-800 hover:border-flow-600",
       )}
     >
       {label}

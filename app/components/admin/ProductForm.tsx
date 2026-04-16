@@ -287,8 +287,8 @@ function variantFromProductVariant(v: ProductVariant): VariantDraft {
     colorHex: v.colorHex ?? null,
     sku: v.sku,
     price: String(v.price),
-    priceMxn: v.priceMxn ? String(v.priceMxn) : "",
-    compareAtPrice: v.compareAtPrice !== null ? String(v.compareAtPrice) : "",
+    priceMxn: v.priceMxn != null ? String(v.priceMxn) : "",
+    compareAtPrice: v.compareAtPrice != null ? String(v.compareAtPrice) : "",
     image: v.image,
     imageHover: v.imageHover,
     gallery: v.images ?? [],
@@ -828,7 +828,7 @@ export function ProductForm({ product }: ProductFormProps) {
                             type="number"
                             min="0"
                             value={
-                              activeVariant?.sizeStock[size]
+                              activeVariant && activeVariant.sizeStock[size] !== undefined
                                 ? String(activeVariant.sizeStock[size])
                                 : ""
                             }
@@ -915,22 +915,35 @@ export function ProductForm({ product }: ProductFormProps) {
               </div>
             </div>
 
-            <div className="flex gap-3">
-              <button
-                type="submit"
-                disabled={formInvalid || isSubmitting}
-                className="flex-1 bg-white text-flow-black font-display font-semibold text-sm tracking-wide uppercase rounded-lg px-6 py-3 hover:bg-flow-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSubmitting ? "Saving…" : isEdit ? "Save Changes" : "Add Product"}
-              </button>
-              <Link
-                to="/admin/products"
-                className="px-6 py-3 border border-flow-700 text-flow-300 rounded-lg text-sm hover:bg-flow-800 transition-colors text-center"
-              >
-                Cancel
-              </Link>
-            </div>
           </div>
+        </div>
+
+        {/* Sticky action bar — always visible while editing */}
+        <div className="sticky bottom-0 -mx-4 lg:-mx-6 mt-8 px-4 lg:px-6 py-3 bg-flow-950/90 backdrop-blur-md border-t border-flow-800 flex items-center gap-3 justify-end z-20">
+          {formInvalid && (
+            <span className="text-xs text-amber-400 mr-auto">
+              {colorError
+                ? colorError
+                : hasEmptyColor
+                  ? "Each color variant needs a name."
+                  : hasEmptyPrice
+                    ? "Each variant needs a price."
+                    : "Please fix validation errors."}
+            </span>
+          )}
+          <Link
+            to="/admin/products"
+            className="px-5 py-2.5 border border-flow-700 text-flow-300 rounded-lg text-sm hover:bg-flow-800 transition-colors text-center"
+          >
+            Cancel
+          </Link>
+          <button
+            type="submit"
+            disabled={formInvalid || isSubmitting}
+            className="bg-white text-flow-black font-display font-semibold text-sm tracking-wide uppercase rounded-lg px-6 py-2.5 hover:bg-flow-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? "Saving…" : isEdit ? "Save Changes" : "Add Product"}
+          </button>
         </div>
       </form>
 

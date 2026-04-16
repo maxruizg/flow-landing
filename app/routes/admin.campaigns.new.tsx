@@ -8,6 +8,7 @@ import { useLoaderData, useFetcher, Link } from "@remix-run/react";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import { cn } from "~/lib/utils";
+import { uploadImageClient } from "~/lib/supabase.client";
 import { requireAdmin } from "~/lib/session.server";
 import {
   getEmailTemplates,
@@ -33,6 +34,152 @@ const btnPrimary =
   "bg-white text-flow-black font-display font-semibold text-sm tracking-wide uppercase rounded-lg px-6 py-3 hover:bg-flow-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
 const btnSecondary =
   "border border-flow-700 text-flow-300 font-display font-semibold text-sm tracking-wide uppercase rounded-lg px-6 py-3 hover:border-flow-500 hover:text-white transition-colors";
+
+// ─── Image Upload Widgets ───────────────────────────────────
+
+function CampaignImageUpload({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (url: string) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const url = await uploadImageClient(file, "campaigns");
+      onChange(url);
+    } catch (err: any) {
+      console.error("Upload failed:", err);
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  return (
+    <div>
+      <label className={labelClass}>{label}</label>
+      <input ref={inputRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
+      {value ? (
+        <div className="relative group w-full h-40 rounded-lg overflow-hidden bg-flow-950 border border-flow-700">
+          <img src={value} alt="" className="w-full h-full object-contain" />
+          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+            {uploading ? (
+              <span className="text-xs text-white uppercase tracking-wide">Uploading…</span>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => inputRef.current?.click()}
+                  className="text-[11px] text-white uppercase tracking-wide bg-black/50 hover:bg-black/80 border border-white/30 rounded px-2.5 py-1"
+                >
+                  Change
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onChange("")}
+                  className="text-[11px] text-red-400 uppercase tracking-wide bg-black/50 hover:bg-black/80 border border-red-500/30 rounded px-2.5 py-1"
+                >
+                  Remove
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div
+          className="w-full h-40 border-2 border-dashed border-flow-700 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-accent-500 transition-colors"
+          onClick={() => inputRef.current?.click()}
+        >
+          {uploading ? (
+            <span className="text-xs text-flow-500">Uploading…</span>
+          ) : (
+            <>
+              <svg className="w-6 h-6 text-flow-500 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span className="text-xs text-flow-500">Click to upload</span>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CampaignGalleryUpload({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string[];
+  onChange: (urls: string[]) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setUploading(true);
+    try {
+      const uploaded = await Promise.all(files.map((f) => uploadImageClient(f, "campaigns")));
+      onChange([...value, ...uploaded]);
+    } catch (err: any) {
+      console.error("Gallery upload failed:", err);
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  return (
+    <div>
+      <label className={labelClass}>{label}</label>
+      <div className="grid grid-cols-4 gap-3 mb-2">
+        {value.map((url, i) => (
+          <div key={`${url}-${i}`} className="relative group h-24 rounded-lg overflow-hidden bg-flow-950 border border-flow-700">
+            <img src={url} alt="" className="w-full h-full object-contain" />
+            <button
+              type="button"
+              onClick={() => onChange(value.filter((_, j) => j !== i))}
+              className="absolute top-1 right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        ))}
+        <div
+          className="h-24 border-2 border-dashed border-flow-700 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-accent-500 transition-colors"
+          onClick={() => inputRef.current?.click()}
+        >
+          {uploading ? (
+            <span className="text-[10px] text-flow-500">Uploading…</span>
+          ) : (
+            <>
+              <svg className="w-5 h-5 text-flow-500 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+              </svg>
+              <span className="text-[10px] text-flow-500">Add</span>
+            </>
+          )}
+        </div>
+      </div>
+      <input ref={inputRef} type="file" accept="image/*" multiple onChange={handleFiles} className="hidden" />
+    </div>
+  );
+}
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -482,7 +629,28 @@ function StepContent({
       );
     }
 
-    // text, image, url — all use a standard text input
+    if (field.type === "image") {
+      return (
+        <CampaignImageUpload
+          key={field.key}
+          label={field.label}
+          value={variables[field.key] ?? ""}
+          onChange={(url) => updateVar(field.key, url)}
+        />
+      );
+    }
+
+    if (field.type === "image-array") {
+      return (
+        <CampaignGalleryUpload
+          key={field.key}
+          label={field.label}
+          value={(variables[field.key] as string[]) ?? []}
+          onChange={(urls) => updateVar(field.key, urls)}
+        />
+      );
+    }
+
     return (
       <div key={field.key}>
         <label className={labelClass}>{field.label}</label>

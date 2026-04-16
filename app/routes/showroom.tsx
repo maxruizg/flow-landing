@@ -8,7 +8,7 @@ import { ShowroomHero } from "~/components/showroom/ShowroomHero";
 import { ShowroomFilters } from "~/components/showroom/ShowroomFilters";
 import { ShowroomGrid } from "~/components/showroom/ShowroomGrid";
 import { expandToVariantCards } from "~/lib/variant-cards";
-import { getAllProducts } from "~/data/queries.server";
+import { getAllProducts, getEmailSettings } from "~/data/queries.server";
 import type { MetaFunction } from "@remix-run/node";
 
 export const meta: MetaFunction = () => {
@@ -19,17 +19,19 @@ export const meta: MetaFunction = () => {
 };
 
 export async function loader() {
-  const allProducts = await getAllProducts();
-  return json({ allProducts });
+  const [allProducts, heroSettings] = await Promise.all([
+    getAllProducts(),
+    getEmailSettings("showroom_hero"),
+  ]);
+  return json({ allProducts, shopHeroImage: heroSettings.image || "" });
 }
 
 export default function Showroom() {
-  const { allProducts } = useLoaderData<typeof loader>();
+  const { allProducts, shopHeroImage } = useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const activeCategory = searchParams.get("category") || "All";
   const activeGender = searchParams.get("gender") || "All";
-  const showNewOnly = searchParams.get("new") === "true";
   const sortBy = searchParams.get("sort") || "featured";
 
   const updateParams = useCallback(
@@ -56,11 +58,6 @@ export default function Showroom() {
 
   const onGenderChange = useCallback(
     (g: string) => updateParams({ gender: g === "All" ? null : g.toLowerCase() }),
-    [updateParams]
-  );
-
-  const onNewOnlyChange = useCallback(
-    (val: boolean) => updateParams({ new: val ? "true" : null }),
     [updateParams]
   );
 
@@ -91,10 +88,6 @@ export default function Showroom() {
 
     let cards = expandToVariantCards(products);
 
-    if (showNewOnly) {
-      cards = cards.filter((c) => c.variant.isNew);
-    }
-
     switch (sortBy) {
       case "price-asc":
         cards = [...cards].sort((a, b) => a.variant.price - b.variant.price);
@@ -112,7 +105,7 @@ export default function Showroom() {
     }
 
     return cards;
-  }, [allProducts, activeCategory, activeGender, showNewOnly, sortBy]);
+  }, [allProducts, activeCategory, activeGender, sortBy]);
 
   // Normalize gender display (URL is lowercase, pills are capitalized)
   const displayGender =
@@ -123,16 +116,20 @@ export default function Showroom() {
   return (
       <div id="main-content">
         <Navbar />
-        <ShowroomHero />
+        <ShowroomHero
+          heroImage={shopHeroImage || undefined}
+          pieceCount={allProducts.reduce(
+            (sum, p) => sum + p.variants.filter((v) => v.status === "active").length,
+            0,
+          )}
+        />
         <ShowroomFilters
           activeCategory={activeCategory}
           activeGender={displayGender}
-          showNewOnly={showNewOnly}
           sortBy={sortBy}
           productCount={filteredCards.length}
           onCategoryChange={onCategoryChange}
           onGenderChange={onGenderChange}
-          onNewOnlyChange={onNewOnlyChange}
           onSortChange={onSortChange}
           onClearAll={onClearAll}
         />
