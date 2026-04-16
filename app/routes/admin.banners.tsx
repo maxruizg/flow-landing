@@ -1,11 +1,11 @@
 import { json } from "@remix-run/node";
-import { useLoaderData, Form, useNavigation, useActionData } from "@remix-run/react";
+import { useLoaderData, Form, useFetcher, useNavigation, useActionData } from "@remix-run/react";
 import type { MetaFunction, ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { requireAdmin } from "~/lib/session.server";
 import { jsonWithToast } from "~/lib/toast.server";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
-import { getBanner, upsertBanner } from "~/data/queries.server";
+import { deleteBanner, getBanner, upsertBanner } from "~/data/queries.server";
 
 export const meta: MetaFunction = () => [{ title: "FLOW Admin — Banners" }];
 
@@ -40,7 +40,26 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  await requireAdmin(request);
   const form = await request.formData();
+  const intent = form.get("intent");
+
+  if (intent === "delete") {
+    const id = (form.get("id") as string) || "";
+    if (!id) {
+      return jsonWithToast(
+        { success: false, error: "Missing banner id" },
+        { type: "error", message: "Missing banner id." },
+        { status: 400 },
+      );
+    }
+    await deleteBanner(id);
+    return jsonWithToast(
+      { success: true, deleted: true },
+      { type: "success", message: "Banner deleted." },
+    );
+  }
+
   const id = (form.get("id") as string) || `banner-${Date.now()}`;
   const title = (form.get("title") as string)?.trim() || "";
   const description = (form.get("description") as string)?.trim() || "";
@@ -110,7 +129,12 @@ export default function AdminBanners() {
   const { banner } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
-  const isSubmitting = navigation.state === "submitting";
+  const isSubmitting =
+    navigation.state === "submitting" &&
+    navigation.formData?.get("intent") !== "delete";
+  const deleteFetcher = useFetcher<{ success: boolean; deleted?: boolean }>();
+  const isDeleting = deleteFetcher.state !== "idle";
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const [title, setTitle] = useState(banner?.title || "");
   const [description, setDescription] = useState(banner?.description || "");
@@ -146,12 +170,27 @@ export default function AdminBanners() {
         </div>
       )}
 
-      {/* Live status */}
-      <div className="flex items-center gap-3">
-        <div className={`w-2.5 h-2.5 rounded-full ${statusDot[status.state]}`} />
-        <span className={`text-sm font-medium ${statusColor[status.state]}`}>
-          {status.label}
-        </span>
+      {/* Live status + delete */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className={`w-2.5 h-2.5 rounded-full ${statusDot[status.state]}`} />
+          <span className={`text-sm font-medium ${statusColor[status.state]}`}>
+            {status.label}
+          </span>
+        </div>
+        {banner?.id && (
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(true)}
+            disabled={isDeleting}
+            className="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-500/60 hover:bg-red-500/10 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Delete Banner
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
@@ -308,6 +347,62 @@ export default function AdminBanners() {
           </div>
         </div>
       </div>
+
+      {/* Delete confirmation */}
+      <AnimatePresence>
+        {confirmDelete && banner?.id && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center px-4"
+          >
+            <div
+              className="absolute inset-0 bg-black/60"
+              onClick={() => !isDeleting && setConfirmDelete(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative bg-flow-900 border border-flow-800/50 rounded-xl p-6 max-w-sm w-full"
+            >
+              <h3 className="text-white font-display font-semibold mb-2">
+                Delete Banner
+              </h3>
+              <p className="text-sm text-flow-400 mb-6">
+                This removes the current banner from the homepage immediately.
+                You can create a new one any time.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(false)}
+                  disabled={isDeleting}
+                  className="flex-1 px-4 py-2.5 border border-flow-700 text-flow-300 rounded-lg text-sm hover:bg-flow-800 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <deleteFetcher.Form
+                  method="post"
+                  className="flex-1"
+                  onSubmit={() => setConfirmDelete(false)}
+                >
+                  <input type="hidden" name="intent" value="delete" />
+                  <input type="hidden" name="id" value={banner.id} />
+                  <button
+                    type="submit"
+                    disabled={isDeleting}
+                    className="w-full px-4 py-2.5 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {isDeleting ? "Deleting..." : "Delete"}
+                  </button>
+                </deleteFetcher.Form>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

@@ -812,6 +812,11 @@ export async function upsertBanner(banner: {
   if (error) throw error;
 }
 
+export async function deleteBanner(id: string): Promise<void> {
+  const { error } = await supabase.from("banners").delete().eq("id", id);
+  if (error) throw error;
+}
+
 // ─── Admin Users ────────────────────────────────────────────────
 
 export async function getAdminByEmail(email: string) {
