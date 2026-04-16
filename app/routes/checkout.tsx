@@ -243,17 +243,27 @@ function CheckoutForm() {
       return;
     }
 
-    // Inline success (card payment with no redirect step) — navigate manually.
-    if (paymentIntent && (paymentIntent.status === "succeeded" || paymentIntent.status === "processing")) {
+    // Any resolved paymentIntent → hand off to the success loader, which has
+    // the full logic to render success / processing / failure. Passing the
+    // real status as redirect_status keeps the server route in control.
+    if (paymentIntent) {
+      const redirect_status =
+        paymentIntent.status === "succeeded"
+          ? "succeeded"
+          : paymentIntent.status === "processing"
+            ? "processing"
+            : paymentIntent.status === "requires_action"
+              ? "requires_action"
+              : "failed";
       const params = new URLSearchParams({
         payment_intent: paymentIntent.id,
-        redirect_status: paymentIntent.status === "succeeded" ? "succeeded" : "processing",
+        redirect_status,
       });
       window.location.assign(`/checkout/success?${params.toString()}`);
       return;
     }
 
-    // Any other state — keep spinner off so the user can retry
+    // No error and no paymentIntent — Stripe handled a full redirect itself.
     setLoading(false);
   };
 
@@ -403,12 +413,19 @@ function CheckoutForm() {
               {/* Billing address toggle */}
               <div className="space-y-3">
                 <label className="flex items-center gap-3 cursor-pointer group">
-                  <div
+                  <input
+                    type="checkbox"
+                    checked={billingSameAsShipping}
+                    onChange={(e) => setBillingSameAsShipping(e.target.checked)}
+                    className="sr-only"
+                  />
+                  <span
+                    aria-hidden
                     className={cn(
                       "w-5 h-5 rounded border-2 flex items-center justify-center transition-colors",
                       billingSameAsShipping
                         ? "bg-white border-white"
-                        : "border-flow-600 group-hover:border-flow-400"
+                        : "border-flow-600 group-hover:border-flow-400",
                     )}
                   >
                     {billingSameAsShipping && (
@@ -416,7 +433,7 @@ function CheckoutForm() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                       </svg>
                     )}
-                  </div>
+                  </span>
                   <span className="text-sm text-flow-300">
                     Billing address same as shipping
                   </span>
