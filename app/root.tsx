@@ -8,6 +8,8 @@ import {
 } from "@remix-run/react";
 import { json } from "@remix-run/node";
 import type { LinksFunction, MetaFunction } from "@remix-run/node";
+import { Analytics } from "@vercel/analytics/remix";
+import { SpeedInsights } from "@vercel/speed-insights/remix";
 import { getTrendingProducts, getActiveBanner } from "~/data/queries.server";
 import { LocaleProvider } from "~/context/LocaleContext";
 import { CartProvider } from "~/context/CartContext";
@@ -82,6 +84,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
           Skip to main content
         </a>
         {children}
+        <Analytics />
+        <SpeedInsights />
         <ScrollRestoration />
         <Scripts />
       </body>
