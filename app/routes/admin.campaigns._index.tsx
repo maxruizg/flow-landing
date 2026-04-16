@@ -5,6 +5,7 @@ import type {
   MetaFunction,
 } from "@remix-run/node";
 import { useLoaderData, Link, useFetcher } from "@remix-run/react";
+import { jsonWithToast } from "~/lib/toast.server";
 import { motion } from "framer-motion";
 import { useState, useMemo } from "react";
 import { cn } from "~/lib/utils";
@@ -79,16 +80,37 @@ export async function action({ request }: ActionFunctionArgs) {
 
   if (intent === "delete") {
     const id = form.get("id") as string;
-    if (!id) return json({ error: "Missing id" }, { status: 400 });
+    if (!id) {
+      return jsonWithToast(
+        { error: "Missing id" },
+        { type: "error", message: "Missing campaign id." },
+        { status: 400 },
+      );
+    }
     await deleteCampaign(id);
-    return json({ ok: true });
+    return jsonWithToast(
+      { ok: true },
+      { type: "success", message: "Campaign deleted." },
+    );
   }
 
   if (intent === "duplicate") {
     const id = form.get("id") as string;
-    if (!id) return json({ error: "Missing id" }, { status: 400 });
+    if (!id) {
+      return jsonWithToast(
+        { error: "Missing id" },
+        { type: "error", message: "Missing campaign id." },
+        { status: 400 },
+      );
+    }
     const original = await getCampaign(id);
-    if (!original) return json({ error: "Not found" }, { status: 404 });
+    if (!original) {
+      return jsonWithToast(
+        { error: "Not found" },
+        { type: "error", message: "Campaign not found." },
+        { status: 404 },
+      );
+    }
     const content = await getCampaignContent(id);
     const newId = await createCampaign({
       name: `${original.name} (Copy)`,
@@ -99,7 +121,10 @@ export async function action({ request }: ActionFunctionArgs) {
       targetTags: original.target_tags,
     });
     if (content?.variables) await upsertCampaignContent(newId, content.variables);
-    return json({ ok: true, newId });
+    return jsonWithToast(
+      { ok: true, newId },
+      { type: "success", message: `Duplicated “${original.name}”.` },
+    );
   }
 
   return json({ error: "Unknown intent" }, { status: 400 });

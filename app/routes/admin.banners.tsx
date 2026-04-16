@@ -2,8 +2,9 @@ import { json } from "@remix-run/node";
 import { useLoaderData, Form, useNavigation, useActionData } from "@remix-run/react";
 import type { MetaFunction, ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { requireAdmin } from "~/lib/session.server";
-import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect } from "react";
+import { jsonWithToast } from "~/lib/toast.server";
+import { motion } from "framer-motion";
+import { useState } from "react";
 import { getBanner, upsertBanner } from "~/data/queries.server";
 
 export const meta: MetaFunction = () => [{ title: "FLOW Admin — Banners" }];
@@ -48,7 +49,11 @@ export async function action({ request }: ActionFunctionArgs) {
   const endLocal = (form.get("end_date") as string) || "";
 
   if (!title) {
-    return json({ success: false, error: "Title is required" }, { status: 400 });
+    return jsonWithToast(
+      { success: false, error: "Title is required" },
+      { type: "error", message: "Title is required." },
+      { status: 400 },
+    );
   }
 
   // Convert datetime-local (local time) → UTC ISO for storage
@@ -56,12 +61,19 @@ export async function action({ request }: ActionFunctionArgs) {
   const endDate = localInputToUtc(endLocal);
 
   if (startDate && endDate && new Date(startDate).getTime() > new Date(endDate).getTime()) {
-    return json({ success: false, error: "End date must be after start date" }, { status: 400 });
+    return jsonWithToast(
+      { success: false, error: "End date must be after start date" },
+      { type: "error", message: "End date must be after start date." },
+      { status: 400 },
+    );
   }
 
   await upsertBanner({ id, title, description, active, startDate, endDate });
 
-  return json({ success: true, savedAt: Date.now() });
+  return jsonWithToast(
+    { success: true, savedAt: Date.now() },
+    { type: "success", message: "Banner saved." },
+  );
 }
 
 type BannerStatus =
@@ -106,16 +118,6 @@ export default function AdminBanners() {
   const [startDate, setStartDate] = useState(utcToLocalInput(banner?.startDate || null));
   const [endDate, setEndDate] = useState(utcToLocalInput(banner?.endDate || null));
 
-  // Show success toast briefly after save
-  const [showToast, setShowToast] = useState(false);
-  useEffect(() => {
-    if (actionData?.success) {
-      setShowToast(true);
-      const t = setTimeout(() => setShowToast(false), 3000);
-      return () => clearTimeout(t);
-    }
-  }, [actionData]);
-
   const status = computeBannerStatus(active, startDate, endDate);
   const statusColor: Record<BannerStatus["state"], string> = {
     live: "text-green-400",
@@ -137,24 +139,6 @@ export default function AdminBanners() {
       transition={{ duration: 0.4 }}
       className="space-y-6 max-w-4xl relative"
     >
-      {/* Success toast */}
-      <AnimatePresence>
-        {showToast && (
-          <motion.div
-            initial={{ opacity: 0, y: -20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            transition={{ duration: 0.25, ease: [0.33, 1, 0.68, 1] }}
-            className="fixed top-20 right-6 z-50 bg-green-500/95 backdrop-blur-sm text-white px-5 py-3 rounded-lg shadow-2xl flex items-center gap-3"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-            </svg>
-            <span className="text-sm font-medium">Banner saved successfully</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Error banner */}
       {actionData && actionData.success === false && "error" in actionData && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3">

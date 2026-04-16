@@ -1,9 +1,10 @@
 import { json } from "@remix-run/node";
-import { useLoaderData, Form, useNavigation, useActionData } from "@remix-run/react";
+import { useLoaderData, Form, useNavigation } from "@remix-run/react";
 import type { MetaFunction, ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { requireAdmin } from "~/lib/session.server";
+import { jsonWithToast } from "~/lib/toast.server";
 import { motion } from "framer-motion";
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { getEmailSettings, saveEmailSettings } from "~/data/queries.server";
 import { uploadImageClient } from "~/lib/supabase.client";
 
@@ -31,12 +32,14 @@ export async function action({ request }: ActionFunctionArgs) {
     ctaUrl: (form.get("ctaUrl") as string)?.trim() || "https://flowurbanwear.com/showroom",
   };
   await saveEmailSettings("order_confirmation", settings);
-  return json({ saved: true });
+  return jsonWithToast(
+    { saved: true },
+    { type: "success", message: "Order confirmation email saved." },
+  );
 }
 
 export default function OrderConfirmationSettings() {
   const { settings } = useLoaderData<typeof loader>();
-  const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
 
@@ -47,16 +50,7 @@ export default function OrderConfirmationSettings() {
   const [ctaText, setCtaText] = useState(settings.ctaText || "View Showroom");
   const [ctaUrl, setCtaUrl] = useState(settings.ctaUrl || "https://flowurbanwear.com/showroom");
   const [uploading, setUploading] = useState(false);
-  const [showToast, setShowToast] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (actionData?.saved) {
-      setShowToast(true);
-      const t = setTimeout(() => setShowToast(false), 2500);
-      return () => clearTimeout(t);
-    }
-  }, [actionData]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -222,19 +216,6 @@ export default function OrderConfirmationSettings() {
         </div>
       </div>
 
-      {showToast && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          className="fixed top-20 right-6 z-50 bg-green-500/95 text-white px-5 py-3 rounded-lg shadow-2xl flex items-center gap-3"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-          </svg>
-          <span className="text-sm font-medium">Settings saved</span>
-        </motion.div>
-      )}
     </motion.div>
   );
 }

@@ -1,7 +1,8 @@
-import { json, redirect } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
 import type { MetaFunction, ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { requireAdmin } from "~/lib/session.server";
+import { jsonWithToast, redirectWithToast } from "~/lib/toast.server";
 import { motion } from "framer-motion";
 import { useRef, useState, useCallback } from "react";
 import { cn } from "~/lib/utils";
@@ -90,10 +91,17 @@ export async function action({ request }: ActionFunctionArgs) {
     }
   } catch (err) {
     console.error("Content upload failed:", err);
-    return json({ error: "Upload failed" }, { status: 500 });
+    return jsonWithToast(
+      { error: "Upload failed" },
+      { type: "error", message: "Upload failed. Please try again." },
+      { status: 500 },
+    );
   }
 
-  return redirect("/admin/content");
+  return redirectWithToast("/admin/content", {
+    type: "success",
+    message: "Content updated.",
+  });
 }
 
 function MediaCard({

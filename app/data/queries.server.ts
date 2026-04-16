@@ -30,7 +30,9 @@ function mapVariant(row: any): ProductVariant {
       row.compare_at_price !== null && row.compare_at_price !== undefined
         ? Number(row.compare_at_price)
         : null,
-    sizeStock: row.size_stock ?? {},
+    sizeStock: typeof row.size_stock === "string"
+      ? JSON.parse(row.size_stock || "{}")
+      : (row.size_stock ?? {}),
     stock: row.stock ?? 0,
     status: row.status,
     image: row.image,

@@ -37,9 +37,9 @@ export function Hero({ collection }: HeroProps) {
       <div className="absolute inset-0 bg-gradient-to-r from-flow-black/60 to-transparent" />
 
       {/* Content */}
-      <Container className="relative h-full flex flex-col justify-end pt-24 pb-16 md:pb-24">
+      <Container className="relative h-full flex flex-col justify-end pt-32 pb-20 md:pt-24 md:pb-24">
         <motion.span
-          className="text-xs uppercase tracking-[0.3em] text-flow-400 mb-4"
+          className="text-xs uppercase tracking-[0.3em] text-flow-400 mb-3 md:mb-4"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.6 }}
@@ -48,7 +48,7 @@ export function Hero({ collection }: HeroProps) {
         </motion.span>
 
         <motion.h1
-          className="font-display text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-bold tracking-tight text-white leading-[0.9] mb-6"
+          className="font-display text-5xl sm:text-6xl md:text-8xl lg:text-9xl font-bold tracking-tight text-white leading-[0.9] mb-4 md:mb-6"
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5, duration: 0.8, ease: [0.33, 1, 0.68, 1] }}

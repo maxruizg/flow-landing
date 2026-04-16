@@ -1,8 +1,9 @@
-import { json, redirect } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import { useLoaderData, Form, Link, useFetcher } from "@remix-run/react";
 import type { MetaFunction, ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { requireAdmin } from "~/lib/session.server";
-import { AnimatePresence, motion } from "framer-motion";
+import { jsonWithToast, redirectWithToast } from "~/lib/toast.server";
+import { motion } from "framer-motion";
 import { useState, useMemo, useEffect } from "react";
 import { cn, formatPrice } from "~/lib/utils";
 import {
@@ -90,14 +91,15 @@ export async function action({ request }: ActionFunctionArgs) {
     const id = form.get("id") as string;
     try {
       await deleteProduct(id);
-      return json({ ok: true, intent: "delete" as const });
+      return jsonWithToast(
+        { ok: true, intent: "delete" as const },
+        { type: "success", message: "Product deleted." },
+      );
     } catch (err: any) {
-      return json(
-        {
-          ok: false,
-          intent: "delete" as const,
-          error: err?.message || "Failed to delete product.",
-        },
+      const message = err?.message || "Failed to delete product.";
+      return jsonWithToast(
+        { ok: false, intent: "delete" as const, error: message },
+        { type: "error", message },
         { status: 400 },
       );
     }
@@ -106,9 +108,16 @@ export async function action({ request }: ActionFunctionArgs) {
   if (intent === "reorder") {
     const payload = JSON.parse(form.get("positions") as string);
     await updateProductPositions(payload);
+    return redirectWithToast("/admin/products", {
+      type: "success",
+      message: "Product order saved.",
+    });
   }
 
-  return redirect("/admin/products");
+  return redirectWithToast("/admin/products", {
+    type: "info",
+    message: "No changes applied.",
+  });
 }
 
 export default function AdminProducts() {
@@ -126,14 +135,10 @@ export default function AdminProducts() {
     deleteFetcher.state === "idle" && deleteFetcher.data && !deleteFetcher.data.ok
       ? deleteFetcher.data.error
       : null;
-  const [showDeleteToast, setShowDeleteToast] = useState(false);
 
   useEffect(() => {
     if (deleteFetcher.state === "idle" && deleteFetcher.data?.ok) {
       setDeleteId(null);
-      setShowDeleteToast(true);
-      const t = setTimeout(() => setShowDeleteToast(false), 2500);
-      return () => clearTimeout(t);
     }
   }, [deleteFetcher.state, deleteFetcher.data]);
 
@@ -462,24 +467,6 @@ export default function AdminProducts() {
           </motion.div>
         </div>
       )}
-
-      {/* Success toast */}
-      <AnimatePresence>
-        {showDeleteToast && (
-          <motion.div
-            initial={{ opacity: 0, y: -20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            transition={{ duration: 0.25, ease: [0.33, 1, 0.68, 1] }}
-            className="fixed top-20 right-6 z-50 bg-green-500/95 backdrop-blur-sm text-white px-5 py-3 rounded-lg shadow-2xl flex items-center gap-3"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-            </svg>
-            <span className="text-sm font-medium">Product deleted</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
     </motion.div>
   );

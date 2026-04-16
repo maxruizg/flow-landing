@@ -1,4 +1,4 @@
-import { json, redirect } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import type {
   MetaFunction,
@@ -6,6 +6,7 @@ import type {
   ActionFunctionArgs,
 } from "@remix-run/node";
 import { requireAdmin } from "~/lib/session.server";
+import { redirectWithToast } from "~/lib/toast.server";
 import {
   deleteVariants,
   getAdminProductById,
@@ -138,7 +139,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
   await upsertVariants(variantInputs);
   await setDefaultVariant(baseProductId, defaultVariantId ?? firstVariantId);
 
-  return redirect("/admin/products");
+  return redirectWithToast("/admin/products", {
+    type: "success",
+    message: `“${name}” updated successfully.`,
+  });
 }
 
 export default function EditProductPage() {

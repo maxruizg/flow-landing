@@ -7,6 +7,7 @@ import {
   createOrUpdateCustomer,
   decrementVariantStock,
   getEmailSettings,
+  getOrderByStripeSession,
 } from "~/data/queries.server";
 import { getResend } from "~/lib/resend.server";
 import { render } from "@react-email/render";
@@ -96,6 +97,13 @@ export async function action({ request }: ActionFunctionArgs) {
 
   if (event.type === "payment_intent.succeeded") {
     const pi = event.data.object as Stripe.PaymentIntent;
+
+    const existing = await getOrderByStripeSession(pi.id);
+    if (existing) {
+      console.log(`Order for PaymentIntent ${pi.id} already exists, skipping`);
+      return json({ received: true, duplicate: true });
+    }
+
     const metadata = pi.metadata || {};
     const items = JSON.parse(metadata.items_json || "[]");
     const currency = metadata.currency || "usd";
@@ -142,6 +150,12 @@ export async function action({ request }: ActionFunctionArgs) {
     const session = event.data.object as Stripe.Checkout.Session;
     if (session.payment_status !== "paid") {
       return json({ received: true });
+    }
+
+    const existing = await getOrderByStripeSession(session.id);
+    if (existing) {
+      console.log(`Order for Checkout Session ${session.id} already exists, skipping`);
+      return json({ received: true, duplicate: true });
     }
 
     const metadata = session.metadata || {};

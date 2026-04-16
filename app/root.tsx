@@ -11,6 +11,7 @@ import type { LinksFunction, MetaFunction } from "@remix-run/node";
 import { getTrendingProducts, getActiveBanner } from "~/data/queries.server";
 import { LocaleProvider } from "~/context/LocaleContext";
 import { CartProvider } from "~/context/CartContext";
+import { getFlashToast } from "~/lib/toast.server";
 
 import styles from "~/styles/global.css?url";
 
@@ -43,20 +44,25 @@ export const meta: MetaFunction = () => [
   },
 ];
 
-export async function loader() {
-  const [trendingProducts, banner] = await Promise.all([
+export async function loader({ request }: { request: Request }) {
+  const [trendingProducts, banner, flash] = await Promise.all([
     getTrendingProducts(),
     getActiveBanner(),
+    getFlashToast(request),
   ]);
-  return json({
-    trendingProducts,
-    banner,
-    ENV: {
-      SUPABASE_URL: process.env.SUPABASE_URL!,
-      SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY!,
-      STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY || "",
+  return json(
+    {
+      trendingProducts,
+      banner,
+      flashToast: flash.toast,
+      ENV: {
+        SUPABASE_URL: process.env.SUPABASE_URL!,
+        SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY!,
+        STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY || "",
+      },
     },
-  });
+    flash.commit ? { headers: { "Set-Cookie": flash.commit } } : undefined,
+  );
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {

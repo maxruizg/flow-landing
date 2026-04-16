@@ -116,16 +116,40 @@ export function Navbar() {
             </button>
           </div>
 
-          {/* Mobile hamburger */}
-          <button
-            aria-label="Open menu"
-            className="md:hidden ml-auto text-white"
-            onClick={() => setMobileOpen(true)}
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5" />
-            </svg>
-          </button>
+          {/* Mobile right icons */}
+          <div className="md:hidden ml-auto flex items-center gap-4">
+            <button
+              aria-label="Cart"
+              className="text-flow-300 hover:text-white transition-colors relative"
+              onClick={() => openPanel("cart")}
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+              </svg>
+              <AnimatePresence>
+                {itemCount > 0 && (
+                  <motion.span
+                    key={itemCount}
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    exit={{ scale: 0 }}
+                    className="absolute -top-1 -right-1 w-4 h-4 bg-white text-flow-black text-[10px] font-bold rounded-full flex items-center justify-center"
+                  >
+                    {itemCount}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </button>
+            <button
+              aria-label="Open menu"
+              className="text-white"
+              onClick={() => setMobileOpen(true)}
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5" />
+              </svg>
+            </button>
+          </div>
         </nav>
         </div>
       </header>
@@ -133,6 +157,7 @@ export function Navbar() {
       <MobileMenu
         isOpen={mobileOpen}
         onClose={() => setMobileOpen(false)}
+        onOpenPanel={openPanel}
         links={navLinks}
       />
 

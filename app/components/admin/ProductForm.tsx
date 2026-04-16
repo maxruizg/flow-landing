@@ -380,16 +380,11 @@ export function ProductForm({ product }: ProductFormProps) {
     [form.sizes],
   );
 
-  // Sync sizeStock keys when the sizes list changes.
-  useEffect(() => {
-    setVariants((prev) =>
-      prev.map((v) => {
-        const next: Record<string, number> = {};
-        for (const size of parsedSizes) next[size] = v.sizeStock[size] ?? 0;
-        return { ...v, sizeStock: next };
-      }),
-    );
-  }, [parsedSizes]);
+  // No sizeStock sync effect — adding a size to the list should NOT mutate
+  // existing variant stock values. The input below handles missing keys
+  // gracefully (renders as empty), and onChange writes the value when the
+  // admin types one in. Removing the previous sync prevents a race that
+  // could wipe loaded values during the initial mount.
 
   const updateForm = (field: keyof typeof form, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -827,11 +822,11 @@ export function ProductForm({ product }: ProductFormProps) {
                             className={inputClass}
                             type="number"
                             min="0"
-                            value={
-                              activeVariant && activeVariant.sizeStock[size] !== undefined
-                                ? String(activeVariant.sizeStock[size])
-                                : ""
-                            }
+                            value={(() => {
+                              const stock = activeVariant?.sizeStock?.[size];
+                              if (stock === undefined || stock === null) return "";
+                              return String(stock);
+                            })()}
                             onChange={(e) => {
                               const raw = e.target.value;
                               const qty = raw === "" ? 0 : Math.max(0, parseInt(raw, 10) || 0);

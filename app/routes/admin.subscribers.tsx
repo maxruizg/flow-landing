@@ -11,6 +11,7 @@ import {
   addSubscriber,
   updateSubscriber,
 } from "~/data/queries.server";
+import { jsonWithToast } from "~/lib/toast.server";
 
 export const meta: MetaFunction = () => [{ title: "FLOW Admin — Subscribers" }];
 
@@ -41,12 +42,21 @@ export async function action({ request }: ActionFunctionArgs) {
       : [];
 
     if (!email) {
-      return json({ intent, error: "Email is required" }, { status: 400 });
+      return jsonWithToast(
+        { intent, error: "Email is required" },
+        { type: "error", message: "Email is required." },
+        { status: 400 },
+      );
     }
 
     const result = await addSubscriber(email);
     if (!result.success) {
-      return json({ intent, error: result.error || "Failed to add subscriber" }, { status: 400 });
+      const message = result.error || "Failed to add subscriber.";
+      return jsonWithToast(
+        { intent, error: message },
+        { type: "error", message },
+        { status: 400 },
+      );
     }
 
     // If we have name or tags, find the subscriber and update
@@ -61,14 +71,20 @@ export async function action({ request }: ActionFunctionArgs) {
       }
     }
 
-    return json({ intent, success: true, message: `Added ${email}` });
+    return jsonWithToast(
+      { intent, success: true, message: `Added ${email}` },
+      { type: "success", message: `Added ${email}.` },
+    );
   }
 
   if (intent === "toggle-active") {
     const id = form.get("id") as string;
     const active = form.get("active") === "true";
     await updateSubscriber(id, { active: !active });
-    return json({ intent, success: true });
+    return jsonWithToast(
+      { intent, success: true },
+      { type: "success", message: active ? "Subscriber paused." : "Subscriber activated." },
+    );
   }
 
   if (intent === "update-tags") {
@@ -78,13 +94,20 @@ export async function action({ request }: ActionFunctionArgs) {
       ? tagsRaw.split(",").map((t) => t.trim()).filter(Boolean)
       : [];
     await updateSubscriber(id, { tags });
-    return json({ intent, success: true });
+    return jsonWithToast(
+      { intent, success: true },
+      { type: "success", message: "Tags updated." },
+    );
   }
 
   if (intent === "import-csv") {
     const csvData = form.get("csvData") as string;
     if (!csvData) {
-      return json({ intent, error: "No CSV data provided" }, { status: 400 });
+      return jsonWithToast(
+        { intent, error: "No CSV data provided" },
+        { type: "error", message: "No CSV data provided." },
+        { status: 400 },
+      );
     }
 
     const lines = csvData.split("\n").map((l) => l.trim()).filter(Boolean);
@@ -120,7 +143,13 @@ export async function action({ request }: ActionFunctionArgs) {
       }
     }
 
-    return json({ intent, success: true, imported, skipped });
+    return jsonWithToast(
+      { intent, success: true, imported, skipped },
+      {
+        type: "success",
+        message: `Imported ${imported}${skipped ? `, skipped ${skipped}` : ""}.`,
+      },
+    );
   }
 
   return json({ error: "Unknown intent" }, { status: 400 });

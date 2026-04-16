@@ -2,6 +2,7 @@ import { json, redirect } from "@remix-run/node";
 import { useLoaderData, useNavigate, useFetcher } from "@remix-run/react";
 import type { MetaFunction, ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { requireAdmin } from "~/lib/session.server";
+import { redirectWithToast } from "~/lib/toast.server";
 import { motion } from "framer-motion";
 import { useState, useMemo } from "react";
 import { cn } from "~/lib/utils";
@@ -24,8 +25,15 @@ export async function action({ request }: ActionFunctionArgs) {
   if (intent === "markRead") {
     const id = form.get("id") as string;
     await markNotificationRead(id);
-  } else if (intent === "markAllRead") {
+    return redirect("/admin/notifications");
+  }
+
+  if (intent === "markAllRead") {
     await markAllNotificationsRead();
+    return redirectWithToast("/admin/notifications", {
+      type: "success",
+      message: "All notifications marked as read.",
+    });
   }
 
   return redirect("/admin/notifications");

@@ -1,6 +1,6 @@
-import { redirect } from "@remix-run/node";
 import type { MetaFunction, ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { requireAdmin } from "~/lib/session.server";
+import { redirectWithToast } from "~/lib/toast.server";
 import {
   getAdminProducts,
   getMaxProductPosition,
@@ -136,7 +136,10 @@ export async function action({ request }: ActionFunctionArgs) {
   await upsertVariants(variantInputs);
   await setDefaultVariant(baseProductId, defaultVariantId ?? firstVariantId);
 
-  return redirect("/admin/products");
+  return redirectWithToast("/admin/products", {
+    type: "success",
+    message: `“${name}” created.`,
+  });
 }
 
 export default function NewProductPage() {

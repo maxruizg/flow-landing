@@ -84,7 +84,7 @@ Stripe sends events (like "payment completed") to your server via webhooks.
 1. Go to **Developers > Webhooks** in the Stripe Dashboard
 2. Click **Add endpoint**
 3. Set the URL to: `https://your-domain.com/api/stripe-webhook`
-4. Select the event: `checkout.session.completed`
+4. Select the event: `payment_intent.succeeded` (the embedded checkout uses PaymentIntents, not Checkout Sessions)
 5. Click **Add endpoint**
 6. Copy the **Signing secret** and add it to your Vercel environment variables:
    ```
@@ -96,32 +96,40 @@ Stripe sends events (like "payment completed") to your server via webhooks.
 
 ## 6. How It Works
 
-### Checkout Flow
+### Checkout Flow (embedded PaymentIntents + Stripe Elements)
 
 ```
-Customer fills shipping form → Clicks "Pay with Stripe"
+Customer opens /checkout
     ↓
-Remix action creates a Stripe Checkout Session (with cart items as line_items)
+Client calls /api/create-payment-intent → returns clientSecret
     ↓
-Customer is redirected to Stripe's hosted checkout page
+Stripe Elements (PaymentElement + AddressElement) renders in-page
     ↓
-Customer enters payment details on Stripe
+Customer fills shipping, then payment, clicks "Pay"
     ↓
-On success → redirected to /checkout/success?session_id=...
+stripe.confirmPayment() charges the card and redirects to
+    /checkout/success?payment_intent=pi_...&redirect_status=succeeded
     ↓
-Stripe sends webhook → our server creates the order in Supabase
+Stripe sends webhook `payment_intent.succeeded` → server creates the order,
+upserts the customer, decrements stock, and sends the Resend confirmation email
 ```
+
+The webhook handler also guards against duplicate deliveries: if an order with
+the same `stripe_session_id` (the PaymentIntent id) already exists, it returns
+early so side effects (order, stock, email) never run twice.
 
 ### Files
 
 | File | Purpose |
 |------|---------|
 | `app/lib/stripe.server.ts` | Stripe SDK client initialization |
-| `app/routes/api.create-checkout.ts` | Creates a Stripe Checkout Session |
-| `app/routes/api.stripe-webhook.ts` | Handles Stripe webhook events |
-| `app/routes/checkout.tsx` | Checkout page with shipping form |
+| `app/lib/resend.server.ts` | Resend client for confirmation emails |
+| `app/routes/api.create-payment-intent.ts` | Creates a Stripe PaymentIntent with cart items as metadata |
+| `app/routes/api.stripe-webhook.ts` | Verifies signature, dedups, creates order, decrements stock, sends email |
+| `app/routes/checkout.tsx` | Embedded checkout page (Elements + PaymentElement) |
 | `app/routes/checkout.success.tsx` | Post-payment success page |
-| `app/data/queries.server.ts` | `createOrder`, `createOrUpdateCustomer`, `getOrderByStripeSession` |
+| `app/routes/checkout.failed.tsx` | Post-payment failure page |
+| `app/data/queries.server.ts` | `createOrder`, `createOrUpdateCustomer`, `getOrderByStripeSession`, `decrementVariantStock` |
 
 ### Currency Handling
 

@@ -10,6 +10,7 @@ import { motion } from "framer-motion";
 import { cn } from "~/lib/utils";
 import { uploadImageClient } from "~/lib/supabase.client";
 import { requireAdmin } from "~/lib/session.server";
+import { jsonWithToast } from "~/lib/toast.server";
 import {
   getEmailTemplates,
   getCampaign,
@@ -285,7 +286,13 @@ export async function action({ request }: ActionFunctionArgs) {
       targetTags: tags,
     });
 
-    return json({ campaignId, done: true });
+    return jsonWithToast(
+      { campaignId, done: true },
+      {
+        type: "success",
+        message: sendOption === "now" ? "Campaign queued to send." : "Campaign scheduled.",
+      },
+    );
   }
 
   return json({ error: "Invalid step" }, { status: 400 });

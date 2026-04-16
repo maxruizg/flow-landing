@@ -1,9 +1,10 @@
-import { json, redirect } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import { useLoaderData, Form, useNavigation } from "@remix-run/react";
 import type { MetaFunction, ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { requireAdmin } from "~/lib/session.server";
+import { jsonWithToast, redirectWithToast } from "~/lib/toast.server";
 import { motion } from "framer-motion";
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import {
   getActiveSubscribers,
   getSubscriberCount,
@@ -43,7 +44,10 @@ export async function action({ request }: ActionFunctionArgs) {
       ctaUrl: (form.get("ctaUrl") as string)?.trim() || "",
     };
     await saveEmailSettings("newsletter", settings);
-    return json({ saved: true });
+    return jsonWithToast(
+      { saved: true },
+      { type: "success", message: "Newsletter draft saved." },
+    );
   }
 
   if (intent === "send") {
@@ -54,14 +58,22 @@ export async function action({ request }: ActionFunctionArgs) {
     const ctaUrl = (form.get("ctaUrl") as string)?.trim() || "";
 
     if (!subject || !body) {
-      return json({ error: "Subject and body are required" }, { status: 400 });
+      return jsonWithToast(
+        { error: "Subject and body are required" },
+        { type: "error", message: "Subject and body are required." },
+        { status: 400 },
+      );
     }
 
     await saveEmailSettings("newsletter", { subject, body, heroImage, ctaText, ctaUrl });
 
     const subscribers = await getActiveSubscribers();
     if (subscribers.length === 0) {
-      return json({ error: "No active subscribers" }, { status: 400 });
+      return jsonWithToast(
+        { error: "No active subscribers" },
+        { type: "error", message: "No active subscribers to send to." },
+        { status: 400 },
+      );
     }
 
     const resend = getResend();
@@ -80,7 +92,13 @@ export async function action({ request }: ActionFunctionArgs) {
       );
     }
 
-    return redirect("/admin/newsletter?sent=" + emails.length);
+    return redirectWithToast(
+      "/admin/newsletter?sent=" + emails.length,
+      {
+        type: "success",
+        message: `Newsletter sent to ${emails.length} subscriber${emails.length === 1 ? "" : "s"}.`,
+      },
+    );
   }
 
   return json({ error: "Unknown intent" }, { status: 400 });
@@ -97,19 +115,10 @@ export default function AdminNewsletter() {
   const [ctaText, setCtaText] = useState(settings.ctaText || "Shop Now");
   const [ctaUrl, setCtaUrl] = useState(settings.ctaUrl || "");
   const [uploading, setUploading] = useState(false);
-  const [savedToast, setSavedToast] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   const sentCount = params?.get("sent");
-
-  useEffect(() => {
-    if (navigation.state === "idle" && (navigation as any).data?.saved) {
-      setSavedToast(true);
-      const t = setTimeout(() => setSavedToast(false), 2500);
-      return () => clearTimeout(t);
-    }
-  }, [navigation]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -323,19 +332,6 @@ export default function AdminNewsletter() {
         </div>
       </div>
 
-      {savedToast && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          className="fixed top-20 right-6 z-50 bg-green-500/95 text-white px-5 py-3 rounded-lg shadow-2xl flex items-center gap-3"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-          </svg>
-          <span className="text-sm font-medium">Settings saved</span>
-        </motion.div>
-      )}
     </motion.div>
   );
 }

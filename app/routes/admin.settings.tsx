@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import { brand, shippingPolicy, refundPolicy, privacyTerms } from "~/data/brand";
 import { requireAdmin } from "~/lib/session.server";
+import { jsonWithToast } from "~/lib/toast.server";
 import { getAllAdmins, createAdmin, deleteAdmin, updateAdminUser, getAdminCount } from "~/data/queries.server";
 import { hashPassword } from "~/lib/auth.server";
 import { cn } from "~/lib/utils";
@@ -37,12 +38,23 @@ export async function action({ request }: ActionFunctionArgs) {
     try {
       const hash = hashPassword(password);
       await createAdmin(name, email, hash);
-      return json({ success: true });
+      return jsonWithToast(
+        { success: true },
+        { type: "success", message: `Admin “${name}” added.` },
+      );
     } catch (err: any) {
       if (err?.code === "23505") {
-        return json({ error: "An admin with this email already exists" }, { status: 400 });
+        return jsonWithToast(
+          { error: "An admin with this email already exists" },
+          { type: "error", message: "An admin with this email already exists." },
+          { status: 400 },
+        );
       }
-      return json({ error: "Failed to create admin" }, { status: 500 });
+      return jsonWithToast(
+        { error: "Failed to create admin" },
+        { type: "error", message: "Failed to create admin." },
+        { status: 500 },
+      );
     }
   }
 
@@ -63,12 +75,23 @@ export async function action({ request }: ActionFunctionArgs) {
       const updates: { name: string; email: string; passwordHash?: string } = { name, email };
       if (password) updates.passwordHash = hashPassword(password);
       await updateAdminUser(id, updates);
-      return json({ success: true });
+      return jsonWithToast(
+        { success: true },
+        { type: "success", message: "Admin updated." },
+      );
     } catch (err: any) {
       if (err?.code === "23505") {
-        return json({ error: "An admin with this email already exists" }, { status: 400 });
+        return jsonWithToast(
+          { error: "An admin with this email already exists" },
+          { type: "error", message: "An admin with this email already exists." },
+          { status: 400 },
+        );
       }
-      return json({ error: "Failed to update admin" }, { status: 500 });
+      return jsonWithToast(
+        { error: "Failed to update admin" },
+        { type: "error", message: "Failed to update admin." },
+        { status: 500 },
+      );
     }
   }
 
@@ -76,10 +99,17 @@ export async function action({ request }: ActionFunctionArgs) {
     const id = form.get("id") as string;
     const count = await getAdminCount();
     if (count <= 1) {
-      return json({ error: "Cannot remove the last admin" }, { status: 400 });
+      return jsonWithToast(
+        { error: "Cannot remove the last admin" },
+        { type: "error", message: "Cannot remove the last admin." },
+        { status: 400 },
+      );
     }
     await deleteAdmin(id);
-    return json({ success: true });
+    return jsonWithToast(
+      { success: true },
+      { type: "success", message: "Admin removed." },
+    );
   }
 
   return json({ error: "Unknown action" }, { status: 400 });
@@ -110,7 +140,6 @@ function AdminManagement() {
 
   const isSubmitting = fetcher.state !== "idle";
   const error = fetcher.data?.error;
-  const justAdded = fetcher.data?.success && fetcher.formData?.get("intent") === "add-admin";
 
   return (
     <Section title="Admin Users">
@@ -223,12 +252,6 @@ function AdminManagement() {
       {error && (
         <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
           <p className="text-xs text-red-400">{error}</p>
-        </div>
-      )}
-
-      {justAdded && (
-        <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-          <p className="text-xs text-green-400">Admin added successfully</p>
         </div>
       )}
 
