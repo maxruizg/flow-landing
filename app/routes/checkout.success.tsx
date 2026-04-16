@@ -5,6 +5,10 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { stripe } from "~/lib/stripe.server";
 import { getOrderByStripeSession } from "~/data/queries.server";
+import {
+  ensureOrderFromCheckoutSession,
+  ensureOrderFromPaymentIntent,
+} from "~/lib/orders.server";
 import { useCart } from "~/context/CartContext";
 import { Navbar } from "~/components/layout/Navbar";
 import { useLocale } from "~/context/LocaleContext";
@@ -32,12 +36,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return redirect("/checkout");
   }
 
-  // If Stripe's return redirect says the payment failed, route to the failure page.
-  if (redirectStatus && redirectStatus !== "succeeded") {
-    if (redirectStatus === "failed") {
-      return redirect(`/checkout/failed?payment_intent=${paymentIntentId ?? ""}`);
-    }
-    // processing / requires_action — show pending screen
+  // Stripe's return redirect may carry an explicit failure — route to the
+  // failure page. "processing" and "requires_action" show a pending screen.
+  if (redirectStatus === "failed") {
+    return redirect(`/checkout/failed?payment_intent=${paymentIntentId ?? ""}`);
+  }
+  if (redirectStatus === "processing" || redirectStatus === "requires_action") {
     return json({
       status: "processing" as const,
       email: null,
@@ -48,62 +52,80 @@ export async function loader({ request }: LoaderFunctionArgs) {
     });
   }
 
-  try {
-    let email: string | null = null;
-    let paymentStatus: string | null = null;
-    let total = 0;
-    let currency = "usd";
+  const trustedSuccess = redirectStatus === "succeeded";
 
+  let email: string | null = null;
+  let paymentStatus: string | null = null;
+  let total = 0;
+  let currency = "usd";
+
+  try {
     if (paymentIntentId) {
       const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
       paymentStatus = pi.status;
       email = pi.receipt_email || null;
       total = pi.amount / 100;
       currency = pi.currency;
+
+      // Fallback path: if the webhook hasn't run yet (or isn't configured),
+      // create the order + decrement stock synchronously here.
+      if (pi.status === "succeeded") {
+        await ensureOrderFromPaymentIntent(pi);
+      }
     } else if (sessionId) {
       const session = await stripe.checkout.sessions.retrieve(sessionId);
       paymentStatus = session.payment_status === "paid" ? "succeeded" : session.payment_status;
       email = session.customer_email || session.metadata?.customer_email || null;
       total = (session.amount_total || 0) / 100;
       currency = session.currency || "usd";
-    }
 
-    if (paymentStatus === "processing" || paymentStatus === "requires_action") {
+      if (session.payment_status === "paid") {
+        await ensureOrderFromCheckoutSession(session);
+      }
+    }
+  } catch (err) {
+    console.error("[checkout.success] Stripe/order sync failed:", err);
+    // If the URL already says the payment succeeded, still show the success
+    // page — don't strand the user on an error screen when their card was
+    // just charged. The webhook will reconcile the order row eventually.
+    if (!trustedSuccess) {
       return json({
-        status: "processing" as const,
-        email,
+        status: "error" as const,
+        email: null,
         orderId: null,
         items: null as OrderSummaryItem[] | null,
-        total,
-        currency,
+        total: 0,
+        currency: "usd",
       });
     }
+  }
 
-    if (paymentStatus !== "succeeded" && paymentStatus !== "paid") {
-      return redirect(`/checkout/failed?payment_intent=${paymentIntentId ?? ""}`);
-    }
-
-    const order = await getOrderByStripeSession(id);
-    const items = (order?.items ?? null) as OrderSummaryItem[] | null;
-
+  if (paymentStatus === "processing" || paymentStatus === "requires_action") {
     return json({
-      status: "paid" as const,
+      status: "processing" as const,
       email,
-      orderId: order?.id || null,
-      items,
-      total: order?.total ?? total,
-      currency,
-    });
-  } catch {
-    return json({
-      status: "error" as const,
-      email: null,
       orderId: null,
       items: null as OrderSummaryItem[] | null,
-      total: 0,
-      currency: "usd",
+      total,
+      currency,
     });
   }
+
+  if (!trustedSuccess && paymentStatus !== "succeeded" && paymentStatus !== "paid") {
+    return redirect(`/checkout/failed?payment_intent=${paymentIntentId ?? ""}`);
+  }
+
+  const order = await getOrderByStripeSession(id).catch(() => null);
+  const items = (order?.items ?? null) as OrderSummaryItem[] | null;
+
+  return json({
+    status: "paid" as const,
+    email,
+    orderId: order?.id || null,
+    items,
+    total: order?.total ?? total,
+    currency,
+  });
 }
 
 function ClearCartOnMount() {

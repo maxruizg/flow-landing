@@ -1,6 +1,7 @@
 import { json } from "@remix-run/node";
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { stripe } from "~/lib/stripe.server";
+import { shippingFee } from "~/lib/shipping";
 import type { CartItem } from "~/lib/types";
 
 interface PaymentIntentRequest {
@@ -21,7 +22,7 @@ export async function action({ request }: ActionFunctionArgs) {
       return json({ error: "Cart is empty" }, { status: 400 });
     }
 
-    const amount = items.reduce((sum, item) => {
+    const subtotal = items.reduce((sum, item) => {
       const unitPrice =
         currency === "mxn" && item.priceMxn
           ? item.priceMxn
@@ -29,6 +30,8 @@ export async function action({ request }: ActionFunctionArgs) {
       return sum + unitPrice * item.quantity;
     }, 0);
 
+    const shipping = shippingFee(currency);
+    const amount = subtotal + shipping;
     const amountInCents = Math.round(amount * 100);
 
     if (amountInCents < 50) {
@@ -49,9 +52,11 @@ export async function action({ request }: ActionFunctionArgs) {
             size: i.size,
             quantity: i.quantity,
             price: currency === "mxn" ? i.priceMxn : i.price,
-          }))
+          })),
         ),
         currency,
+        shipping_fee: String(shipping),
+        subtotal: String(subtotal),
       },
     });
 

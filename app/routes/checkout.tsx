@@ -14,6 +14,7 @@ import { useCart } from "~/context/CartContext";
 import { useLocale } from "~/context/LocaleContext";
 import { Navbar } from "~/components/layout/Navbar";
 import { cn } from "~/lib/utils";
+import { shippingFee } from "~/lib/shipping";
 
 export const meta: MetaFunction = () => [
   { title: "Checkout — FLOW URBAN WEAR" },
@@ -143,6 +144,11 @@ function CheckoutForm() {
   const { items, subtotal, subtotalMxn } = useCart();
   const { formatLocalPrice, currency } = useLocale();
 
+  const shippingUsd = shippingFee("usd");
+  const shippingMxn = shippingFee("mxn");
+  const totalUsd = subtotal + shippingUsd;
+  const totalMxn = subtotalMxn + shippingMxn;
+
   const [step, setStep] = useState<1 | 2>(1);
   const [shipping, setShipping] = useState<ShippingInfo>({
     firstName: "",
@@ -204,7 +210,7 @@ function CheckoutForm() {
     setLoading(true);
     setError(null);
 
-    const { error: stripeError } = await stripeHook.confirmPayment({
+    const { error: stripeError, paymentIntent } = await stripeHook.confirmPayment({
       elements,
       confirmParams: {
         return_url: `${window.location.origin}/checkout/success`,
@@ -224,17 +230,31 @@ function CheckoutForm() {
             }
           : undefined,
       },
+      redirect: "if_required",
     });
 
     if (stripeError) {
       setError(
         stripeError.type === "card_error" || stripeError.type === "validation_error"
           ? stripeError.message || "Payment failed"
-          : "An unexpected error occurred. Please try again."
+          : "An unexpected error occurred. Please try again.",
       );
       setLoading(false);
+      return;
     }
-    // If no error, Stripe redirects to success_url automatically
+
+    // Inline success (card payment with no redirect step) — navigate manually.
+    if (paymentIntent && (paymentIntent.status === "succeeded" || paymentIntent.status === "processing")) {
+      const params = new URLSearchParams({
+        payment_intent: paymentIntent.id,
+        redirect_status: paymentIntent.status === "succeeded" ? "succeeded" : "processing",
+      });
+      window.location.assign(`/checkout/success?${params.toString()}`);
+      return;
+    }
+
+    // Any other state — keep spinner off so the user can retry
+    setLoading(false);
   };
 
   const step1Valid =
@@ -442,7 +462,7 @@ function CheckoutForm() {
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
-                    Pay {formatLocalPrice(subtotal, subtotalMxn)}
+                    Pay {formatLocalPrice(totalUsd, totalMxn)}
                   </>
                 )}
               </button>
@@ -504,12 +524,14 @@ function CheckoutForm() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-flow-500">Shipping</span>
-                <span className="text-flow-200">Free</span>
+                <span className="text-flow-200">
+                  {formatLocalPrice(shippingUsd, shippingMxn)}
+                </span>
               </div>
               <div className="flex justify-between text-base font-display font-semibold pt-2 border-t border-flow-800/50">
                 <span className="text-white">Total</span>
                 <span className="text-white">
-                  {formatLocalPrice(subtotal, subtotalMxn)}
+                  {formatLocalPrice(totalUsd, totalMxn)}
                 </span>
               </div>
             </div>

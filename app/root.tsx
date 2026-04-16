@@ -5,6 +5,7 @@ import {
   Scripts,
   ScrollRestoration,
   useLoaderData,
+  useRouteLoaderData,
 } from "@remix-run/react";
 import { json } from "@remix-run/node";
 import type { LinksFunction, MetaFunction } from "@remix-run/node";
@@ -14,6 +15,10 @@ import { getTrendingProducts, getActiveBanner } from "~/data/queries.server";
 import { LocaleProvider } from "~/context/LocaleContext";
 import { CartProvider } from "~/context/CartContext";
 import { getFlashToast } from "~/lib/toast.server";
+import { getConsent, type CookieConsent } from "~/lib/cookies.server";
+import { CookieBanner } from "~/components/layout/CookieBanner";
+import { GoogleAnalytics } from "~/components/analytics/GoogleAnalytics";
+import { MetaPixel } from "~/components/analytics/MetaPixel";
 
 import styles from "~/styles/global.css?url";
 
@@ -47,27 +52,47 @@ export const meta: MetaFunction = () => [
 ];
 
 export async function loader({ request }: { request: Request }) {
-  const [trendingProducts, banner, flash] = await Promise.all([
+  const [trendingProducts, banner, flash, consent] = await Promise.all([
     getTrendingProducts(),
     getActiveBanner(),
     getFlashToast(request),
+    getConsent(request),
   ]);
   return json(
     {
       trendingProducts,
       banner,
       flashToast: flash.toast,
+      consent,
       ENV: {
         SUPABASE_URL: process.env.SUPABASE_URL!,
         SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY!,
         STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY || "",
+        GA_MEASUREMENT_ID: process.env.GA_MEASUREMENT_ID || "",
+        META_PIXEL_ID: process.env.META_PIXEL_ID || "",
       },
     },
     flash.commit ? { headers: { "Set-Cookie": flash.commit } } : undefined,
   );
 }
 
+type RootLoaderData = {
+  consent: CookieConsent | null;
+  ENV: {
+    SUPABASE_URL: string;
+    SUPABASE_ANON_KEY: string;
+    STRIPE_PUBLISHABLE_KEY: string;
+    GA_MEASUREMENT_ID: string;
+    META_PIXEL_ID: string;
+  };
+};
+
 export function Layout({ children }: { children: React.ReactNode }) {
+  const rootData = useRouteLoaderData<RootLoaderData>("root");
+  const consent = rootData?.consent ?? null;
+  const gaId = rootData?.ENV?.GA_MEASUREMENT_ID ?? "";
+  const metaPixelId = rootData?.ENV?.META_PIXEL_ID ?? "";
+
   return (
     <html lang="en">
       <head>
@@ -86,6 +111,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {children}
         <Analytics />
         <SpeedInsights />
+        {consent?.analytics && gaId && <GoogleAnalytics measurementId={gaId} />}
+        {consent?.marketing && metaPixelId && <MetaPixel pixelId={metaPixelId} />}
+        <CookieBanner initialConsent={consent} />
         <ScrollRestoration />
         <Scripts />
       </body>
