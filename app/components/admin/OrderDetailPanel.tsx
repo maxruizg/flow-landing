@@ -1,6 +1,6 @@
 import { SlidePanel } from "~/components/layout/SlidePanel";
 import { AdminStatusBadge } from "./AdminStatusBadge";
-import { formatPrice } from "~/lib/utils";
+import { formatPrice, formatShippingAddress } from "~/lib/utils";
 import type { AdminOrder } from "~/lib/types";
 
 interface OrderDetailPanelProps {
@@ -11,6 +11,8 @@ interface OrderDetailPanelProps {
 
 export function OrderDetailPanel({ isOpen, onClose, order }: OrderDetailPanelProps) {
   if (!order) return null;
+
+  const addressLines = formatShippingAddress(order.shippingAddress);
 
   return (
     <SlidePanel isOpen={isOpen} onClose={onClose} title={`Order ${order.id}`}>
@@ -31,7 +33,17 @@ export function OrderDetailPanel({ isOpen, onClose, order }: OrderDetailPanelPro
         {/* Shipping */}
         <div className="bg-flow-950 border border-flow-800/50 rounded-lg p-4 space-y-2">
           <h4 className="text-xs text-flow-500 uppercase tracking-wide mb-3">Shipping Address</h4>
-          <p className="text-sm text-flow-300">{order.shippingAddress}</p>
+          {addressLines.length > 0 ? (
+            <address className="not-italic text-sm text-flow-300 leading-relaxed">
+              {addressLines.map((line, i) => (
+                <span key={i} className="block">
+                  {line}
+                </span>
+              ))}
+            </address>
+          ) : (
+            <p className="text-sm text-flow-500 italic">No shipping address on file</p>
+          )}
         </div>
 
         {/* Line items */}
@@ -44,7 +56,10 @@ export function OrderDetailPanel({ isOpen, onClose, order }: OrderDetailPanelPro
                 className="flex items-center justify-between bg-flow-950 border border-flow-800/50 rounded-lg p-4"
               >
                 <div>
-                  <p className="text-sm text-white">{item.productName}</p>
+                  <p className="text-sm text-white">
+                    {item.productName}
+                    {item.colorName ? ` — ${item.colorName}` : ""}
+                  </p>
                   <p className="text-xs text-flow-500">
                     Size: {item.size} &middot; Qty: {item.quantity}
                   </p>

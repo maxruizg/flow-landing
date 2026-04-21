@@ -17,3 +17,27 @@ export function formatPrice(amount: number): string {
     maximumFractionDigits: 0,
   }).format(amount);
 }
+
+export function formatShippingAddress(raw: string): string[] {
+  if (!raw) return [];
+  try {
+    const a = JSON.parse(raw) as {
+      line1?: string;
+      line2?: string;
+      city?: string;
+      state?: string;
+      postal_code?: string;
+      country?: string;
+    };
+    if (!a || typeof a !== "object") return [raw];
+    const lines: string[] = [];
+    if (a.line1) lines.push(a.line1);
+    if (a.line2) lines.push(a.line2);
+    const cityLine = [a.city, a.state, a.postal_code].filter(Boolean).join(", ");
+    if (cityLine) lines.push(cityLine);
+    if (a.country) lines.push(a.country);
+    return lines.length ? lines : [raw];
+  } catch {
+    return [raw];
+  }
+}

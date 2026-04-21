@@ -55,8 +55,10 @@ export async function ensureOrderFromPaymentIntent(
   const orderId = `ORD-${Date.now().toString(36).toUpperCase()}`;
   const total = pi.amount / 100;
 
-  // Create the order row — treat as the critical write. If it fails, we still
-  // attempt to decrement stock so the inventory matches reality.
+  // Create the order row FIRST — its primary-key / unique-stripe_session_id
+  // constraint is the atomic gate that serializes concurrent callers (webhook
+  // + success loader fallback). Only the caller that wins the insert runs the
+  // side effects — otherwise stock and customer stats would double-count.
   let orderCreated = false;
   try {
     await createOrder({
@@ -74,8 +76,15 @@ export async function ensureOrderFromPaymentIntent(
     console.error(`[orders] createOrder failed for ${pi.id}:`, err);
   }
 
-  // Stock, customer, and email are all best-effort — any one failing must not
-  // block the others.
+  if (!orderCreated) {
+    // Another caller already processed this PaymentIntent (or the insert
+    // genuinely failed — in which case the webhook will retry and succeed
+    // on its own). Don't double-decrement stock or double-count customer stats.
+    const winner = await getOrderByStripeSession(pi.id).catch(() => null);
+    return winner ? { orderId: winner.id, created: false } : null;
+  }
+
+  // We're the single winner → safe to run side effects exactly once.
   await decrementStockForItems(items);
 
   try {
@@ -84,7 +93,7 @@ export async function ensureOrderFromPaymentIntent(
     console.error(`[orders] createOrUpdateCustomer failed for ${pi.id}:`, err);
   }
 
-  if (customerEmail && orderCreated) {
+  if (customerEmail) {
     try {
       await sendOrderConfirmation(customerEmail, customerName, orderId, items, total, currency);
     } catch (err) {
@@ -92,7 +101,7 @@ export async function ensureOrderFromPaymentIntent(
     }
   }
 
-  return { orderId, created: orderCreated };
+  return { orderId, created: true };
 }
 
 /** Idempotent variant of ensureOrderFromPaymentIntent for Checkout Sessions. */
@@ -130,6 +139,13 @@ export async function ensureOrderFromCheckoutSession(
     console.error(`[orders] createOrder failed for session ${session.id}:`, err);
   }
 
+  if (!orderCreated) {
+    // Race: another caller already processed this session — don't double-run
+    // stock / customer side effects.
+    const winner = await getOrderByStripeSession(session.id).catch(() => null);
+    return winner ? { orderId: winner.id, created: false } : null;
+  }
+
   await decrementStockForItems(items);
 
   try {
@@ -138,7 +154,7 @@ export async function ensureOrderFromCheckoutSession(
     console.error(`[orders] createOrUpdateCustomer failed for session ${session.id}:`, err);
   }
 
-  if (customerEmail && orderCreated) {
+  if (customerEmail) {
     try {
       await sendOrderConfirmation(customerEmail, customerName, orderId, items, total, currency);
     } catch (err) {
@@ -146,7 +162,7 @@ export async function ensureOrderFromCheckoutSession(
     }
   }
 
-  return { orderId, created: orderCreated };
+  return { orderId, created: true };
 }
 
 /**

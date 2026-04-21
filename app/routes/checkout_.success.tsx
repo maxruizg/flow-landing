@@ -239,7 +239,7 @@ export default function CheckoutSuccess() {
           transition={{ duration: 0.5, ease: [0.33, 1, 0.68, 1] }}
           className="max-w-lg w-full"
         >
-          {/* Success icon with burst */}
+          {/* Success icon — FLOW wave in green */}
           <div className="relative w-24 h-24 mx-auto mb-8">
             <motion.div
               initial={{ scale: 0, rotate: -90 }}
@@ -247,9 +247,21 @@ export default function CheckoutSuccess() {
               transition={{ delay: 0.15, type: "spring", stiffness: 180, damping: 14 }}
               className="absolute inset-0 rounded-full bg-gradient-to-br from-green-500/30 to-green-600/10 border border-green-500/40 flex items-center justify-center"
             >
-              <svg className="w-12 h-12 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-              </svg>
+              <div
+                className="w-14 h-14 bg-green-400"
+                style={{
+                  maskImage: "url('/images/logo/flow-wave-icon.png')",
+                  WebkitMaskImage: "url('/images/logo/flow-wave-icon.png')",
+                  maskSize: "contain",
+                  WebkitMaskSize: "contain",
+                  maskRepeat: "no-repeat",
+                  WebkitMaskRepeat: "no-repeat",
+                  maskPosition: "center",
+                  WebkitMaskPosition: "center",
+                  maskMode: "luminance",
+                  WebkitMaskMode: "luminance",
+                } as React.CSSProperties}
+              />
             </motion.div>
             {/* Burst dots */}
             {[0, 60, 120, 180, 240, 300].map((angle, i) => (
@@ -300,54 +312,88 @@ export default function CheckoutSuccess() {
           </div>
 
           {/* Order summary card */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="bg-flow-900 border border-flow-800/50 rounded-2xl p-5 mb-6"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-[11px] uppercase tracking-[0.2em] text-flow-500">
-                Order Summary
-              </span>
-              {orderId && (
-                <span className="text-[11px] text-flow-400 font-mono">#{orderId}</span>
-              )}
-            </div>
+          {(() => {
+            const itemsSubtotal =
+              items && items.length > 0
+                ? items.reduce((sum, it) => sum + it.price * it.quantity, 0)
+                : 0;
+            const shipping = items && items.length > 0 ? Math.max(0, total - itemsSubtotal) : 0;
+            const hasBreakdown = items && items.length > 0;
 
-            {items && items.length > 0 && (
-              <div className="space-y-3 mb-4">
-                {items.map((item, i) => (
-                  <div key={i} className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm text-white font-medium truncate">
-                        {item.productName}
-                        {item.colorName ? ` — ${item.colorName}` : ""}
-                      </p>
-                      <p className="text-xs text-flow-500 mt-0.5">
-                        Size {item.size} &middot; Qty {item.quantity}
-                      </p>
-                    </div>
-                    <p className="text-sm text-flow-300 tabular-nums shrink-0">
-                      {currencySymbol}
-                      {(item.price * item.quantity).toFixed(2)}
-                    </p>
+            return (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="bg-flow-900 border border-flow-800/50 rounded-2xl p-5 mb-6"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-[11px] uppercase tracking-[0.2em] text-flow-500">
+                    Order Summary
+                  </span>
+                  {orderId && (
+                    <span className="text-[11px] text-flow-400 font-mono">#{orderId}</span>
+                  )}
+                </div>
+
+                {/* Articles */}
+                {hasBreakdown && (
+                  <div className="space-y-3 mb-4">
+                    {items.map((item, i) => (
+                      <div key={i} className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm text-white font-medium truncate">
+                            {item.productName}
+                            {item.colorName ? ` — ${item.colorName}` : ""}
+                          </p>
+                          <p className="text-xs text-flow-500 mt-0.5">
+                            Size {item.size} &middot; Qty {item.quantity}
+                          </p>
+                        </div>
+                        <p className="text-sm text-flow-300 tabular-nums shrink-0">
+                          {currencySymbol}
+                          {(item.price * item.quantity).toFixed(2)}
+                        </p>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
+                )}
 
-            <div className="pt-3 border-t border-flow-800/50 flex items-center justify-between">
-              <span className="text-sm font-medium text-white">Total</span>
-              <span className="text-lg font-display font-bold text-white tabular-nums">
-                {currencySymbol}
-                {total.toFixed(2)}{" "}
-                <span className="text-xs text-flow-500 font-normal uppercase">
-                  {currency}
-                </span>
-              </span>
-            </div>
-          </motion.div>
+                {/* Subtotal + Shipping */}
+                {hasBreakdown && (
+                  <div className="pt-3 border-t border-flow-800/50 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-flow-500">Subtotal</span>
+                      <span className="text-sm text-flow-300 tabular-nums">
+                        {currencySymbol}
+                        {itemsSubtotal.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-flow-500">Shipping</span>
+                      <span className="text-sm text-flow-300 tabular-nums">
+                        {shipping > 0
+                          ? `${currencySymbol}${shipping.toFixed(2)}`
+                          : "Free"}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Total */}
+                <div className="pt-3 mt-2 border-t border-flow-800/50 flex items-center justify-between">
+                  <span className="text-sm font-medium text-white">Total</span>
+                  <span className="text-lg font-display font-bold text-white tabular-nums">
+                    {currencySymbol}
+                    {total.toFixed(2)}{" "}
+                    <span className="text-xs text-flow-500 font-normal uppercase">
+                      {currency}
+                    </span>
+                  </span>
+                </div>
+              </motion.div>
+            );
+          })()}
 
           {/* What's next */}
           <motion.div

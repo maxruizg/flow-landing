@@ -92,6 +92,7 @@ export interface AdminProduct extends Product {
 
 export interface OrderItem {
   productName: string;
+  colorName?: string | null;
   size: string;
   quantity: number;
   price: number;

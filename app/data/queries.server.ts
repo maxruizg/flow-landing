@@ -304,7 +304,13 @@ export async function createOrder(order: {
   id: string;
   customerName: string;
   customerEmail: string;
-  items: { productName: string; size: string; quantity: number; price: number }[];
+  items: {
+    productName: string;
+    colorName?: string | null;
+    size: string;
+    quantity: number;
+    price: number;
+  }[];
   total: number;
   currency: string;
   shippingAddress: string;
