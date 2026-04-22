@@ -172,26 +172,21 @@ function CheckoutForm() {
   const handleAddressChange = useCallback(
     (event: StripeAddressElementChangeEvent) => {
       setAddressComplete(event.complete);
-      if (event.complete) {
-        setShipping((prev) => ({
-          ...prev,
-          address: event.value.address,
-          firstName: prev.firstName || event.value.name?.split(" ")[0] || "",
-          lastName:
-            prev.lastName ||
-            event.value.name?.split(" ").slice(1).join(" ") ||
-            "",
-          phone: prev.phone || event.value.phone || "",
-        }));
-      }
+      const fullName = event.value.name?.trim() ?? "";
+      const [firstName = "", ...rest] = fullName.split(/\s+/);
+      const lastName = rest.join(" ");
+      setShipping((prev) => ({
+        ...prev,
+        address: event.complete ? event.value.address : prev.address,
+        firstName,
+        lastName,
+      }));
     },
     []
   );
 
   const validateStep1 = (): boolean => {
     const errors: Record<string, boolean> = {};
-    if (!shipping.firstName.trim()) errors.firstName = true;
-    if (!shipping.lastName.trim()) errors.lastName = true;
     if (!shipping.email.trim() || !isValidEmail(shipping.email))
       errors.email = true;
     if (!addressComplete) errors.address = true;
@@ -267,11 +262,7 @@ function CheckoutForm() {
     setLoading(false);
   };
 
-  const step1Valid =
-    shipping.firstName.trim() &&
-    shipping.lastName.trim() &&
-    isValidEmail(shipping.email) &&
-    addressComplete;
+  const step1Valid = isValidEmail(shipping.email) && addressComplete;
 
   return (
     <div className="min-h-screen pt-24 pb-16 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto">
@@ -289,30 +280,7 @@ function CheckoutForm() {
                 Contact & Shipping
               </h2>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className={labelClass}>First Name *</label>
-                  <input
-                    type="text"
-                    placeholder="John"
-                    value={shipping.firstName}
-                    onChange={(e) => updateField("firstName", e.target.value)}
-                    className={cn(inputClass, fieldErrors.firstName && "border-red-500")}
-                  />
-                </div>
-                <div>
-                  <label className={labelClass}>Last Name *</label>
-                  <input
-                    type="text"
-                    placeholder="Doe"
-                    value={shipping.lastName}
-                    onChange={(e) => updateField("lastName", e.target.value)}
-                    className={cn(inputClass, fieldErrors.lastName && "border-red-500")}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className={labelClass}>Email *</label>
                   <input

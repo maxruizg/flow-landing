@@ -2,6 +2,7 @@ import type Stripe from "stripe";
 import { render } from "@react-email/render";
 import { stripe } from "~/lib/stripe.server";
 import {
+  createNotification,
   createOrder,
   createOrUpdateCustomer,
   decrementVariantStock,
@@ -43,7 +44,7 @@ export async function ensureOrderFromPaymentIntent(
   }
 
   const metadata = pi.metadata || {};
-  const items: WebhookOrderItem[] = safeParseItems(metadata.items_json);
+  const items: WebhookOrderItem[] = safeParseItems(metadata);
   const currency = metadata.currency || pi.currency || "usd";
 
   const customerName = pi.shipping?.name || metadata.customer_name || "Unknown";
@@ -87,11 +88,15 @@ export async function ensureOrderFromPaymentIntent(
   // We're the single winner → safe to run side effects exactly once.
   await decrementStockForItems(items);
 
+  let customerIsNew = false;
   try {
-    await createOrUpdateCustomer({ name: customerName, email: customerEmail, orderTotal: total });
+    const result = await createOrUpdateCustomer({ name: customerName, email: customerEmail, orderTotal: total });
+    customerIsNew = result.isNew;
   } catch (err) {
     console.error(`[orders] createOrUpdateCustomer failed for ${pi.id}:`, err);
   }
+
+  await emitOrderNotifications({ orderId, customerName, total, currency, itemCount: items.length, customerIsNew });
 
   if (customerEmail) {
     try {
@@ -114,7 +119,7 @@ export async function ensureOrderFromCheckoutSession(
   if (existing) return { orderId: existing.id, created: false };
 
   const metadata = session.metadata || {};
-  const items: WebhookOrderItem[] = safeParseItems(metadata.items_json);
+  const items: WebhookOrderItem[] = safeParseItems(metadata);
   const currency = metadata.currency || session.currency || "usd";
   const shippingAddress = metadata.shipping_address || "{}";
   const customerName = metadata.customer_name || "Unknown";
@@ -148,11 +153,15 @@ export async function ensureOrderFromCheckoutSession(
 
   await decrementStockForItems(items);
 
+  let customerIsNew = false;
   try {
-    await createOrUpdateCustomer({ name: customerName, email: customerEmail, orderTotal: total });
+    const result = await createOrUpdateCustomer({ name: customerName, email: customerEmail, orderTotal: total });
+    customerIsNew = result.isNew;
   } catch (err) {
     console.error(`[orders] createOrUpdateCustomer failed for session ${session.id}:`, err);
   }
+
+  await emitOrderNotifications({ orderId, customerName, total, currency, itemCount: items.length, customerIsNew });
 
   if (customerEmail) {
     try {
@@ -191,14 +200,81 @@ async function decrementStockForItems(items: WebhookOrderItem[]): Promise<void> 
       continue;
     }
     try {
-      await decrementVariantStock(it.variantId, it.size, it.quantity);
+      const result = await decrementVariantStock(it.variantId, it.size, it.quantity);
+      if (result && result.nextStock === 0) {
+        const label = it.colorName
+          ? `${it.productName} — ${it.colorName} (${it.size})`
+          : `${it.productName} (${it.size})`;
+        await createNotification({
+          type: "stock",
+          title: "Out of stock",
+          message: `${label} is now out of stock after the latest order.`,
+          linkTo: "/admin/products",
+        });
+      }
     } catch (err) {
       console.error(`[orders] decrementVariantStock failed for ${it.variantId} (${it.size}):`, err);
     }
   }
 }
 
-function safeParseItems(raw: string | undefined): WebhookOrderItem[] {
+async function emitOrderNotifications(input: {
+  orderId: string;
+  customerName: string;
+  total: number;
+  currency: string;
+  itemCount: number;
+  customerIsNew: boolean;
+}): Promise<void> {
+  const { orderId, customerName, total, currency, itemCount, customerIsNew } = input;
+  const amount = formatAmount(total, currency);
+  const itemWord = itemCount === 1 ? "item" : "items";
+
+  try {
+    await createNotification({
+      type: "order",
+      title: `New order ${orderId}`,
+      message: `${customerName} · ${itemCount} ${itemWord} · ${amount}`,
+      linkTo: "/admin/orders",
+    });
+  } catch (err) {
+    console.error(`[orders] order notification failed for ${orderId}:`, err);
+  }
+
+  if (customerIsNew) {
+    try {
+      await createNotification({
+        type: "customer",
+        title: "New customer",
+        message: `${customerName} just placed their first order.`,
+        linkTo: "/admin/customers",
+      });
+    } catch (err) {
+      console.error(`[orders] customer notification failed for ${orderId}:`, err);
+    }
+  }
+}
+
+function formatAmount(amount: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: (currency || "usd").toUpperCase(),
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return `${amount.toFixed(2)} ${currency?.toUpperCase() || ""}`.trim();
+  }
+}
+
+/**
+ * Reassemble the items JSON from metadata. Stripe caps each value at 500 chars,
+ * so the PI creation endpoint chunks long payloads into `items_json_0`,
+ * `items_json_1`, ... We read chunks in order; we also fall back to the legacy
+ * single `items_json` key so any in-flight pre-migration orders still work.
+ */
+function safeParseItems(metadata: Record<string, string>): WebhookOrderItem[] {
+  const raw = joinChunkedMetadata(metadata, "items_json") ?? metadata.items_json;
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
@@ -206,6 +282,20 @@ function safeParseItems(raw: string | undefined): WebhookOrderItem[] {
   } catch {
     return [];
   }
+}
+
+function joinChunkedMetadata(
+  metadata: Record<string, string>,
+  prefix: string,
+): string | null {
+  if (metadata[`${prefix}_0`] === undefined) return null;
+  let joined = "";
+  for (let i = 0; ; i++) {
+    const chunk = metadata[`${prefix}_${i}`];
+    if (chunk === undefined) break;
+    joined += chunk;
+  }
+  return joined;
 }
 
 async function sendOrderConfirmation(

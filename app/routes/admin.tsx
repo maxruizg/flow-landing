@@ -6,6 +6,7 @@ import { AdminSidebar } from "~/components/admin/AdminSidebar";
 import { AdminTopbar } from "~/components/admin/AdminTopbar";
 import { ToastProvider } from "~/components/admin/ToastProvider";
 import { getAdminSession } from "~/lib/session.server";
+import { getUnreadNotificationCount } from "~/data/queries.server";
 import type { Toast } from "~/lib/toast.server";
 
 const pageTitles: Record<string, string> = {
@@ -25,11 +26,16 @@ const pageTitles: Record<string, string> = {
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { adminId, adminName } = await getAdminSession(request);
-  return json({ adminId: adminId || null, adminName: adminName || null });
+  const unreadNotifications = adminId ? await getUnreadNotificationCount() : 0;
+  return json({
+    adminId: adminId || null,
+    adminName: adminName || null,
+    unreadNotifications,
+  });
 }
 
 export default function AdminLayout() {
-  const { adminName } = useLoaderData<typeof loader>();
+  const { adminName, unreadNotifications } = useLoaderData<typeof loader>();
   const rootData = useRouteLoaderData("root") as { flashToast?: Toast | null } | undefined;
   const location = useLocation();
   const isLoginPage = location.pathname === "/admin" || location.pathname === "/admin/";
@@ -60,6 +66,7 @@ export default function AdminLayout() {
             title={title}
             onMenuToggle={() => setSidebarOpen((o) => !o)}
             adminName={adminName || undefined}
+            unreadNotifications={unreadNotifications}
           />
           <main className="p-4 lg:p-6">
             <Outlet />

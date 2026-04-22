@@ -9,6 +9,23 @@ interface PaymentIntentRequest {
   currency: "usd" | "mxn";
 }
 
+// Stripe caps each metadata value at 500 chars but allows 50 keys. Chunk long
+// JSON payloads into `<prefix>_0`, `<prefix>_1`, ... so carts of any realistic
+// size fit. The reader in app/lib/orders.server.ts mirrors this.
+const METADATA_CHUNK_SIZE = 450;
+
+function chunkMetadata(prefix: string, value: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (value.length <= METADATA_CHUNK_SIZE) {
+    out[`${prefix}_0`] = value;
+    return out;
+  }
+  for (let i = 0, idx = 0; i < value.length; i += METADATA_CHUNK_SIZE, idx++) {
+    out[`${prefix}_${idx}`] = value.slice(i, i + METADATA_CHUNK_SIZE);
+  }
+  return out;
+}
+
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== "POST") {
     return json({ error: "Method not allowed" }, { status: 405 });
@@ -38,22 +55,24 @@ export async function action({ request }: ActionFunctionArgs) {
       return json({ error: "Order amount too small" }, { status: 400 });
     }
 
+    const itemsJson = JSON.stringify(
+      items.map((i) => ({
+        productId: i.productId,
+        variantId: i.variantId ?? null,
+        productName: i.productName,
+        colorName: i.colorName ?? null,
+        size: i.size,
+        quantity: i.quantity,
+        price: currency === "mxn" ? i.priceMxn : i.price,
+      })),
+    );
+
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountInCents,
       currency,
       automatic_payment_methods: { enabled: true },
       metadata: {
-        items_json: JSON.stringify(
-          items.map((i) => ({
-            productId: i.productId,
-            variantId: i.variantId ?? null,
-            productName: i.productName,
-            colorName: i.colorName ?? null,
-            size: i.size,
-            quantity: i.quantity,
-            price: currency === "mxn" ? i.priceMxn : i.price,
-          })),
-        ),
+        ...chunkMetadata("items_json", itemsJson),
         currency,
         shipping_fee: String(shipping),
         subtotal: String(subtotal),

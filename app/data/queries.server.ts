@@ -336,7 +336,7 @@ export async function createOrUpdateCustomer(customer: {
   name: string;
   email: string;
   orderTotal: number;
-}) {
+}): Promise<{ isNew: boolean }> {
   const today = new Date().toISOString().slice(0, 10);
   const { data: existing } = await supabase
     .from("customers")
@@ -355,18 +355,20 @@ export async function createOrUpdateCustomer(customer: {
       })
       .eq("id", existing.id);
     if (error) throw error;
-  } else {
-    const { error } = await supabase.from("customers").insert({
-      id: crypto.randomUUID(),
-      name: customer.name,
-      email: customer.email,
-      total_orders: 1,
-      total_spent: customer.orderTotal,
-      joined_date: today,
-      last_order_date: today,
-    });
-    if (error) throw error;
+    return { isNew: false };
   }
+
+  const { error } = await supabase.from("customers").insert({
+    id: crypto.randomUUID(),
+    name: customer.name,
+    email: customer.email,
+    total_orders: 1,
+    total_spent: customer.orderTotal,
+    joined_date: today,
+    last_order_date: today,
+  });
+  if (error) throw error;
+  return { isNew: true };
 }
 
 export async function getOrderByStripeSession(sessionId: string): Promise<AdminOrder | null> {
@@ -385,6 +387,38 @@ export async function getAdminNotifications(): Promise<AdminNotification[]> {
     .order("date", { ascending: false });
   if (error) throw error;
   return data.map(mapNotification);
+}
+
+export async function getUnreadNotificationCount(): Promise<number> {
+  const { count, error } = await supabase
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("read", false);
+  if (error) {
+    console.error("[notifications] getUnreadNotificationCount failed:", error);
+    return 0;
+  }
+  return count ?? 0;
+}
+
+/** Fire-and-forget notification insert. Failures are logged, never thrown —
+ *  notifications are a side-channel, they must not break the caller's flow. */
+export async function createNotification(n: {
+  type: AdminNotification["type"];
+  title: string;
+  message?: string;
+  linkTo?: string | null;
+}): Promise<void> {
+  const { error } = await supabase.from("notifications").insert({
+    id: crypto.randomUUID(),
+    type: n.type,
+    title: n.title,
+    message: n.message ?? "",
+    date: new Date().toISOString(),
+    read: false,
+    link_to: n.linkTo ?? null,
+  });
+  if (error) console.error("[notifications] createNotification failed:", error);
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
@@ -613,21 +647,23 @@ export async function decrementVariantStock(
   variantId: string,
   size: string,
   qty: number,
-): Promise<void> {
+): Promise<{ nextStock: number } | null> {
   const { data, error } = await supabase
     .from("product_variants")
     .select("size_stock")
     .eq("id", variantId)
     .maybeSingle();
   if (error) throw error;
-  if (!data) return;
+  if (!data) return null;
   const current = (data.size_stock ?? {}) as Record<string, number>;
-  const next = { ...current, [size]: Math.max(0, (current[size] ?? 0) - qty) };
+  const nextStock = Math.max(0, (current[size] ?? 0) - qty);
+  const next = { ...current, [size]: nextStock };
   const { error: uErr } = await supabase
     .from("product_variants")
     .update({ size_stock: next })
     .eq("id", variantId);
   if (uErr) throw uErr;
+  return { nextStock };
 }
 
 export async function setDefaultVariant(productId: string, variantId: string | null): Promise<void> {
