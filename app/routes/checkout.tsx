@@ -315,7 +315,7 @@ function CheckoutForm() {
                     mode: "shipping",
                     allowedCountries: ["MX", "US"],
                     fields: { phone: "never" },
-                    display: { name: "split" },
+                    display: { name: "full" },
                   }}
                   onChange={handleAddressChange}
                 />
