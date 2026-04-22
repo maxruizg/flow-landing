@@ -530,7 +530,7 @@ function CheckoutForm() {
 // ─── Main Checkout Page ───────────────────────────────────────────
 export default function Checkout() {
   const { items, itemCount } = useCart();
-  const { currency } = useLocale();
+  const { currency, language } = useLocale();
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [initError, setInitError] = useState<string | null>(null);
 
@@ -634,6 +634,7 @@ export default function Checkout() {
         options={{
           clientSecret,
           appearance: stripeAppearance,
+          locale: language === "es" ? "es-419" : "en",
         }}
       >
         <CheckoutForm />
