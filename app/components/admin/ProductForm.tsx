@@ -265,6 +265,7 @@ interface VariantDraft {
   badge: string | null;
   isNew: boolean;
   sortOrder: number;
+  description: string;
 }
 
 interface ProductFormProps {
@@ -297,6 +298,7 @@ function variantFromProductVariant(v: ProductVariant): VariantDraft {
     badge: v.badge,
     isNew: v.isNew,
     sortOrder: v.sortOrder,
+    description: v.description ?? "",
   };
 }
 
@@ -317,6 +319,7 @@ function emptyVariant(index: number): VariantDraft {
     badge: null,
     isNew: false,
     sortOrder: index + 1,
+    description: "",
   };
 }
 
@@ -331,7 +334,6 @@ export function ProductForm({ product }: ProductFormProps) {
     gender: "unisex" as "men" | "women" | "unisex",
     sizes: "S, M, L, XL",
     material: "",
-    description: "",
     origin: "",
     fit: "",
     brand: "",
@@ -358,7 +360,6 @@ export function ProductForm({ product }: ProductFormProps) {
       gender: product.gender,
       sizes: product.sizes.join(", "),
       material: product.material,
-      description: product.description,
       origin: product.origin,
       fit: product.fit || "",
       brand: product.brand ?? "",
@@ -477,6 +478,7 @@ export function ProductForm({ product }: ProductFormProps) {
             <input type="hidden" name={`variant_${i}_status`} value={v.status} />
             <input type="hidden" name={`variant_${i}_badge`} value={v.badge ?? ""} />
             <input type="hidden" name={`variant_${i}_isNew`} value={v.isNew ? "true" : "false"} />
+            <input type="hidden" name={`variant_${i}_description`} value={v.description} />
           </div>
         ))}
 
@@ -623,6 +625,17 @@ export function ProductForm({ product }: ProductFormProps) {
                     </div>
                   </div>
 
+                  <div className="mb-4">
+                    <label className={labelClass}>Description</label>
+                    <textarea
+                      className={`${inputClass} resize-none`}
+                      rows={4}
+                      value={v.description}
+                      onChange={(e) => updateVariant(i, { description: e.target.value })}
+                      placeholder={`Description for ${v.colorName || "this color"}...`}
+                    />
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4 mb-4">
                     <ImageUpload
                       label="Main Image"
@@ -669,17 +682,6 @@ export function ProductForm({ product }: ProductFormProps) {
                     value={form.name}
                     onChange={(e) => updateForm("name", e.target.value)}
                     placeholder="Product name"
-                  />
-                </div>
-                <div>
-                  <label className={labelClass}>Description</label>
-                  <textarea
-                    className={`${inputClass} resize-none`}
-                    rows={4}
-                    name="description"
-                    value={form.description}
-                    onChange={(e) => updateForm("description", e.target.value)}
-                    placeholder="Product description..."
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">

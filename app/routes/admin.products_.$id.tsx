@@ -36,7 +36,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const baseProductId = params.id!;
 
   const name = form.get("name") as string;
-  const description = form.get("description") as string;
   const category = form.get("category") as string;
   const gender = form.get("gender") as "men" | "women" | "unisex";
   const sizes = ((form.get("sizes_raw") as string) || "")
@@ -60,7 +59,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
     id: baseProductId,
     slug: baseSlug,
     name,
-    description,
     category,
     gender,
     material,
@@ -106,6 +104,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const badgeRaw = form.get(`variant_${i}_badge`) as string;
     const badge = badgeRaw ? badgeRaw : null;
     const isNew = form.get(`variant_${i}_isNew`) === "true";
+    const description = (form.get(`variant_${i}_description`) as string) || "";
 
     const finalId = rawId.startsWith("new-") ? `v-${baseProductId}-${kebab(colorName)}` : rawId;
     const variantSlug = `${baseSlug}-${kebab(colorName)}`;
@@ -133,6 +132,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       badge,
       isNew,
       sortOrder: i + 1,
+      description,
     });
   }
 

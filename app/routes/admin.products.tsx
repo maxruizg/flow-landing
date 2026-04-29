@@ -10,6 +10,7 @@ import {
   getAdminProducts,
   deleteProduct,
   updateProductPositions,
+  updateNewArrivalsPositions,
 } from "~/data/queries.server";
 import { AdminEmptyState } from "~/components/admin/AdminEmptyState";
 import type { AdminProduct } from "~/lib/types";
@@ -114,6 +115,15 @@ export async function action({ request }: ActionFunctionArgs) {
     });
   }
 
+  if (intent === "reorder_new_arrivals") {
+    const payload = JSON.parse(form.get("positions") as string);
+    await updateNewArrivalsPositions(payload);
+    return redirectWithToast("/admin/products", {
+      type: "success",
+      message: "New Collection order saved.",
+    });
+  }
+
   return redirectWithToast("/admin/products", {
     type: "info",
     message: "No changes applied.",
@@ -125,6 +135,7 @@ export default function AdminProducts() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
   const [gender, setGender] = useState("All");
+  const [newOnly, setNewOnly] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [arrangeMode, setArrangeMode] = useState(false);
   const [orderedProducts, setOrderedProducts] = useState<AdminProduct[]>([]);
@@ -152,13 +163,24 @@ export default function AdminProducts() {
       const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
       const matchCat = category === "All" || p.category === category;
       const matchGender = gender === "All" || p.gender === gender;
-      return matchSearch && matchCat && matchGender;
+      const matchNew = !newOnly || p.variants.some((v) => v.isNew);
+      return matchSearch && matchCat && matchGender && matchNew;
     });
-  }, [adminProducts, search, category, gender]);
+  }, [adminProducts, search, category, gender, newOnly]);
 
   const toggleArrange = () => {
     if (!arrangeMode) {
-      setOrderedProducts([...adminProducts]);
+      // In "New only" mode we reorder ONLY the new arrivals (sorted by their
+      // independent newArrivalsPosition). Otherwise reorder the full catalog
+      // by the global position.
+      if (newOnly) {
+        const newArrivals = adminProducts
+          .filter((p) => p.variants.some((v) => v.isNew))
+          .sort((a, b) => a.newArrivalsPosition - b.newArrivalsPosition);
+        setOrderedProducts(newArrivals);
+      } else {
+        setOrderedProducts([...adminProducts]);
+      }
     }
     setArrangeMode(!arrangeMode);
   };
@@ -209,6 +231,24 @@ export default function AdminProducts() {
               <option key={g} value={g}>{g === "All" ? "All Genders" : g.charAt(0).toUpperCase() + g.slice(1)}</option>
             ))}
           </select>
+          <button
+            type="button"
+            onClick={() => {
+              if (arrangeMode) return;
+              setNewOnly((v) => !v);
+            }}
+            disabled={arrangeMode}
+            className={cn(
+              "font-display font-semibold text-xs tracking-wide uppercase rounded-lg px-4 py-2.5 transition-colors whitespace-nowrap border disabled:opacity-50 disabled:cursor-not-allowed",
+              newOnly
+                ? "border-accent-500 text-accent-400 bg-accent-500/10 hover:bg-accent-500/20"
+                : "border-flow-700 text-flow-300 hover:bg-flow-800",
+            )}
+            aria-pressed={newOnly}
+            title="Filter to products in the New Collection"
+          >
+            {newOnly ? "New only ✓" : "New only"}
+          </button>
         </div>
         <div className="flex gap-2">
           <button
@@ -243,9 +283,18 @@ export default function AdminProducts() {
               </div>
             </SortableContext>
           </DndContext>
-          <div className="px-5 py-4 border-t border-flow-800/30">
+          <div className="px-5 py-4 border-t border-flow-800/30 flex items-center justify-between gap-3">
+            <p className="text-xs text-flow-500">
+              {newOnly
+                ? "Reordering the New Collection — shop order is unchanged."
+                : "Reordering the full catalog — affects shop and section fallbacks."}
+            </p>
             <Form method="post">
-              <input type="hidden" name="intent" value="reorder" />
+              <input
+                type="hidden"
+                name="intent"
+                value={newOnly ? "reorder_new_arrivals" : "reorder"}
+              />
               <input
                 type="hidden"
                 name="positions"

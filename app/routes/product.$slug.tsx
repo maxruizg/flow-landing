@@ -22,9 +22,13 @@ import { colorSwatch } from "~/lib/color-map";
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
   if (!data?.product) return [{ title: "Product Not Found — FLOW URBAN WEAR" }];
+  const product = data.product;
+  const defaultVariant =
+    product.variants.find((v) => v.id === product.defaultVariantId) ??
+    product.variants[0];
   return [
-    { title: `${data.product.name} — FLOW URBAN WEAR` },
-    { name: "description", content: data.product.description },
+    { title: `${product.name} — FLOW URBAN WEAR` },
+    { name: "description", content: defaultVariant?.description ?? "" },
   ];
 };
 
@@ -238,7 +242,7 @@ function ProductModal({ product }: { product: Product }) {
                 )}
 
                 <p className="text-flow-400 text-sm leading-relaxed mb-5">
-                  {product.description}
+                  {selectedVariant.description}
                 </p>
 
                 {/* Color variants */}

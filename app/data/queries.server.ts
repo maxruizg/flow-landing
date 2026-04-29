@@ -41,6 +41,7 @@ function mapVariant(row: any): ProductVariant {
     badge: row.badge ?? null,
     isNew: !!row.is_new,
     sortOrder: row.sort_order ?? 0,
+    description: row.description ?? "",
   };
 }
 
@@ -71,7 +72,6 @@ function hydrateProduct(productRow: any, variantRows: any[]): Product {
     id: productRow.id,
     slug: productRow.slug,
     name: productRow.name,
-    description: productRow.description ?? "",
     category: productRow.category,
     gender: productRow.gender,
     material: productRow.material ?? "",
@@ -83,6 +83,7 @@ function hydrateProduct(productRow: any, variantRows: any[]): Product {
     defaultVariantId: productRow.default_variant_id ?? null,
     variants,
     position: productRow.position ?? 0,
+    newArrivalsPosition: productRow.new_arrivals_position ?? 0,
 
     // Legacy-shaped derived fields (PR 1 compat).
     price: dflt?.price ?? 0,
@@ -249,7 +250,9 @@ export async function getBestSellers(): Promise<Product[]> {
 
 export async function getNewArrivals(): Promise<Product[]> {
   const all = await getAllProducts();
-  return all.filter((p) => p.variants.some((v) => v.isNew));
+  return all
+    .filter((p) => p.variants.some((v) => v.isNew))
+    .sort((a, b) => a.newArrivalsPosition - b.newArrivalsPosition);
 }
 
 export async function getCollections(): Promise<Collection[]> {
@@ -555,7 +558,6 @@ export interface BaseProductInput {
   id: string;
   slug: string;
   name: string;
-  description: string;
   category: string;
   gender: "men" | "women" | "unisex";
   material: string;
@@ -585,6 +587,7 @@ export interface VariantInput {
   badge: string | null;
   isNew: boolean;
   sortOrder: number;
+  description: string;
 }
 
 export async function upsertBaseProduct(p: BaseProductInput): Promise<void> {
@@ -592,7 +595,6 @@ export async function upsertBaseProduct(p: BaseProductInput): Promise<void> {
     id: p.id,
     slug: p.slug,
     name: p.name,
-    description: p.description,
     category: p.category,
     gender: p.gender,
     material: p.material,
@@ -628,6 +630,7 @@ export async function upsertVariants(variants: VariantInput[]): Promise<void> {
     badge: v.badge,
     is_new: v.isNew,
     sort_order: v.sortOrder,
+    description: v.description,
     updated_at: new Date().toISOString(),
   }));
   const { error } = await supabase.from("product_variants").upsert(rows);
@@ -737,6 +740,18 @@ export async function updateProductPositions(
     const { error } = await supabase
       .from("products")
       .update({ position })
+      .eq("id", id);
+    if (error) throw error;
+  }
+}
+
+export async function updateNewArrivalsPositions(
+  positions: { id: string; position: number }[]
+) {
+  for (const { id, position } of positions) {
+    const { error } = await supabase
+      .from("products")
+      .update({ new_arrivals_position: position })
       .eq("id", id);
     if (error) throw error;
   }
@@ -1160,6 +1175,146 @@ export async function saveEmailSettings(key: string, value: Record<string, any>)
     updated_at: new Date().toISOString(),
   });
   if (error) throw error;
+}
+
+// ─── Visitor Analytics ─────────────────────────────────────────
+
+export interface VisitorAnalytics {
+  // Headline metrics for KPI cards.
+  today: { uniques: number; views: number; uniquesChange: number };
+  week: { uniques: number; views: number; uniquesChange: number };
+  month: { uniques: number; views: number; uniquesChange: number };
+  allTime: { uniques: number; views: number };
+  // Last 30 days, oldest → newest, one entry per calendar day.
+  daily: { date: string; uniques: number; views: number }[];
+}
+
+export interface PageViewInput {
+  visitorId: string;
+  path: string;
+  referrer?: string | null;
+  userAgent?: string | null;
+}
+
+/** Fire-and-forget. Errors are logged, never thrown — analytics must never
+ *  break a public page render. */
+export async function recordPageView(input: PageViewInput): Promise<void> {
+  const { error } = await supabase.from("page_views").insert({
+    visitor_id: input.visitorId,
+    path: input.path,
+    referrer: input.referrer ?? null,
+    user_agent: input.userAgent ?? null,
+  });
+  if (error) console.error("[analytics] recordPageView failed:", error.message);
+}
+
+function dayKey(d: Date): string {
+  // YYYY-MM-DD in UTC.
+  return d.toISOString().slice(0, 10);
+}
+
+function pctChange(current: number, prior: number): number {
+  if (prior === 0) return current > 0 ? 100 : 0;
+  return Math.round(((current - prior) / prior) * 1000) / 10;
+}
+
+export async function getVisitorAnalytics(): Promise<VisitorAnalytics> {
+  const now = new Date();
+  // Use a 60-day window so we can compute week/month deltas vs prior period.
+  const windowStart = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+
+  const { data, error } = await supabase
+    .from("page_views")
+    .select("visitor_id, viewed_at")
+    .gte("viewed_at", windowStart.toISOString())
+    .order("viewed_at", { ascending: true });
+  if (error) throw error;
+
+  const rows = data ?? [];
+  const startOfTodayUTC = new Date(Date.UTC(
+    now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(),
+  ));
+  const dayMs = 24 * 60 * 60 * 1000;
+
+  const inRange = (rowTime: number, start: Date, end: Date) =>
+    rowTime >= start.getTime() && rowTime < end.getTime();
+
+  const aggregate = (start: Date, end: Date) => {
+    const uniques = new Set<string>();
+    let views = 0;
+    for (const r of rows) {
+      const t = new Date(r.viewed_at).getTime();
+      if (inRange(t, start, end)) {
+        views++;
+        uniques.add(r.visitor_id);
+      }
+    }
+    return { uniques: uniques.size, views };
+  };
+
+  const todayEnd = new Date(startOfTodayUTC.getTime() + dayMs);
+  const yesterdayStart = new Date(startOfTodayUTC.getTime() - dayMs);
+  const weekStart = new Date(startOfTodayUTC.getTime() - 6 * dayMs);
+  const weekPriorStart = new Date(startOfTodayUTC.getTime() - 13 * dayMs);
+  const weekPriorEnd = new Date(startOfTodayUTC.getTime() - 6 * dayMs);
+  const monthStart = new Date(startOfTodayUTC.getTime() - 29 * dayMs);
+  const monthPriorStart = new Date(startOfTodayUTC.getTime() - 59 * dayMs);
+  const monthPriorEnd = new Date(startOfTodayUTC.getTime() - 29 * dayMs);
+
+  const todayAgg = aggregate(startOfTodayUTC, todayEnd);
+  const yesterdayAgg = aggregate(yesterdayStart, startOfTodayUTC);
+  const weekAgg = aggregate(weekStart, todayEnd);
+  const weekPriorAgg = aggregate(weekPriorStart, weekPriorEnd);
+  const monthAgg = aggregate(monthStart, todayEnd);
+  const monthPriorAgg = aggregate(monthPriorStart, monthPriorEnd);
+
+  // All-time: cheap counts that don't go through the 60-day window.
+  const [{ count: totalViews }, { data: allUniqueRows }] = await Promise.all([
+    supabase.from("page_views").select("*", { count: "exact", head: true }),
+    supabase.from("page_views").select("visitor_id"),
+  ]);
+  const allTimeUniques = new Set((allUniqueRows ?? []).map((r: any) => r.visitor_id)).size;
+
+  // Build a 30-day daily series from the windowed rows.
+  const dayBuckets = new Map<string, { uniques: Set<string>; views: number }>();
+  for (let i = 29; i >= 0; i--) {
+    const day = new Date(startOfTodayUTC.getTime() - i * dayMs);
+    dayBuckets.set(dayKey(day), { uniques: new Set(), views: 0 });
+  }
+  for (const r of rows) {
+    const t = new Date(r.viewed_at);
+    const key = dayKey(t);
+    const bucket = dayBuckets.get(key);
+    if (bucket) {
+      bucket.views++;
+      bucket.uniques.add(r.visitor_id);
+    }
+  }
+  const daily = Array.from(dayBuckets.entries()).map(([date, b]) => ({
+    date,
+    uniques: b.uniques.size,
+    views: b.views,
+  }));
+
+  return {
+    today: {
+      uniques: todayAgg.uniques,
+      views: todayAgg.views,
+      uniquesChange: pctChange(todayAgg.uniques, yesterdayAgg.uniques),
+    },
+    week: {
+      uniques: weekAgg.uniques,
+      views: weekAgg.views,
+      uniquesChange: pctChange(weekAgg.uniques, weekPriorAgg.uniques),
+    },
+    month: {
+      uniques: monthAgg.uniques,
+      views: monthAgg.views,
+      uniquesChange: pctChange(monthAgg.uniques, monthPriorAgg.uniques),
+    },
+    allTime: { uniques: allTimeUniques, views: totalViews ?? 0 },
+    daily,
+  };
 }
 
 export async function getCampaignStats() {

@@ -11,11 +11,11 @@ import { json } from "@remix-run/node";
 import type { LinksFunction, MetaFunction } from "@remix-run/node";
 import { Analytics } from "@vercel/analytics/remix";
 import { SpeedInsights } from "@vercel/speed-insights/remix";
-import { getTrendingProducts, getActiveBanner } from "~/data/queries.server";
+import { getTrendingProducts, getActiveBanner, recordPageView } from "~/data/queries.server";
 import { LocaleProvider } from "~/context/LocaleContext";
 import { CartProvider } from "~/context/CartContext";
 import { getFlashToast } from "~/lib/toast.server";
-import { getConsent, type CookieConsent } from "~/lib/cookies.server";
+import { getConsent, getOrCreateVisitorId, type CookieConsent } from "~/lib/cookies.server";
 import { CookieBanner } from "~/components/layout/CookieBanner";
 import { GoogleAnalytics } from "~/components/analytics/GoogleAnalytics";
 import { MetaPixel } from "~/components/analytics/MetaPixel";
@@ -51,13 +51,49 @@ export const meta: MetaFunction = () => [
   },
 ];
 
+function shouldTrackPageView(request: Request): boolean {
+  if (request.method !== "GET") return false;
+  if (request.headers.get("Sec-Purpose") === "prefetch") return false;
+  const url = new URL(request.url);
+  // Skip Remix data fetches (client-side nav re-runs the loader as a data
+  // request) and admin/internal routes.
+  if (url.searchParams.has("_data")) return false;
+  if (url.pathname.endsWith(".data")) return false;
+  if (url.pathname.startsWith("/admin")) return false;
+  if (url.pathname.startsWith("/api")) return false;
+  if (url.pathname.startsWith("/build")) return false;
+  if (url.pathname.startsWith("/assets")) return false;
+  if (url.pathname.startsWith("/_")) return false;
+  return true;
+}
+
 export async function loader({ request }: { request: Request }) {
-  const [trendingProducts, banner, flash, consent] = await Promise.all([
+  const [trendingProducts, banner, flash, consent, visitor] = await Promise.all([
     getTrendingProducts(),
     getActiveBanner(),
     getFlashToast(request),
     getConsent(request),
+    getOrCreateVisitorId(request),
   ]);
+
+  if (shouldTrackPageView(request)) {
+    const url = new URL(request.url);
+    void recordPageView({
+      visitorId: visitor.visitorId,
+      path: url.pathname,
+      referrer: request.headers.get("Referer"),
+      userAgent: request.headers.get("User-Agent"),
+    });
+  }
+
+  const setCookies = [flash.commit, visitor.setCookie].filter(
+    (c): c is string => typeof c === "string" && c.length > 0,
+  );
+  const responseInit =
+    setCookies.length > 0
+      ? { headers: setCookies.map((c) => ["Set-Cookie", c] as [string, string]) }
+      : undefined;
+
   return json(
     {
       trendingProducts,
@@ -72,7 +108,7 @@ export async function loader({ request }: { request: Request }) {
         META_PIXEL_ID: process.env.META_PIXEL_ID || "",
       },
     },
-    flash.commit ? { headers: { "Set-Cookie": flash.commit } } : undefined,
+    responseInit,
   );
 }
 

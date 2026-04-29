@@ -19,13 +19,13 @@ export interface ProductVariant {
   badge: string | null;
   isNew: boolean;
   sortOrder: number;
+  description: string;
 }
 
 export interface Product {
   id: string;
   slug: string;
   name: string;
-  description: string;
   category: string;
   gender: "men" | "women" | "unisex";
   material: string;
@@ -37,6 +37,7 @@ export interface Product {
   defaultVariantId: string | null;
   variants: ProductVariant[];
   position: number;
+  newArrivalsPosition: number;
 
   // Legacy-shaped fields, derived from the default (or first) variant.
   // Kept for PR 1 so existing UI renders unchanged; PR 2 migrates consumers

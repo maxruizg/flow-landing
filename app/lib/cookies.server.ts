@@ -134,6 +134,17 @@ export const filterPrefsCookie = createCookie("filter_prefs", {
   maxAge: 60 * 60 * 24 * 90,
 });
 
+// 11. flow_vid — opaque visitor id for first-party analytics (1y).
+//     Not PII, not signed: it's just a random token that lets us dedupe
+//     "unique visitors" in the admin analytics page.
+export const visitorIdCookie = createCookie("flow_vid", {
+  httpOnly: true,
+  secure: IS_PROD,
+  sameSite: "lax",
+  path: "/",
+  maxAge: 60 * 60 * 24 * 365,
+});
+
 // ───────────────────────────────────────────────────────────────────────────
 // Helpers — essential cookies
 // ───────────────────────────────────────────────────────────────────────────
@@ -186,6 +197,17 @@ export async function getCartToken(
   }
   const token = randomToken(16);
   return { token, setCookie: await cartTokenCookie.serialize(token) };
+}
+
+export async function getOrCreateVisitorId(
+  request: Request,
+): Promise<{ visitorId: string; setCookie: string | null }> {
+  const existing = await visitorIdCookie.parse(cookieHeader(request));
+  if (typeof existing === "string" && existing.length >= 16) {
+    return { visitorId: existing, setCookie: null };
+  }
+  const visitorId = randomToken(16);
+  return { visitorId, setCookie: await visitorIdCookie.serialize(visitorId) };
 }
 
 // ───────────────────────────────────────────────────────────────────────────
