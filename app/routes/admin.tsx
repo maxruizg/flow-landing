@@ -1,5 +1,5 @@
 import { json } from "@remix-run/node";
-import type { LoaderFunctionArgs } from "@remix-run/node";
+import type { HeadersFunction, LoaderFunctionArgs } from "@remix-run/node";
 import { Outlet, useLoaderData, useLocation, useRouteLoaderData } from "@remix-run/react";
 import { useState } from "react";
 import { AdminSidebar } from "~/components/admin/AdminSidebar";
@@ -34,6 +34,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
     unreadNotifications,
   });
 }
+
+export const headers: HeadersFunction = () => ({
+  "Cache-Control": "private, no-store, must-revalidate",
+});
 
 export default function AdminLayout() {
   const { adminName, unreadNotifications } = useLoaderData<typeof loader>();

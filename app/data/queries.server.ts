@@ -273,9 +273,50 @@ export async function getDailyFlowImages(): Promise<DailyFlowImage[]> {
   return data.map(mapDailyFlowImage);
 }
 
-export async function getTrendingProducts(): Promise<Product[]> {
-  const all = await getAllProducts();
-  return all.filter((p) => p.variants.some((v) => v.badge === "Best Seller")).slice(0, 3);
+/**
+ * Fetch the products that have at least one variant flagged "Best Seller",
+ * limited to a small N. Avoids pulling the full catalog when only a couple
+ * of cards are needed (root loader trending strip).
+ */
+export async function getTrendingProducts(limit = 3): Promise<Product[]> {
+  const { data: bestSellerVariants, error: vErr } = await supabase
+    .from("product_variants")
+    .select("product_id")
+    .eq("badge", "Best Seller")
+    .eq("status", "active");
+  if (vErr) throw vErr;
+  const productIds = Array.from(
+    new Set((bestSellerVariants ?? []).map((v: any) => v.product_id)),
+  ).slice(0, limit);
+  if (productIds.length === 0) return [];
+  const products = await fetchProductsWithVariants(productIds);
+  return products.filter(visibleForShop).slice(0, limit);
+}
+
+/**
+ * Single round-trip for everything the homepage renders. Fetches the full
+ * shoppable catalog once, then derives bestSellers / newArrivals in-memory.
+ * Replaces three separate getAllProducts() calls (saves ~4 Supabase queries
+ * per home view).
+ */
+export async function getHomePageData(): Promise<{
+  collections: Collection[];
+  bestSellers: Product[];
+  dailyFlowImages: DailyFlowImage[];
+  newArrivals: Product[];
+}> {
+  const [collections, dailyFlowImages, allProducts] = await Promise.all([
+    getCollections(),
+    getDailyFlowImages(),
+    getAllProducts(),
+  ]);
+  const bestSellers = allProducts.filter((p) =>
+    p.variants.some((v) => v.badge === "Best Seller"),
+  );
+  const newArrivals = allProducts
+    .filter((p) => p.variants.some((v) => v.isNew))
+    .sort((a, b) => a.newArrivalsPosition - b.newArrivalsPosition);
+  return { collections, bestSellers, dailyFlowImages, newArrivals };
 }
 
 // ─── Admin queries ──────────────────────────────────────

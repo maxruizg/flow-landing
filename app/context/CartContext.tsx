@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import type { ReactNode } from "react";
 import type { CartItem } from "~/lib/types";
+import { trackAddToCart } from "~/lib/analytics";
 
 interface CartContextValue {
   items: CartItem[];
@@ -52,6 +53,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return updated;
       }
       return [...prev, { ...item, quantity: 1 }];
+    });
+    trackAddToCart({
+      item: {
+        item_id: item.variantId ?? item.productId,
+        item_name: item.productName,
+        item_variant: item.colorName,
+        price: item.price,
+        quantity: 1,
+      },
     });
   }, []);
 

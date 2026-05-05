@@ -15,6 +15,11 @@ export function BestSellers({ products }: BestSellersProps) {
   const scrollSpeedRef = useRef(0);
   const rafRef = useRef<number>(0);
   const cursorZoneRef = useRef<"left" | "right" | null>(null);
+  // Cache the bounding rect once per pointer-enter so mousemove can stay
+  // cheap (reading layout on every event was a hot INP path).
+  const rectRef = useRef<{ left: number; width: number } | null>(null);
+  const lastClientXRef = useRef(0);
+  const moveScheduledRef = useRef(false);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -46,46 +51,55 @@ export function BestSellers({ products }: BestSellersProps) {
     return () => cancelAnimationFrame(rafRef.current);
   }, []);
 
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      const el = e.currentTarget;
-      const rect = el.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const ratio = x / rect.width;
+  const applyMove = useCallback(
+    (el: HTMLDivElement) => {
+      moveScheduledRef.current = false;
+      const rect = rectRef.current;
+      if (!rect) return;
+      const ratio = (lastClientXRef.current - rect.left) / rect.width;
       const maxSpeed = 12;
 
       if (ratio < 0.3) {
-        // Left zone: speed increases toward left edge
-        const intensity = 1 - ratio / 0.3;
-        scrollSpeedRef.current = -maxSpeed * intensity;
+        scrollSpeedRef.current = -maxSpeed * (1 - ratio / 0.3);
         if (cursorZoneRef.current !== "left") {
           cursorZoneRef.current = "left";
+          el.style.cursor = "w-resize";
           startLoop();
         }
       } else if (ratio > 0.7) {
-        // Right zone: speed increases toward right edge
-        const intensity = (ratio - 0.7) / 0.3;
-        scrollSpeedRef.current = maxSpeed * intensity;
+        scrollSpeedRef.current = maxSpeed * ((ratio - 0.7) / 0.3);
         if (cursorZoneRef.current !== "right") {
           cursorZoneRef.current = "right";
+          el.style.cursor = "e-resize";
           startLoop();
         }
       } else {
-        // Dead zone
         scrollSpeedRef.current = 0;
-        cursorZoneRef.current = null;
+        if (cursorZoneRef.current !== null) {
+          cursorZoneRef.current = null;
+          el.style.cursor = "grab";
+        }
       }
     },
     [startLoop],
   );
 
-  const getCursor = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const ratio = (e.clientX - rect.left) / rect.width;
-    if (ratio < 0.3) return "w-resize";
-    if (ratio > 0.7) return "e-resize";
-    return "grab";
+  const handleMouseEnter = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    rectRef.current = { left: r.left, width: r.width };
+    e.currentTarget.style.cursor = "grab";
   }, []);
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      lastClientXRef.current = e.clientX;
+      if (moveScheduledRef.current) return;
+      moveScheduledRef.current = true;
+      const el = e.currentTarget;
+      requestAnimationFrame(() => applyMove(el));
+    },
+    [applyMove],
+  );
 
   return (
     <section id="best-sellers" className="bg-flow-black py-20 md:py-28 overflow-hidden">
@@ -106,12 +120,11 @@ export function BestSellers({ products }: BestSellersProps) {
       <div
         ref={constraintsRef}
         className="overflow-x-auto overflow-y-hidden md:overflow-hidden scrollbar-hide"
-        onMouseMove={(e) => {
-          handleMouseMove(e);
-          e.currentTarget.style.cursor = getCursor(e);
-        }}
+        onMouseEnter={handleMouseEnter}
+        onMouseMove={handleMouseMove}
         onMouseLeave={(e) => {
           stopLoop();
+          rectRef.current = null;
           e.currentTarget.style.cursor = "grab";
         }}
       >

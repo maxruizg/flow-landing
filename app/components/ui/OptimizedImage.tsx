@@ -8,6 +8,10 @@ interface OptimizedImageProps {
   quality?: number;
   className?: string;
   loading?: "lazy" | "eager";
+  fetchPriority?: "high" | "low" | "auto";
+  width?: number;
+  height?: number;
+  decoding?: "async" | "sync" | "auto";
 }
 
 export function OptimizedImage({
@@ -18,6 +22,10 @@ export function OptimizedImage({
   quality = 80,
   className,
   loading = "lazy",
+  fetchPriority,
+  width,
+  height,
+  decoding = "async",
 }: OptimizedImageProps) {
   const srcSet = buildSrcSet(src, widths, quality);
   const fallbackSrc = srcSet
@@ -32,6 +40,12 @@ export function OptimizedImage({
       alt={alt}
       className={className}
       loading={loading}
+      decoding={decoding}
+      // React 18.3 accepts fetchPriority via the camelCased prop name; the
+      // type defs lag, so we widen via a typed spread.
+      {...({ fetchPriority } as { fetchPriority?: "high" | "low" | "auto" })}
+      width={width}
+      height={height}
     />
   );
 }

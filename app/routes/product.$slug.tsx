@@ -15,10 +15,15 @@ import {
   getProductBySlug,
 } from "~/data/queries.server";
 import { cn } from "~/lib/utils";
-import type { MetaFunction, LoaderFunctionArgs } from "@remix-run/node";
+import type {
+  HeadersFunction,
+  MetaFunction,
+  LoaderFunctionArgs,
+} from "@remix-run/node";
 import type { Product, ProductVariant } from "~/lib/types";
 import { OptimizedImage } from "~/components/ui/OptimizedImage";
 import { colorSwatch } from "~/lib/color-map";
+import { trackViewItem } from "~/lib/analytics";
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
   if (!data?.product) return [{ title: "Product Not Found — FLOW URBAN WEAR" }];
@@ -47,6 +52,15 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
   }
   return json({ product: null as Product | null }, { status: 404 });
 }
+
+/**
+ * PDPs change less often than the home/showroom and benefit from a longer
+ * edge cache. Stale-while-revalidate keeps cached responses serving for a
+ * week while a new one is fetched in the background.
+ */
+export const headers: HeadersFunction = () => ({
+  "Cache-Control": "public, max-age=0, s-maxage=900, stale-while-revalidate=604800",
+});
 
 function pickDefaultVariant(product: Product): ProductVariant | undefined {
   const active = product.variants
@@ -93,6 +107,28 @@ function ProductModal({ product }: { product: Product }) {
     setSelectedSize(null);
     setSizeError(false);
   }, [selectedVariant?.id]);
+
+  // GA4 view_item — fires once per product+variant combination.
+  useEffect(() => {
+    if (!selectedVariant) return;
+    trackViewItem({
+      item: {
+        item_id: selectedVariant.id,
+        item_name: product.name,
+        item_variant: selectedVariant.colorName,
+        item_category: product.category,
+        item_brand: product.brand ?? undefined,
+        price: selectedVariant.price,
+      },
+    });
+  }, [
+    selectedVariant?.id,
+    selectedVariant?.price,
+    selectedVariant?.colorName,
+    product.name,
+    product.category,
+    product.brand,
+  ]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

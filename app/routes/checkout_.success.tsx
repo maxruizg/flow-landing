@@ -12,6 +12,7 @@ import {
 import { useCart } from "~/context/CartContext";
 import { Navbar } from "~/components/layout/Navbar";
 import { useLocale } from "~/context/LocaleContext";
+import { trackPurchase } from "~/lib/analytics";
 
 export const meta: MetaFunction = () => [
   { title: "Order Confirmed — FLOW URBAN WEAR" },
@@ -136,6 +137,48 @@ function ClearCartOnMount() {
   return null;
 }
 
+interface PurchaseTrackerItem {
+  productName: string;
+  colorName?: string | null;
+  size: string;
+  quantity: number;
+  price: number;
+}
+
+/**
+ * Fires the GA4 purchase event exactly once per transaction. Deduplication
+ * lives in trackPurchase() via sessionStorage, so a refresh of the success
+ * page won't double-count revenue.
+ */
+function PurchaseTracker({
+  transactionId,
+  items,
+  total,
+  currency,
+}: {
+  transactionId: string;
+  items: PurchaseTrackerItem[] | null;
+  total: number;
+  currency: string;
+}) {
+  useEffect(() => {
+    if (!transactionId) return;
+    trackPurchase({
+      transactionId,
+      currency: currency.toUpperCase(),
+      value: total,
+      items: (items ?? []).map((it, idx) => ({
+        item_id: `${transactionId}:${idx}`,
+        item_name: it.productName,
+        item_variant: it.colorName ?? undefined,
+        price: it.price,
+        quantity: it.quantity,
+      })),
+    });
+  }, [transactionId, items, total, currency]);
+  return null;
+}
+
 function AutoRedirect({ to, seconds }: { to: string; seconds: number }) {
   const [remaining, setRemaining] = useState(seconds);
   useEffect(() => {
@@ -232,6 +275,14 @@ export default function CheckoutSuccess() {
     <div id="main-content" className="min-h-screen bg-flow-black">
       <Navbar />
       <ClearCartOnMount />
+      {orderId && (
+        <PurchaseTracker
+          transactionId={orderId}
+          items={items}
+          total={total}
+          currency={currency}
+        />
+      )}
       <div className="min-h-[calc(100vh-80px)] flex items-center justify-center px-4 py-12">
         <motion.div
           initial={{ opacity: 0, y: 20 }}

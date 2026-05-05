@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import {
   Links,
   Meta,
@@ -5,94 +6,77 @@ import {
   Scripts,
   ScrollRestoration,
   useLoaderData,
+  useLocation,
   useRouteLoaderData,
 } from "@remix-run/react";
+import type { ShouldRevalidateFunction } from "@remix-run/react";
 import { json } from "@remix-run/node";
-import type { LinksFunction, MetaFunction } from "@remix-run/node";
+import type {
+  HeadersFunction,
+  LinksFunction,
+  MetaFunction,
+} from "@remix-run/node";
 import { Analytics } from "@vercel/analytics/remix";
 import { SpeedInsights } from "@vercel/speed-insights/remix";
-import { getTrendingProducts, getActiveBanner, recordPageView } from "~/data/queries.server";
+import { getTrendingProducts, getActiveBanner } from "~/data/queries.server";
 import { LocaleProvider } from "~/context/LocaleContext";
 import { CartProvider } from "~/context/CartContext";
 import { getFlashToast } from "~/lib/toast.server";
-import { getConsent, getOrCreateVisitorId, type CookieConsent } from "~/lib/cookies.server";
+import { getConsent, type CookieConsent } from "~/lib/cookies.server";
 import { CookieBanner } from "~/components/layout/CookieBanner";
 import { GoogleAnalytics } from "~/components/analytics/GoogleAnalytics";
+import { GoogleTagManager } from "~/components/analytics/GoogleTagManager";
 import { MetaPixel } from "~/components/analytics/MetaPixel";
 
 import styles from "~/styles/global.css?url";
 
 export const links: LinksFunction = () => [
-  { rel: "preconnect", href: "https://fonts.googleapis.com" },
+  // Preload the latin subsets so the body text and hero heading don't FOIT.
+  // The latin-ext files are still loaded lazily by global.css's @font-face
+  // rules but are not on the critical path.
   {
-    rel: "preconnect",
-    href: "https://fonts.gstatic.com",
+    rel: "preload",
+    as: "font",
+    type: "font/woff2",
+    href: "/fonts/inter-latin.woff2",
     crossOrigin: "anonymous",
   },
   {
-    rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap",
+    rel: "preload",
+    as: "font",
+    type: "font/woff2",
+    href: "/fonts/space-grotesk-latin.woff2",
+    crossOrigin: "anonymous",
   },
   { rel: "stylesheet", href: styles },
 ];
 
 export const meta: MetaFunction = () => [
-  { title: "FLOW URBAN WEAR — Less Thinking More Flow" },
+  { title: "FLOW Urban Wear | Ropa Streetwear Mexicana CDMX - Hecho en México" },
   {
     name: "description",
-    content:
-      "FLOW URBAN WEAR. Streetwear born in Mexico City for those who move with intention. Self-expression, culture, and the freedom to just flow.",
+    content: "Ropa streetwear mexicana 100% hecha en CDMX. Less thinking, more flow.",
   },
+  { name: "slogan", content: "Less thinking, more flow." },
   { property: "og:type", content: "website" },
-  { property: "og:title", content: "FLOW URBAN WEAR — Less Thinking More Flow" },
+  { property: "og:title", content: "FLOW Urban Wear | Ropa Streetwear Mexicana CDMX - Hecho en México" },
   {
     property: "og:description",
-    content: "Streetwear born in Mexico City for those who move with intention.",
+    content: "Ropa streetwear mexicana 100% hecha en CDMX. Less thinking, more flow.",
   },
 ];
 
-function shouldTrackPageView(request: Request): boolean {
-  if (request.method !== "GET") return false;
-  if (request.headers.get("Sec-Purpose") === "prefetch") return false;
-  const url = new URL(request.url);
-  // Skip Remix data fetches (client-side nav re-runs the loader as a data
-  // request) and admin/internal routes.
-  if (url.searchParams.has("_data")) return false;
-  if (url.pathname.endsWith(".data")) return false;
-  if (url.pathname.startsWith("/admin")) return false;
-  if (url.pathname.startsWith("/api")) return false;
-  if (url.pathname.startsWith("/build")) return false;
-  if (url.pathname.startsWith("/assets")) return false;
-  if (url.pathname.startsWith("/_")) return false;
-  return true;
-}
-
 export async function loader({ request }: { request: Request }) {
-  const [trendingProducts, banner, flash, consent, visitor] = await Promise.all([
+  const [trendingProducts, banner, flash, consent] = await Promise.all([
     getTrendingProducts(),
     getActiveBanner(),
     getFlashToast(request),
     getConsent(request),
-    getOrCreateVisitorId(request),
   ]);
 
-  if (shouldTrackPageView(request)) {
-    const url = new URL(request.url);
-    void recordPageView({
-      visitorId: visitor.visitorId,
-      path: url.pathname,
-      referrer: request.headers.get("Referer"),
-      userAgent: request.headers.get("User-Agent"),
-    });
-  }
-
-  const setCookies = [flash.commit, visitor.setCookie].filter(
-    (c): c is string => typeof c === "string" && c.length > 0,
-  );
-  const responseInit =
-    setCookies.length > 0
-      ? { headers: setCookies.map((c) => ["Set-Cookie", c] as [string, string]) }
-      : undefined;
+  const responseInit = flash.commit
+    ? { headers: { "Set-Cookie": flash.commit } }
+    : undefined;
 
   return json(
     {
@@ -105,12 +89,39 @@ export async function loader({ request }: { request: Request }) {
         SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY!,
         STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY || "",
         GA_MEASUREMENT_ID: process.env.GA_MEASUREMENT_ID || "",
+        GTM_CONTAINER_ID: process.env.GTM_CONTAINER_ID || "",
         META_PIXEL_ID: process.env.META_PIXEL_ID || "",
       },
     },
     responseInit,
   );
 }
+
+/**
+ * Skip the root loader on client-side navigations within the same path. The
+ * data we return (trending, banner, ENV) is stable per session; without this
+ * guard Single Fetch re-runs all loaders on every nav, which dominates TTFB.
+ * Mutations and pathname changes still revalidate.
+ */
+export const shouldRevalidate: ShouldRevalidateFunction = ({
+  currentUrl,
+  nextUrl,
+  formMethod,
+  defaultShouldRevalidate,
+}) => {
+  if (formMethod) return defaultShouldRevalidate;
+  if (currentUrl.pathname === nextUrl.pathname) return false;
+  return defaultShouldRevalidate;
+};
+
+/**
+ * Root cache policy: do not let upstream caches store the shell. Public
+ * routes that *do* want edge caching set their own headers (Remix's default
+ * is child-wins).
+ */
+export const headers: HeadersFunction = () => ({
+  "Cache-Control": "private, max-age=0, must-revalidate",
+});
 
 type RootLoaderData = {
   consent: CookieConsent | null;
@@ -119,6 +130,7 @@ type RootLoaderData = {
     SUPABASE_ANON_KEY: string;
     STRIPE_PUBLISHABLE_KEY: string;
     GA_MEASUREMENT_ID: string;
+    GTM_CONTAINER_ID: string;
     META_PIXEL_ID: string;
   };
 };
@@ -127,6 +139,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const rootData = useRouteLoaderData<RootLoaderData>("root");
   const consent = rootData?.consent ?? null;
   const gaId = rootData?.ENV?.GA_MEASUREMENT_ID ?? "";
+  const gtmId = rootData?.ENV?.GTM_CONTAINER_ID ?? "";
   const metaPixelId = rootData?.ENV?.META_PIXEL_ID ?? "";
 
   return (
@@ -148,6 +161,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Analytics />
         <SpeedInsights />
         {consent?.analytics && gaId && <GoogleAnalytics measurementId={gaId} />}
+        {consent?.analytics && gtmId && <GoogleTagManager containerId={gtmId} />}
         {consent?.marketing && metaPixelId && <MetaPixel pixelId={metaPixelId} />}
         <CookieBanner initialConsent={consent} />
         <ScrollRestoration />
@@ -159,6 +173,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   const { ENV } = useLoaderData<typeof loader>();
+  usePageViewBeacon();
   return (
     <LocaleProvider>
       <CartProvider>
@@ -167,6 +182,31 @@ export default function App() {
       </CartProvider>
     </LocaleProvider>
   );
+}
+
+/**
+ * Reports public page views to /api/pageview off the critical render path.
+ * Skips admin/api/internal paths and prefetched data requests.
+ */
+function usePageViewBeacon() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    if (
+      pathname.startsWith("/admin") ||
+      pathname.startsWith("/api") ||
+      pathname.startsWith("/build") ||
+      pathname.startsWith("/assets") ||
+      pathname.startsWith("/_")
+    ) {
+      return;
+    }
+    const url = `/api/pageview?path=${encodeURIComponent(pathname)}`;
+    if (typeof navigator !== "undefined" && "sendBeacon" in navigator) {
+      navigator.sendBeacon(url);
+      return;
+    }
+    void fetch(url, { method: "POST", keepalive: true }).catch(() => {});
+  }, [pathname]);
 }
 
 function EnvScript({ env }: { env: Record<string, string> }) {

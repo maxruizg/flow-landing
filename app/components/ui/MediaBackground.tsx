@@ -9,6 +9,13 @@ interface MediaBackgroundProps {
   sizes?: string;
   className?: string;
   loading?: "lazy" | "eager";
+  /**
+   * When true (or when loading="eager") the underlying <img> is given
+   * fetchPriority="high" so the browser prioritizes it during preload.
+   */
+  priority?: boolean;
+  width?: number;
+  height?: number;
 }
 
 /**
@@ -23,9 +30,15 @@ export function MediaBackground({
   sizes,
   className = "",
   loading = "lazy",
+  priority,
+  width,
+  height,
 }: MediaBackgroundProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoLoaded, setVideoLoaded] = useState(false);
+
+  const isPriority = priority ?? loading === "eager";
+  const fetchPriority = isPriority ? "high" : undefined;
 
   useEffect(() => {
     const el = videoRef.current;
@@ -43,6 +56,10 @@ export function MediaBackground({
         sizes={sizes}
         className={className}
         loading={loading}
+        fetchPriority={fetchPriority}
+        width={width}
+        height={height}
+        decoding={isPriority ? "sync" : "async"}
       />
     );
   }
@@ -58,6 +75,10 @@ export function MediaBackground({
           sizes={sizes}
           className={className}
           loading={loading}
+          fetchPriority={fetchPriority}
+          width={width}
+          height={height}
+          decoding={isPriority ? "sync" : "async"}
         />
       )}
       <video

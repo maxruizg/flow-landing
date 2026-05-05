@@ -15,6 +15,7 @@ import { useLocale } from "~/context/LocaleContext";
 import { Navbar } from "~/components/layout/Navbar";
 import { cn } from "~/lib/utils";
 import { shippingFee } from "~/lib/shipping";
+import { trackBeginCheckout } from "~/lib/analytics";
 
 export const meta: MetaFunction = () => [
   { title: "Checkout — FLOW URBAN WEAR" },
@@ -529,10 +530,28 @@ function CheckoutForm() {
 
 // ─── Main Checkout Page ───────────────────────────────────────────
 export default function Checkout() {
-  const { items, itemCount } = useCart();
+  const { items, itemCount, subtotal, subtotalMxn } = useCart();
   const { currency, language } = useLocale();
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [initError, setInitError] = useState<string | null>(null);
+
+  // GA4 begin_checkout — fires once when the user reaches checkout with a
+  // non-empty cart. Re-fires only if the cart contents change.
+  useEffect(() => {
+    if (itemCount === 0) return;
+    const isMxn = currency === "MXN";
+    trackBeginCheckout({
+      currency,
+      value: isMxn ? subtotalMxn : subtotal,
+      items: items.map((i) => ({
+        item_id: i.variantId ?? i.productId,
+        item_name: i.productName,
+        item_variant: i.colorName,
+        price: isMxn ? i.priceMxn : i.price,
+        quantity: i.quantity,
+      })),
+    });
+  }, [itemCount, items, currency, subtotal, subtotalMxn]);
 
   useEffect(() => {
     if (itemCount === 0) return;

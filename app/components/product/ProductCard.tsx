@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { Link } from "@remix-run/react";
-import { motion } from "framer-motion";
 import { cn } from "~/lib/utils";
 import { useLocale } from "~/context/LocaleContext";
 import { QuickAdd } from "./QuickAdd";
@@ -42,13 +41,19 @@ export function ProductCard({ product, index = 0, variant = "dark", initialVaria
       ? `/product/${product.slug}`
       : `/product/${product.slug}?variant=${view.id}`;
 
+  // CSS-only fade-in: the previous framer-motion `whileInView` registered
+  // one IntersectionObserver per card, which became measurable jank on the
+  // showroom (~100 cards). The fade now runs on mount via animate-fade-in-up
+  // with a stagger via inline animation-delay.
+  const cardStyle =
+    index > 0
+      ? { animationDelay: `${Math.min(index, 12) * 0.05}s` }
+      : undefined;
+
   return (
-    <motion.div
-      className="group relative"
-      initial={{ opacity: 0, y: 30 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-50px" }}
-      transition={{ delay: index * 0.075, duration: 0.5 }}
+    <div
+      className="group relative animate-fade-in-up opacity-0"
+      style={cardStyle}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -160,6 +165,6 @@ export function ProductCard({ product, index = 0, variant = "dark", initialVaria
           )}
         </div>
       </Link>
-    </motion.div>
+    </div>
   );
 }

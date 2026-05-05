@@ -1,5 +1,3 @@
-import { useRef } from "react";
-import { motion, useScroll, useTransform } from "framer-motion";
 import { Container } from "~/components/ui/Container";
 import { Button } from "~/components/ui/Button";
 import type { Collection } from "~/lib/types";
@@ -9,59 +7,50 @@ interface HeroProps {
   collection: Collection;
 }
 
+/**
+ * Above-the-fold hero. The previous implementation imported framer-motion at
+ * the module level for entry-stagger animations and a parallax background —
+ * both ran on the critical render path. This version uses pure CSS keyframes
+ * (declared in app/styles/global.css) and a static background image, dropping
+ * framer-motion from the homepage's initial JS chunk entirely.
+ */
 export function Hero({ collection }: HeroProps) {
-  const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({
-    target: ref,
-    offset: ["start start", "end start"],
-  });
-  const y = useTransform(scrollYProgress, [0, 1], ["0%", "30%"]);
-
   return (
-    <div ref={ref} className="relative h-full w-full overflow-hidden bg-flow-black">
-      {/* Parallax background */}
-      <motion.div className="absolute inset-0" style={{ y }}>
+    <div className="relative h-full w-full overflow-hidden bg-flow-black">
+      {/* Static background — no JS parallax to keep the LCP element on the
+          fast path. */}
+      <div className="absolute inset-0">
         <MediaBackground
           src={collection.image}
           video={collection.video}
           alt={collection.name}
           widths={[960, 1280, 1920]}
           sizes="100vw"
-          className="w-full h-[130%] object-cover"
+          className="w-full h-full object-cover"
           loading="eager"
+          priority
         />
-      </motion.div>
+      </div>
 
-      {/* Dark gradient overlay */}
+      {/* Dark gradient overlays */}
       <div className="absolute inset-0 bg-gradient-to-t from-flow-black via-flow-black/40 to-transparent" />
       <div className="absolute inset-0 bg-gradient-to-r from-flow-black/60 to-transparent" />
 
       {/* Content */}
       <Container className="relative h-full flex flex-col justify-end pt-32 pb-20 md:pt-24 md:pb-24">
-        <motion.span
-          className="text-xs uppercase tracking-[0.3em] text-flow-400 mb-3 md:mb-4"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.6 }}
+        <span
+          className="text-xs uppercase tracking-[0.3em] text-flow-400 mb-3 md:mb-4 hero-fade hero-fade-1"
         >
           {collection.season} Collection
-        </motion.span>
+        </span>
 
-        <motion.h1
-          className="font-display text-5xl sm:text-6xl md:text-8xl lg:text-9xl font-bold tracking-tight text-white leading-[0.9] mb-4 md:mb-6"
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5, duration: 0.8, ease: [0.33, 1, 0.68, 1] }}
+        <h1
+          className="font-display text-5xl sm:text-6xl md:text-8xl lg:text-9xl font-bold tracking-tight text-white leading-[0.9] mb-4 md:mb-6 hero-fade hero-fade-2"
         >
           {collection.name}
-        </motion.h1>
+        </h1>
 
-        <motion.div
-          className="flex flex-wrap gap-3 mb-8"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.9, duration: 0.5 }}
-        >
+        <div className="flex flex-wrap gap-3 mb-8 hero-fade hero-fade-3">
           {[
             { label: "Men's", gender: "men" },
             { label: "Women's", gender: "women" },
@@ -75,33 +64,19 @@ export function Hero({ collection }: HeroProps) {
               {label}
             </a>
           ))}
-        </motion.div>
+        </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.1, duration: 0.5 }}
-        >
+        <div className="hero-fade hero-fade-4">
           <a href="/showroom">
             <Button size="lg">Explore Collection</Button>
           </a>
-        </motion.div>
+        </div>
 
         {/* Scroll indicator — hidden on mobile to avoid overlapping the CTA */}
-        <motion.div
-          className="hidden md:flex absolute bottom-8 left-1/2 -translate-x-1/2 flex-col items-center gap-2"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.5 }}
-        >
+        <div className="hidden md:flex absolute bottom-8 left-1/2 -translate-x-1/2 flex-col items-center gap-2 hero-fade hero-fade-5">
           <span className="text-[10px] uppercase tracking-[0.3em] text-flow-500">Scroll</span>
-          <motion.div
-            className="w-px h-8 bg-flow-500"
-            animate={{ scaleY: [1, 0.5, 1], opacity: [1, 0.5, 1] }}
-            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-            style={{ transformOrigin: "top" }}
-          />
-        </motion.div>
+          <span className="block w-px h-8 bg-flow-500 hero-scroll-pulse origin-top" />
+        </div>
       </Container>
     </div>
   );
