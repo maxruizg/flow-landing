@@ -53,7 +53,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   const existing = await getAdminProductById(baseProductId);
   if (!existing) throw new Response("Product not found", { status: 404 });
-  const baseSlug = existing.slug;
+  const baseSlug = `${kebab(name)}-${gender}`.replace(/-+/g, "-");
 
   await upsertBaseProduct({
     id: baseProductId,

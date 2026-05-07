@@ -11,6 +11,7 @@ import { useLocale } from "~/context/LocaleContext";
 import { useCart } from "~/context/CartContext";
 import { Navbar } from "~/components/layout/Navbar";
 import {
+  findProductBySlugSuffixSwap,
   findProductByVariantSlug,
   getProductBySlug,
 } from "~/data/queries.server";
@@ -50,6 +51,15 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
     url.searchParams.set("variant", legacy.variantId);
     return redirect(`${url.pathname}${url.search}`, 301);
   }
+
+  // Slug whose gender suffix is stale (e.g. -unisex → -women after an edit).
+  const renamed = await findProductBySlugSuffixSwap(slug);
+  if (renamed) {
+    const url = new URL(request.url);
+    url.pathname = `/product/${renamed.slug}`;
+    return redirect(`${url.pathname}${url.search}`, 301);
+  }
+
   return json({ product: null as Product | null }, { status: 404 });
 }
 

@@ -223,6 +223,25 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
   return visibleForShop(product) ? product : null;
 }
 
+/** Resolve a slug whose only difference is a swapped gender suffix
+ *  (e.g. inbound `flow-jumpsuit-unisex` → DB has `flow-jumpsuit-women`).
+ *  Lets the PDP loader 301-redirect after an admin edits a product's gender. */
+export async function findProductBySlugSuffixSwap(
+  slug: string,
+): Promise<Product | null> {
+  const genders = ["men", "women", "unisex"] as const;
+  const matched = genders.find((g) => slug.endsWith(`-${g}`));
+  if (!matched) return null;
+  const stem = slug.slice(0, slug.length - matched.length - 1);
+  if (!stem) return null;
+  for (const g of genders) {
+    if (g === matched) continue;
+    const found = await getProductBySlug(`${stem}-${g}`);
+    if (found) return found;
+  }
+  return null;
+}
+
 /** Look up a legacy per-color slug. Returns the new base slug + the matching
  *  variant id so the PDP loader can 301-redirect. */
 export async function findProductByVariantSlug(

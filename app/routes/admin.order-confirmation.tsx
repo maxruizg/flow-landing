@@ -5,8 +5,15 @@ import { requireAdmin } from "~/lib/session.server";
 import { jsonWithToast } from "~/lib/toast.server";
 import { motion } from "framer-motion";
 import { useState, useRef } from "react";
-import { getEmailSettings, saveEmailSettings } from "~/data/queries.server";
+import { render } from "@react-email/render";
+import {
+  getAdminById,
+  getEmailSettings,
+  saveEmailSettings,
+} from "~/data/queries.server";
 import { uploadImageClient } from "~/lib/supabase.client";
+import { getResend } from "~/lib/resend.server";
+import { OrderConfirmationEmail } from "~/emails/order-confirmation";
 
 export const meta: MetaFunction = () => [{ title: "FLOW Admin — Order Confirmation Email" }];
 
@@ -21,8 +28,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  await requireAdmin(request);
+  const { adminId } = await requireAdmin(request);
   const form = await request.formData();
+  const intent = (form.get("intent") as string) || "save";
+
   const settings = {
     subject: (form.get("subject") as string)?.trim() || "Order Confirmed — FLOW",
     headerText: (form.get("headerText") as string)?.trim() || "Thank you for your order",
@@ -31,6 +40,56 @@ export async function action({ request }: ActionFunctionArgs) {
     ctaText: (form.get("ctaText") as string)?.trim() || "View Showroom",
     ctaUrl: (form.get("ctaUrl") as string)?.trim() || "https://flowurbanwear.com/showroom",
   };
+
+  if (intent === "test") {
+    const admin = adminId ? await getAdminById(adminId) : null;
+    const to = admin?.email;
+    if (!to) {
+      return jsonWithToast(
+        { saved: false },
+        { type: "error", message: "Could not find an admin email to send the preview to." },
+      );
+    }
+
+    try {
+      const html = await render(
+        OrderConfirmationEmail({
+          orderId: "PREVIEW-0001",
+          customerName: admin?.name || "Friend",
+          items: [
+            { productName: "Flow Jumpsuit — Onyx", colorName: "Onyx", size: "M", quantity: 1, price: 1450 },
+            { productName: "Flow Tee", colorName: "Bone", size: "L", quantity: 2, price: 590 },
+          ],
+          total: 2780,
+          currency: "mxn",
+          subject: settings.subject,
+          headerText: settings.headerText,
+          bodyText: settings.bodyText,
+          heroImage: settings.heroImage || undefined,
+          ctaText: settings.ctaText,
+          ctaUrl: settings.ctaUrl,
+        }),
+      );
+      const resend = getResend();
+      await resend.emails.send({
+        from: process.env.RESEND_FROM_EMAIL || "Flow Urban Wear <contact@flowurbanwear.com>",
+        to,
+        subject: `[Preview] ${settings.subject}`,
+        html,
+      });
+      return jsonWithToast(
+        { saved: true },
+        { type: "success", message: `Preview sent to ${to}.` },
+      );
+    } catch (err: any) {
+      console.error("[admin.order-confirmation] test send failed:", err);
+      return jsonWithToast(
+        { saved: false },
+        { type: "error", message: `Preview failed: ${err?.message || "unknown error"}` },
+      );
+    }
+  }
+
   await saveEmailSettings("order_confirmation", settings);
   return jsonWithToast(
     { saved: true },
@@ -197,14 +256,28 @@ export default function OrderConfirmationSettings() {
               </div>
             </div>
 
-            <div className="pt-2">
+            <div className="pt-2 flex flex-wrap items-center gap-3">
               <button
                 type="submit"
+                name="intent"
+                value="save"
                 disabled={isSubmitting}
                 className="bg-white text-flow-black font-display font-semibold text-sm tracking-wide uppercase rounded-lg px-6 py-3 hover:bg-flow-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? "Saving..." : "Save Settings"}
               </button>
+              <button
+                type="submit"
+                name="intent"
+                value="test"
+                disabled={isSubmitting}
+                className="border border-flow-700 text-flow-200 font-display font-semibold text-sm tracking-wide uppercase rounded-lg px-6 py-3 hover:border-white hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Send Test Email
+              </button>
+              <p className="text-[10px] text-flow-600 uppercase tracking-wider">
+                Sends a preview to your admin email so you can verify the design and hero image.
+              </p>
             </div>
           </Form>
         </div>
