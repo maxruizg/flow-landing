@@ -88,7 +88,7 @@ export async function loader({ request }: { request: Request }) {
         SUPABASE_URL: process.env.SUPABASE_URL!,
         SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY!,
         STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY || "",
-        GA_MEASUREMENT_ID: process.env.GA_MEASUREMENT_ID || "",
+        GA_MEASUREMENT_ID: process.env.GA_MEASUREMENT_ID || "G-QZLRSH3XQ3",
         GTM_CONTAINER_ID: process.env.GTM_CONTAINER_ID || "",
         META_PIXEL_ID: process.env.META_PIXEL_ID || "",
       },
