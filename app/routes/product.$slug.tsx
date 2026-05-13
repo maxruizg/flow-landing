@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { json, redirect } from "@remix-run/node";
 import {
   useLoaderData,
@@ -110,6 +110,8 @@ function ProductModal({ product }: { product: Product }) {
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [sizeError, setSizeError] = useState(false);
   const [addedFeedback, setAddedFeedback] = useState(false);
+  const touchStartXRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
 
   // Reset image/size state whenever the selected variant changes.
   useEffect(() => {
@@ -204,7 +206,33 @@ function ProductModal({ product }: { product: Product }) {
           <div className="overflow-y-auto overscroll-contain">
             <div className="grid grid-cols-1 md:grid-cols-2">
               {/* Left — Image */}
-              <div className="relative bg-flow-900">
+              <div
+                className="relative bg-flow-900 touch-pan-y select-none"
+                onTouchStart={(e) => {
+                  if (images.length <= 1) return;
+                  const t = e.touches[0];
+                  touchStartXRef.current = t.clientX;
+                  touchStartYRef.current = t.clientY;
+                }}
+                onTouchEnd={(e) => {
+                  if (images.length <= 1) return;
+                  const startX = touchStartXRef.current;
+                  const startY = touchStartYRef.current;
+                  touchStartXRef.current = null;
+                  touchStartYRef.current = null;
+                  if (startX === null || startY === null) return;
+                  const t = e.changedTouches[0];
+                  const dx = t.clientX - startX;
+                  const dy = t.clientY - startY;
+                  // Require dominantly horizontal motion past a 40px threshold.
+                  if (Math.abs(dx) < 40 || Math.abs(dx) <= Math.abs(dy)) return;
+                  if (dx < 0) {
+                    setSelectedImage((prev) => (prev + 1) % images.length);
+                  } else {
+                    setSelectedImage((prev) => (prev - 1 + images.length) % images.length);
+                  }
+                }}
+              >
                 <div className="aspect-square sticky top-0">
                   <OptimizedImage
                     src={images[selectedImage]}
