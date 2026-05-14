@@ -4,6 +4,23 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { uploadImageClient, uploadBlobClient } from "~/lib/supabase.client";
 import { ImageAdjuster } from "~/components/admin/ImageAdjuster";
 import { COLOR_HEX_MAP } from "~/lib/color-hex-map";
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 const inputClass =
   "w-full bg-flow-950 border border-flow-700 rounded-lg px-4 py-3 text-sm text-flow-100 placeholder:text-flow-500 focus:border-accent-500 focus:outline-none transition-colors";
@@ -129,6 +146,93 @@ function ImageUpload({
   );
 }
 
+function SortableGalleryItem({
+  url,
+  index,
+  onAdjust,
+  onRemove,
+}: {
+  url: string;
+  index: number;
+  onAdjust: () => void;
+  onRemove: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: url });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : undefined,
+    opacity: isDragging ? 0.85 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`relative group h-32 rounded-lg overflow-hidden bg-flow-950 border ${
+        isDragging ? "border-accent-500 shadow-lg" : "border-flow-700"
+      }`}
+    >
+      <img src={url} alt="" className="w-full h-full object-contain pointer-events-none select-none" />
+
+      {/* Drag handle — covers the whole card except the action buttons */}
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        aria-label={`Reorder image ${index + 1}`}
+        className="absolute inset-0 cursor-grab active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-accent-500"
+      />
+
+      {/* Order badge */}
+      <span className="absolute top-1.5 left-1.5 bg-black/70 text-white text-[10px] font-medium tracking-wide rounded px-1.5 py-0.5 pointer-events-none">
+        {index + 1}
+      </span>
+
+      {/* Drag hint icon */}
+      <span className="absolute bottom-1.5 left-1.5 text-white/70 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+          <circle cx="7" cy="5" r="1.4" />
+          <circle cx="7" cy="10" r="1.4" />
+          <circle cx="7" cy="15" r="1.4" />
+          <circle cx="13" cy="5" r="1.4" />
+          <circle cx="13" cy="10" r="1.4" />
+          <circle cx="13" cy="15" r="1.4" />
+        </svg>
+      </span>
+
+      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+        <button
+          type="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={onAdjust}
+          className="text-[10px] text-flow-black uppercase tracking-wide bg-white hover:bg-flow-200 rounded px-2 py-1 pointer-events-auto"
+        >
+          Adjust
+        </button>
+      </div>
+      <button
+        type="button"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={onRemove}
+        className="absolute top-1.5 right-1.5 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+      >
+        <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 function GalleryUpload({
   existingUrls,
   onUrlsChange,
@@ -143,6 +247,11 @@ function GalleryUpload({
   const [error, setError] = useState<string | null>(null);
   const [adjustIndex, setAdjustIndex] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   useEffect(() => {
     setUrls(existingUrls);
@@ -190,49 +299,57 @@ function GalleryUpload({
     }
   };
 
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = urls.indexOf(String(active.id));
+    const newIndex = urls.indexOf(String(over.id));
+    if (oldIndex < 0 || newIndex < 0) return;
+    const next = arrayMove(urls, oldIndex, newIndex);
+    setUrls(next);
+    onUrlsChange(next);
+  };
+
   return (
     <div>
-      <label className={labelClass}>Gallery Images</label>
-      <div className="grid grid-cols-4 gap-3 mb-2">
-        {urls.map((url, i) => (
-          <div key={`${url}-${i}`} className="relative group h-32 rounded-lg overflow-hidden bg-flow-950 border border-flow-700">
-            <img src={url} alt="" className="w-full h-full object-contain" />
-            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <button
-                type="button"
-                onClick={() => setAdjustIndex(i)}
-                className="text-[10px] text-flow-black uppercase tracking-wide bg-white hover:bg-flow-200 rounded px-2 py-1"
-              >
-                Adjust
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={() => removeUrl(i)}
-              className="absolute top-1.5 right-1.5 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        ))}
-        <div
-          className="h-32 border-2 border-dashed border-flow-700 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-accent-500 transition-colors"
-          onClick={() => inputRef.current?.click()}
-        >
-          {uploading ? (
-            <span className="text-xs text-flow-500">Uploading…</span>
-          ) : (
-            <>
-              <svg className="w-6 h-6 text-flow-500 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
-              </svg>
-              <span className="text-xs text-flow-500">Add Images</span>
-            </>
-          )}
-        </div>
+      <div className="flex items-baseline justify-between mb-1.5">
+        <label className={`${labelClass} mb-0`}>Gallery Images</label>
+        {urls.length > 1 && (
+          <span className="text-[10px] text-flow-500 normal-case tracking-normal">
+            Drag to reorder
+          </span>
+        )}
       </div>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={urls} strategy={rectSortingStrategy}>
+          <div className="grid grid-cols-4 gap-3 mb-2">
+            {urls.map((url, i) => (
+              <SortableGalleryItem
+                key={url}
+                url={url}
+                index={i}
+                onAdjust={() => setAdjustIndex(i)}
+                onRemove={() => removeUrl(i)}
+              />
+            ))}
+            <div
+              className="h-32 border-2 border-dashed border-flow-700 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-accent-500 transition-colors"
+              onClick={() => inputRef.current?.click()}
+            >
+              {uploading ? (
+                <span className="text-xs text-flow-500">Uploading…</span>
+              ) : (
+                <>
+                  <svg className="w-6 h-6 text-flow-500 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                  </svg>
+                  <span className="text-xs text-flow-500">Add Images</span>
+                </>
+              )}
+            </div>
+          </div>
+        </SortableContext>
+      </DndContext>
       <input ref={inputRef} type="file" accept="image/*" multiple onChange={handleFiles} className="hidden" />
       {error && <p className="text-xs text-red-400 mt-1">{error}</p>}
       {adjustIndex !== null && urls[adjustIndex] && (
