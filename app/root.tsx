@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
   Links,
   Meta,
@@ -88,7 +88,7 @@ export async function loader({ request }: { request: Request }) {
         SUPABASE_URL: process.env.SUPABASE_URL!,
         SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY!,
         STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY || "",
-        GA_MEASUREMENT_ID: process.env.GA_MEASUREMENT_ID || "G-QZLRSH3XQ3",
+        GA_MEASUREMENT_ID: process.env.GA_MEASUREMENT_ID || "",
         GTM_CONTAINER_ID: process.env.GTM_CONTAINER_ID || "",
         META_PIXEL_ID: process.env.META_PIXEL_ID || "",
       },
@@ -190,6 +190,7 @@ export default function App() {
  */
 function usePageViewBeacon() {
   const { pathname } = useLocation();
+  const isFirstRender = useRef(true);
   useEffect(() => {
     if (
       pathname.startsWith("/admin") ||
@@ -203,9 +204,25 @@ function usePageViewBeacon() {
     const url = `/api/pageview?path=${encodeURIComponent(pathname)}`;
     if (typeof navigator !== "undefined" && "sendBeacon" in navigator) {
       navigator.sendBeacon(url);
+    } else {
+      void fetch(url, { method: "POST", keepalive: true }).catch(() => {});
+    }
+
+    // GA4 SPA pageview — skip the first mount, since gtag('config', id) in
+    // /scripts/ga-init.js already fires the initial page_view.
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
       return;
     }
-    void fetch(url, { method: "POST", keepalive: true }).catch(() => {});
+    const gtag = (window as unknown as { gtag?: (...args: unknown[]) => void })
+      .gtag;
+    if (typeof gtag === "function") {
+      gtag("event", "page_view", {
+        page_path: pathname,
+        page_location: window.location.href,
+        page_title: document.title,
+      });
+    }
   }, [pathname]);
 }
 

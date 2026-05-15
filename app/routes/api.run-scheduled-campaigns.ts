@@ -1,6 +1,10 @@
 import { json } from "@remix-run/node";
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { render } from "@react-email/render";
+
+export const config = {
+  maxDuration: 60,
+};
 import { getResend } from "~/lib/resend.server";
 import {
   getCampaign,

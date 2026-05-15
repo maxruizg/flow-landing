@@ -5,11 +5,5 @@
       "path": "/api/run-scheduled-campaigns",
       "schedule": "0 9 * * *"
     }
-  ],
-  "functions": {
-    "api/run-scheduled-campaigns.ts": {
-      "memory": 1024,
-      "maxDuration": 60
-    }
-  }
+  ]
 }
