@@ -10,19 +10,47 @@ import { ShowroomGrid } from "~/components/showroom/ShowroomGrid";
 import { expandToVariantCards } from "~/lib/variant-cards";
 import { getAllProducts, getEmailSettings } from "~/data/queries.server";
 import { optimizedImageUrl, buildSrcSet } from "~/lib/image";
+import { SITE_URL, DEFAULT_OG_IMAGE } from "~/lib/seo";
 import type { HeadersFunction, MetaFunction } from "@remix-run/node";
 
 const GRID_WIDTHS = [320, 480, 640];
 const PRELOAD_COUNT = 4;
+const SHOWROOM_URL = `${SITE_URL}/showroom`;
+const SHOWROOM_TITLE = "Showroom — FLOW URBAN WEAR";
+const SHOWROOM_DESC =
+  "Explore the full FLOW Urban Wear collection. 36 pieces made in Mexico, curated for those who move with intention.";
 
-export const meta: MetaFunction<typeof loader> = ({ data }) => {
+// Tag identifiers we redefine for this route — filter them out of the parent
+// meta before re-adding so the head doesn't end up with duplicates.
+const SHOWROOM_OVERRIDE_NAMES = new Set(["description", "twitter:title", "twitter:description"]);
+const SHOWROOM_OVERRIDE_PROPS = new Set([
+  "og:title",
+  "og:description",
+  "og:url",
+  "og:image",
+]);
+
+export const meta: MetaFunction<typeof loader> = ({ data, matches }) => {
+  const parentMeta = matches.flatMap((m) => m.meta ?? []);
+  const filtered = parentMeta.filter((tag) => {
+    const t = tag as { title?: string; name?: string; property?: string };
+    if (t.title !== undefined) return false; // overridden below
+    if (t.name && SHOWROOM_OVERRIDE_NAMES.has(t.name)) return false;
+    if (t.property && SHOWROOM_OVERRIDE_PROPS.has(t.property)) return false;
+    return true;
+  });
+
   const tags: ReturnType<MetaFunction> = [
-    { title: "Showroom — FLOW URBAN WEAR" },
-    {
-      name: "description",
-      content:
-        "Explore the full FLOW Urban Wear collection. 36 pieces made in Mexico, curated for those who move with intention.",
-    },
+    ...filtered,
+    { title: SHOWROOM_TITLE },
+    { name: "description", content: SHOWROOM_DESC },
+    { tagName: "link", rel: "canonical", href: SHOWROOM_URL },
+    { property: "og:title", content: SHOWROOM_TITLE },
+    { property: "og:description", content: SHOWROOM_DESC },
+    { property: "og:url", content: SHOWROOM_URL },
+    { property: "og:image", content: DEFAULT_OG_IMAGE },
+    { name: "twitter:title", content: SHOWROOM_TITLE },
+    { name: "twitter:description", content: SHOWROOM_DESC },
   ];
 
   // Preload the first N above-the-fold grid images so the LCP candidate

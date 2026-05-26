@@ -6,7 +6,7 @@ import {
   useNavigate,
   useSearchParams,
 } from "@remix-run/react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, animate as motionAnimate } from "framer-motion";
 import { useLocale } from "~/context/LocaleContext";
 import { useCart } from "~/context/CartContext";
 import { Navbar } from "~/components/layout/Navbar";
@@ -22,20 +22,79 @@ import type {
   LoaderFunctionArgs,
 } from "@remix-run/node";
 import type { Product, ProductVariant } from "~/lib/types";
-import { OptimizedImage } from "~/components/ui/OptimizedImage";
+import { optimizedImageUrl, buildSrcSet } from "~/lib/image";
+import { SITE_URL, absoluteUrl, productJsonLd } from "~/lib/seo";
+import { JsonLdScript } from "~/components/seo/JsonLdScript";
 import { colorSwatch } from "~/lib/color-map";
 import { trackViewItem } from "~/lib/analytics";
 
-export const meta: MetaFunction<typeof loader> = ({ data }) => {
-  if (!data?.product) return [{ title: "Product Not Found — FLOW URBAN WEAR" }];
+// Tag identifiers redefined per-PDP — filtered out of inherited root meta to
+// avoid duplicates in the rendered <head>.
+const PRODUCT_OVERRIDE_NAMES = new Set([
+  "description",
+  "twitter:title",
+  "twitter:description",
+  "twitter:image",
+]);
+const PRODUCT_OVERRIDE_PROPS = new Set([
+  "og:type",
+  "og:title",
+  "og:description",
+  "og:url",
+  "og:image",
+]);
+
+export const meta: MetaFunction<typeof loader> = ({ data, matches }) => {
+  const parentMeta = matches.flatMap((m) => m.meta ?? []);
+
+  if (!data?.product) {
+    const filtered = parentMeta.filter((t) => !("title" in (t as object)));
+    return [...filtered, { title: "Product Not Found — FLOW URBAN WEAR" }];
+  }
+
   const product = data.product;
   const defaultVariant =
     product.variants.find((v) => v.id === product.defaultVariantId) ??
     product.variants[0];
-  return [
-    { title: `${product.name} — FLOW URBAN WEAR` },
-    { name: "description", content: defaultVariant?.description ?? "" },
+  const title = `${product.name} — FLOW URBAN WEAR`;
+  const description = defaultVariant?.description ?? "";
+  const canonical = `${SITE_URL}/product/${product.slug}`;
+  const ogImage = defaultVariant
+    ? absoluteUrl(optimizedImageUrl(defaultVariant.image, 1280, 85))
+    : undefined;
+
+  const filtered = parentMeta.filter((tag) => {
+    const t = tag as { title?: string; name?: string; property?: string };
+    if (t.title !== undefined) return false;
+    if (t.name && PRODUCT_OVERRIDE_NAMES.has(t.name)) return false;
+    if (t.property && PRODUCT_OVERRIDE_PROPS.has(t.property)) return false;
+    return true;
+  });
+
+  const tags: ReturnType<MetaFunction> = [
+    ...filtered,
+    { title },
+    { name: "description", content: description },
+    { tagName: "link", rel: "canonical", href: canonical },
+    { property: "og:type", content: "product" },
+    { property: "og:title", content: title },
+    { property: "og:description", content: description },
+    { property: "og:url", content: canonical },
+    { name: "twitter:title", content: title },
+    { name: "twitter:description", content: description },
   ];
+
+  if (ogImage) {
+    tags.push({ property: "og:image", content: ogImage });
+    tags.push({ name: "twitter:image", content: ogImage });
+  }
+
+  // Note: Product JSON-LD is rendered inside the page component (see
+  // ProductJsonLd below). Remix v2 only honors `tagName: "meta" | "link"` in
+  // meta exports and silently drops "script", so script injection has to
+  // happen in the component tree.
+
+  return tags;
 };
 
 export async function loader({ params, request }: LoaderFunctionArgs) {
@@ -83,6 +142,271 @@ function pickDefaultVariant(product: Product): ProductVariant | undefined {
   return active[0] ?? product.variants[0];
 }
 
+type ProductImageProps = {
+  src: string;
+  alt: string;
+  badge: string | null;
+  onExpand: () => void;
+};
+
+function ProductImage({ src, alt, badge, onExpand }: ProductImageProps) {
+  const widths = [640, 960, 1280];
+  const srcSet = buildSrcSet(src, widths, 80);
+  const fallbackSrc = srcSet ? optimizedImageUrl(src, widths[widths.length - 1], 80) : src;
+
+  return (
+    <div className="absolute inset-0 overflow-hidden select-none">
+      <img
+        src={fallbackSrc}
+        srcSet={srcSet || undefined}
+        sizes="(min-width: 768px) 50vw, 100vw"
+        alt={alt}
+        className="w-full h-full object-contain transition-transform duration-500 ease-out md:hover:scale-[1.02]"
+        loading="eager"
+        decoding="async"
+        draggable={false}
+      />
+
+      {badge && (
+        <span
+          className={cn(
+            "absolute top-4 left-4 text-[10px] uppercase tracking-[0.2em] px-2.5 py-1 font-medium rounded-full pointer-events-none",
+            badge === "New"
+              ? "bg-white text-flow-black"
+              : "bg-flow-black text-white border border-flow-700",
+          )}
+        >
+          {badge}
+        </span>
+      )}
+
+      <button
+        type="button"
+        onClick={onExpand}
+        className="absolute bottom-3 right-3 w-9 h-9 rounded-full bg-flow-black/50 backdrop-blur-sm border border-flow-700/40 flex items-center justify-center text-white/80 hover:text-white hover:bg-flow-black/70 transition-colors"
+        aria-label="Expand image"
+      >
+        <svg
+          className="w-4 h-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M3 9V5a2 2 0 0 1 2-2h4M21 9V5a2 2 0 0 0-2-2h-4M3 15v4a2 2 0 0 0 2 2h4M21 15v4a2 2 0 0 1-2 2h-4" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+const LIGHTBOX_ZOOM = 2;
+
+type ImageLightboxProps = {
+  images: string[];
+  index: number;
+  onIndexChange: (next: number) => void;
+  onClose: () => void;
+  alt: string;
+};
+
+function ImageLightbox({
+  images,
+  index,
+  onIndexChange,
+  onClose,
+  alt,
+}: ImageLightboxProps) {
+  const [zoomed, setZoomed] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const [bounds, setBounds] = useState({ width: 0, height: 0 });
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+
+  // Reset zoom + drag position whenever the visible image changes.
+  useEffect(() => {
+    setZoomed(false);
+    x.set(0);
+    y.set(0);
+  }, [index, x, y]);
+
+  // Animate image back to center when zoom is dismissed.
+  useEffect(() => {
+    if (!zoomed) {
+      motionAnimate(x, 0, { type: "spring", stiffness: 260, damping: 28 });
+      motionAnimate(y, 0, { type: "spring", stiffness: 260, damping: 28 });
+    }
+  }, [zoomed, x, y]);
+
+  // Track lightbox stage size for drag bounds.
+  useEffect(() => {
+    const update = () => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) setBounds({ width: rect.width, height: rect.height });
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  // Keyboard: Escape closes, arrows navigate (only when not zoomed).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (zoomed || images.length <= 1) return;
+      if (e.key === "ArrowLeft") {
+        onIndexChange((index - 1 + images.length) % images.length);
+      } else if (e.key === "ArrowRight") {
+        onIndexChange((index + 1) % images.length);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [index, images.length, onIndexChange, onClose, zoomed]);
+
+  const widths = [960, 1280, 1920];
+  const srcSet = buildSrcSet(images[index], widths, 85);
+  const fallbackSrc = srcSet
+    ? optimizedImageUrl(images[index], widths[widths.length - 1], 85)
+    : images[index];
+
+  const dragRange = {
+    left: (-bounds.width * (LIGHTBOX_ZOOM - 1)) / 2,
+    right: (bounds.width * (LIGHTBOX_ZOOM - 1)) / 2,
+    top: (-bounds.height * (LIGHTBOX_ZOOM - 1)) / 2,
+    bottom: (bounds.height * (LIGHTBOX_ZOOM - 1)) / 2,
+  };
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 backdrop-blur-md"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Image viewer"
+    >
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+        className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+        aria-label="Close zoom"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+
+      {images.length > 1 && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 text-[11px] uppercase tracking-[0.2em] text-white/70">
+          {index + 1} / {images.length}
+        </div>
+      )}
+
+      <div
+        ref={containerRef}
+        className="relative w-[min(95vw,90vh)] h-[min(95vw,90vh)]"
+        onClick={(e) => e.stopPropagation()}
+        onTouchStart={(e) => {
+          if (zoomed || images.length <= 1) return;
+          const t = e.touches[0];
+          swipeStartRef.current = { x: t.clientX, y: t.clientY };
+        }}
+        onTouchEnd={(e) => {
+          if (zoomed || images.length <= 1 || !swipeStartRef.current) return;
+          const t = e.changedTouches[0];
+          const dx = t.clientX - swipeStartRef.current.x;
+          const dy = t.clientY - swipeStartRef.current.y;
+          swipeStartRef.current = null;
+          if (Math.abs(dx) < 40 || Math.abs(dx) <= Math.abs(dy)) return;
+          if (dx < 0) onIndexChange((index + 1) % images.length);
+          else onIndexChange((index - 1 + images.length) % images.length);
+        }}
+      >
+        <motion.div
+          className="w-full h-full"
+          drag={zoomed}
+          dragConstraints={dragRange}
+          dragElastic={0.08}
+          dragMomentum={false}
+          onTap={() => setZoomed((z) => !z)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setZoomed((z) => !z);
+            }
+          }}
+          role="button"
+          tabIndex={0}
+          aria-label={zoomed ? "Exit zoom" : "Zoom image"}
+          style={{
+            x,
+            y,
+            touchAction: zoomed ? "none" : "pan-y",
+            cursor: zoomed ? "zoom-out" : "zoom-in",
+          }}
+        >
+          <motion.img
+            key={index}
+            src={fallbackSrc}
+            srcSet={srcSet || undefined}
+            sizes="90vw"
+            alt={alt}
+            initial={{ scale: 0.96, opacity: 0 }}
+            animate={{ scale: zoomed ? LIGHTBOX_ZOOM : 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 260, damping: 28 }}
+            className="w-full h-full object-contain pointer-events-none select-none"
+            draggable={false}
+          />
+        </motion.div>
+      </div>
+
+      {images.length > 1 && !zoomed && (
+        <>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onIndexChange((index - 1 + images.length) % images.length);
+            }}
+            className="hidden sm:flex absolute left-4 top-1/2 -translate-y-1/2 z-10 w-11 h-11 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 items-center justify-center text-white hover:bg-white/20 transition-colors"
+            aria-label="Previous image"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onIndexChange((index + 1) % images.length);
+            }}
+            className="hidden sm:flex absolute right-4 top-1/2 -translate-y-1/2 z-10 w-11 h-11 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 items-center justify-center text-white hover:bg-white/20 transition-colors"
+            aria-label="Next image"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </>
+      )}
+    </motion.div>
+  );
+}
+
 function ProductModal({ product }: { product: Product }) {
   const { formatLocalPrice } = useLocale();
   const { addItem } = useCart();
@@ -110,6 +434,7 @@ function ProductModal({ product }: { product: Product }) {
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [sizeError, setSizeError] = useState(false);
   const [addedFeedback, setAddedFeedback] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
 
@@ -118,6 +443,22 @@ function ProductModal({ product }: { product: Product }) {
     setSelectedImage(0);
     setSelectedSize(null);
     setSizeError(false);
+    setLightboxOpen(false);
+  }, [selectedVariant?.id]);
+
+  // Preload every variant image as soon as the variant is selected. Without
+  // this, the first arrow/dot click after opening the modal appears to do
+  // nothing because the browser is still fetching the new src; by the time
+  // images are cached, navigation feels instant from the very first click.
+  useEffect(() => {
+    if (typeof window === "undefined" || !selectedVariant) return;
+    const list = selectedVariant.images.length > 0
+      ? selectedVariant.images
+      : [selectedVariant.image];
+    list.forEach((url) => {
+      const img = new Image();
+      img.src = optimizedImageUrl(url, 1280, 80);
+    });
   }, [selectedVariant?.id]);
 
   // GA4 view_item — fires once per product+variant combination.
@@ -144,6 +485,8 @@ function ProductModal({ product }: { product: Product }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // When the lightbox is open it owns Escape (closes itself first).
+      if (lightboxOpen) return;
       if (e.key === "Escape") navigate(-1);
     };
     document.body.style.overflow = "hidden";
@@ -152,7 +495,7 @@ function ProductModal({ product }: { product: Product }) {
       document.body.style.overflow = "";
       window.removeEventListener("keydown", onKey);
     };
-  }, [navigate]);
+  }, [navigate, lightboxOpen]);
 
   if (!selectedVariant) return null;
 
@@ -234,27 +577,12 @@ function ProductModal({ product }: { product: Product }) {
                 }}
               >
                 <div className="aspect-square sticky top-0">
-                  <OptimizedImage
+                  <ProductImage
                     src={images[selectedImage]}
                     alt={`${product.name} ${selectedVariant.colorName}`}
-                    widths={[640, 960, 1280]}
-                    sizes="(min-width: 768px) 50vw, 100vw"
-                    className="w-full h-full object-contain"
-                    loading="eager"
+                    badge={selectedVariant.badge ?? null}
+                    onExpand={() => setLightboxOpen(true)}
                   />
-
-                  {selectedVariant.badge && (
-                    <span
-                      className={cn(
-                        "absolute top-4 left-4 text-[10px] uppercase tracking-[0.2em] px-2.5 py-1 font-medium rounded-full",
-                        selectedVariant.badge === "New"
-                          ? "bg-white text-flow-black"
-                          : "bg-flow-black text-white border border-flow-700",
-                      )}
-                    >
-                      {selectedVariant.badge}
-                    </span>
-                  )}
                 </div>
 
                 {images.length > 1 && (
@@ -474,8 +802,26 @@ function ProductModal({ product }: { product: Product }) {
           </div>
         </motion.div>
       </div>
+      {lightboxOpen && (
+        <ImageLightbox
+          images={images}
+          index={selectedImage}
+          onIndexChange={setSelectedImage}
+          onClose={() => setLightboxOpen(false)}
+          alt={`${product.name} ${selectedVariant.colorName}`}
+        />
+      )}
     </AnimatePresence>
   );
+}
+
+function ProductJsonLd({ product }: { product: Product }) {
+  const defaultVariant =
+    product.variants.find((v) => v.id === product.defaultVariantId) ??
+    product.variants[0];
+  if (!defaultVariant) return null;
+  const canonical = `${SITE_URL}/product/${product.slug}`;
+  return <JsonLdScript data={productJsonLd(product, defaultVariant, canonical)} />;
 }
 
 export default function ProductPage() {
@@ -486,7 +832,10 @@ export default function ProductPage() {
     <div id="main-content">
       <Navbar />
       {product ? (
-        <ProductModal product={product} />
+        <>
+          <ProductJsonLd product={product} />
+          <ProductModal product={product} />
+        </>
       ) : (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => navigate(-1)} />

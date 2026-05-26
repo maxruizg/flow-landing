@@ -27,8 +27,20 @@ import { CookieBanner } from "~/components/layout/CookieBanner";
 import { GoogleAnalytics } from "~/components/analytics/GoogleAnalytics";
 import { GoogleTagManager } from "~/components/analytics/GoogleTagManager";
 import { MetaPixel } from "~/components/analytics/MetaPixel";
+import {
+  SITE_URL,
+  ORG_NAME,
+  ORG_DESCRIPTION,
+  DEFAULT_OG_IMAGE,
+  organizationJsonLd,
+  websiteJsonLd,
+  serializeJsonLd,
+} from "~/lib/seo";
 
 import styles from "~/styles/global.css?url";
+
+const ROOT_TITLE =
+  "FLOW Urban Wear | Ropa Streetwear Mexicana CDMX - Hecho en México";
 
 export const links: LinksFunction = () => [
   // Preload the latin subsets so the body text and hero heading don't FOIT.
@@ -48,22 +60,25 @@ export const links: LinksFunction = () => [
     href: "/fonts/space-grotesk-latin.woff2",
     crossOrigin: "anonymous",
   },
+  { rel: "icon", type: "image/png", href: "/images/logo/flow-wave-icon.png" },
+  { rel: "apple-touch-icon", href: "/images/logo/flow-wave-icon.png" },
+  { rel: "shortcut icon", href: "/images/logo/flow-wave-icon.png" },
   { rel: "stylesheet", href: styles },
 ];
 
 export const meta: MetaFunction = () => [
-  { title: "FLOW Urban Wear | Ropa Streetwear Mexicana CDMX - Hecho en México" },
-  {
-    name: "description",
-    content: "Ropa streetwear mexicana 100% hecha en CDMX. Less thinking, more flow.",
-  },
-  { name: "slogan", content: "Less thinking, more flow." },
+  { title: ROOT_TITLE },
+  { name: "description", content: ORG_DESCRIPTION },
   { property: "og:type", content: "website" },
-  { property: "og:title", content: "FLOW Urban Wear | Ropa Streetwear Mexicana CDMX - Hecho en México" },
-  {
-    property: "og:description",
-    content: "Ropa streetwear mexicana 100% hecha en CDMX. Less thinking, more flow.",
-  },
+  { property: "og:site_name", content: ORG_NAME },
+  { property: "og:title", content: ROOT_TITLE },
+  { property: "og:description", content: ORG_DESCRIPTION },
+  { property: "og:image", content: DEFAULT_OG_IMAGE },
+  { property: "og:url", content: SITE_URL },
+  { name: "twitter:card", content: "summary_large_image" },
+  { name: "twitter:title", content: ROOT_TITLE },
+  { name: "twitter:description", content: ORG_DESCRIPTION },
+  { name: "twitter:image", content: DEFAULT_OG_IMAGE },
 ];
 
 export async function loader({ request }: { request: Request }) {
@@ -149,6 +164,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
+        <JsonLdScripts />
       </head>
       <body className="font-body antialiased bg-flow-black text-flow-100">
         <a
@@ -229,6 +245,33 @@ function usePageViewBeacon() {
 function EnvScript({ env }: { env: Record<string, string> }) {
   const value = JSON.stringify(env);
   return <script dangerouslySetInnerHTML={{ __html: `window.ENV=${value}` }} />;
+}
+
+/**
+ * Site-wide JSON-LD: Organization + WebSite. These feed Google's knowledge
+ * panel (brand name, logo, founding date, social profile verification).
+ *
+ * XSS surface: the payload is built from server-owned constants in
+ * app/lib/seo.ts and serialized through serializeJsonLd, which escapes `<`
+ * (the only break-out vector inside a <script> body) along with U+2028 and
+ * U+2029. This is the established safe pattern for inline JSON-LD shared by
+ * Next.js, the React docs, and Google's structured-data guide.
+ */
+function JsonLdScripts() {
+  const org = serializeJsonLd(organizationJsonLd());
+  const site = serializeJsonLd(websiteJsonLd());
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: org }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: site }}
+      />
+    </>
+  );
 }
 
 export function ErrorBoundary() {

@@ -11,6 +11,7 @@ import {
 } from "~/components/ui/DrawerReveal";
 import { getHomePageData } from "~/data/queries.server";
 import { optimizedImageUrl, buildSrcSet } from "~/lib/image";
+import { SITE_URL } from "~/lib/seo";
 
 // Below-the-fold sections — split out of the initial JS bundle. Each section
 // imports framer-motion; loading them lazily cuts ~50–80 KB of gzipped JS off
@@ -46,12 +47,29 @@ export async function loader() {
  * HTML reaches the browser. Without this, the browser only discovers the
  * image after parsing the React tree, costing ~600 ms LCP on cold loads.
  */
-export const meta: MetaFunction<typeof loader> = ({ data }) => {
+export const meta: MetaFunction<typeof loader> = ({ data, matches }) => {
+  // Remix v2 replaces parent meta on every child export — spread the root's
+  // meta (title, description, og:*, twitter:*, JSON-LD scripts) so the
+  // homepage inherits everything instead of clobbering it.
+  const parentMeta = matches.flatMap((m) => m.meta ?? []);
+
+  // The homepage canonicalizes to the bare SITE_URL — override the og:url
+  // that root.tsx sets (already equal here, but explicit is safer).
+  const filtered = parentMeta.filter((tag) => {
+    const t = tag as { property?: string };
+    return t.property !== "og:url";
+  });
+
+  const tags: ReturnType<MetaFunction> = [
+    ...filtered,
+    { tagName: "link", rel: "canonical", href: SITE_URL },
+    { property: "og:url", content: SITE_URL },
+  ];
+
   const heroSrc = data?.collections?.[0]?.image;
-  if (!heroSrc) return [];
-  const imageSrcSet = buildSrcSet(heroSrc, HERO_WIDTHS);
-  return [
-    {
+  if (heroSrc) {
+    const imageSrcSet = buildSrcSet(heroSrc, HERO_WIDTHS);
+    tags.push({
       tagName: "link",
       rel: "preload",
       as: "image",
@@ -59,8 +77,10 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
       imageSrcSet,
       imageSizes: imageSrcSet ? HERO_SIZES : undefined,
       fetchpriority: "high",
-    },
-  ];
+    });
+  }
+
+  return tags;
 };
 
 /**
