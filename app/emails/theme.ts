@@ -1,0 +1,193 @@
+/**
+ * Shared FLOW email brand system.
+ *
+ * Single source of truth for email colors, fonts and reusable style fragments
+ * so every template (order confirmation, newsletter, campaigns) reads as the
+ * same brand. Mirrors the site tokens in app/styles/global.css — most
+ * importantly the warm-taupe accent (#b8a490) and the Space Grotesk / Inter
+ * type pairing, replacing the generic emerald / purple / red accents and
+ * system fonts the templates used before.
+ */
+
+export const colors = {
+  // Surfaces (darkest → lighter), matching --color-flow-* tokens.
+  black: "#0a0a0a", // --color-flow-black
+  surface950: "#0d0d0d", // --color-flow-950
+  surface900: "#171717", // --color-flow-900
+  surface800: "#262626", // --color-flow-800 — borders / dividers
+  border: "#262626",
+  borderSoft: "#1a1a1a",
+  borderFaint: "#404040", // --color-flow-700
+
+  // Text.
+  text: "#f5f5f5", // --color-flow-100
+  textMuted: "#a3a3a3", // --color-flow-400
+  textFaint: "#737373", // --color-flow-500
+  textGhost: "#525252", // --color-flow-600
+  white: "#ffffff",
+
+  // Brand accent — warm taupe (--color-accent-500) and a translucent wash.
+  accent: "#b8a490",
+  accentDark: "#a08b75", // --color-accent-600
+  accentSoftBg: "rgba(184, 164, 144, 0.10)",
+  accentSoftBorder: "rgba(184, 164, 144, 0.30)",
+} as const;
+
+export const fonts = {
+  // Web fonts load in clients that honour <style> @import (Apple Mail, iOS);
+  // everyone else falls back gracefully down the stack.
+  display: '"Space Grotesk", "Helvetica Neue", Helvetica, Arial, sans-serif',
+  body: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+} as const;
+
+/** Drop into a template's <Head> via dangerouslySetInnerHTML to pull brand
+ *  fonts on supporting clients. Safe to ignore where unsupported. */
+export const fontImportCss =
+  "@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');";
+
+export const brand = {
+  name: "FLOW",
+  tagline: "URBAN WEAR",
+  site: "https://flowurbanwear.com",
+  instagram: "https://instagram.com/flowurbanwear",
+  tiktok: "https://tiktok.com/@flowurbanwear",
+  email: "contact@flowurbanwear.com",
+} as const;
+
+/* ─── Reusable style fragments ─── */
+
+export const main = {
+  backgroundColor: colors.black,
+  fontFamily: fonts.body,
+  margin: 0,
+  padding: 0,
+};
+
+export const container = {
+  margin: "0 auto",
+  padding: "40px 20px",
+  maxWidth: "600px",
+};
+
+export const header = {
+  textAlign: "center" as const,
+  padding: "8px 0 24px 0",
+};
+
+export const logo = {
+  fontFamily: fonts.display,
+  fontSize: "32px",
+  fontWeight: "700" as const,
+  letterSpacing: "0.32em",
+  color: colors.white,
+  margin: "0",
+  lineHeight: "1",
+};
+
+export const tagline = {
+  fontFamily: fonts.body,
+  fontSize: "10px",
+  letterSpacing: "0.42em",
+  color: colors.accent,
+  margin: "6px 0 0 0",
+  textTransform: "uppercase" as const,
+};
+
+export const divider = { borderColor: colors.border, margin: "24px 0" };
+export const dividerSoft = { borderColor: colors.borderSoft, margin: "16px 0" };
+
+export const heading = {
+  fontFamily: fonts.display,
+  fontSize: "26px",
+  fontWeight: "700" as const,
+  color: colors.white,
+  lineHeight: "1.25",
+  letterSpacing: "-0.01em",
+  margin: "12px 0 12px 0",
+};
+
+export const bodyText = {
+  fontFamily: fonts.body,
+  fontSize: "15px",
+  lineHeight: "1.7",
+  color: colors.textMuted,
+  margin: "0",
+};
+
+export const label = {
+  fontFamily: fonts.body,
+  fontSize: "11px",
+  fontWeight: "700" as const,
+  letterSpacing: "0.28em",
+  textTransform: "uppercase" as const,
+  color: colors.textFaint,
+  margin: "0 0 16px 0",
+};
+
+/** Primary CTA — brand accent fill, dark text. The brand-forward default. */
+export const ctaButton = {
+  fontFamily: fonts.body,
+  backgroundColor: colors.accent,
+  color: colors.black,
+  fontSize: "12px",
+  fontWeight: "700" as const,
+  letterSpacing: "0.2em",
+  textTransform: "uppercase" as const,
+  textDecoration: "none",
+  padding: "16px 36px",
+  borderRadius: "9999px",
+  display: "inline-block",
+};
+
+export const accentPill = {
+  display: "inline-block",
+  fontFamily: fonts.body,
+  fontSize: "10px",
+  fontWeight: "600" as const,
+  letterSpacing: "0.3em",
+  textTransform: "uppercase" as const,
+  color: colors.accent,
+  backgroundColor: colors.accentSoftBg,
+  border: `1px solid ${colors.accentSoftBorder}`,
+  borderRadius: "9999px",
+  padding: "6px 14px",
+  margin: "0",
+};
+
+export const footer = {
+  textAlign: "center" as const,
+  padding: "16px 0 0 0",
+};
+
+export const footerText = {
+  fontFamily: fonts.body,
+  fontSize: "12px",
+  color: colors.textFaint,
+  margin: "0 0 10px 0",
+};
+
+export const footerSmall = {
+  fontFamily: fonts.body,
+  fontSize: "11px",
+  color: colors.textGhost,
+  margin: "0",
+  lineHeight: "1.6",
+};
+
+export const socialLinks = {
+  fontFamily: fonts.body,
+  fontSize: "13px",
+  color: colors.textGhost,
+  margin: "0 0 16px 0",
+};
+
+export const socialLink = {
+  color: colors.textMuted,
+  textDecoration: "none",
+};
+
+export const footerLink = {
+  color: colors.textMuted,
+  textDecoration: "underline",
+  textUnderlineOffset: "2px",
+};

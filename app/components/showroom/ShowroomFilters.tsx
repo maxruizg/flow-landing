@@ -14,10 +14,12 @@ interface ShowroomFiltersProps {
   activeCategory: string;
   activeGender: string;
   sortBy: string;
+  searchQuery?: string;
   productCount: number;
   onCategoryChange: (category: string) => void;
   onGenderChange: (gender: string) => void;
   onSortChange: (sort: string) => void;
+  onClearSearch?: () => void;
   onClearAll: () => void;
 }
 
@@ -25,13 +27,17 @@ export function ShowroomFilters({
   activeCategory,
   activeGender,
   sortBy,
+  searchQuery,
   productCount,
   onCategoryChange,
   onGenderChange,
   onSortChange,
+  onClearSearch,
   onClearAll,
 }: ShowroomFiltersProps) {
-  const hasActiveFilters = activeCategory !== "All" || activeGender !== "All";
+  const hasSearch = Boolean(searchQuery);
+  const hasActiveFilters =
+    activeCategory !== "All" || activeGender !== "All" || hasSearch;
 
   return (
     <div className="sticky top-16 md:top-20 z-30 bg-flow-black/90 backdrop-blur-lg border-b border-flow-800/50">
@@ -81,6 +87,12 @@ export function ShowroomFilters({
         {/* Active filter tags */}
         {hasActiveFilters && (
           <div className="flex items-center gap-2 mt-3 flex-wrap">
+            {hasSearch && onClearSearch && (
+              <FilterTag
+                label={`“${searchQuery}”`}
+                onRemove={onClearSearch}
+              />
+            )}
             {activeCategory !== "All" && (
               <FilterTag
                 label={activeCategory}

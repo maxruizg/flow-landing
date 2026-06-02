@@ -13,6 +13,7 @@ import {
   Hr,
   Preview,
 } from "@react-email/components";
+import * as t from "./theme";
 
 interface Category {
   image: string;
@@ -36,7 +37,7 @@ export function FlashSaleEmail({
   discount_percentage,
   expiration_text,
   banner_image,
-  urgency_color,
+  urgency_color = t.colors.accent,
   categories,
   coupon_code,
   preview,
@@ -45,7 +46,9 @@ export function FlashSaleEmail({
 }: FlashSaleEmailProps) {
   return (
     <Html>
-      <Head />
+      <Head>
+        <style dangerouslySetInnerHTML={{ __html: t.fontImportCss }} />
+      </Head>
       <Preview>
         {preview || `${discount_percentage} OFF — ${expiration_text}`}
       </Preview>
@@ -171,7 +174,7 @@ export function getDefaultVariables(): FlashSaleEmailProps {
     expiration_text: "Ends Sunday at midnight — CDMX time",
     banner_image:
       "https://placehold.co/600x300/1a1a1a/ffffff?text=FLASH+SALE+%E2%80%94+LIMITED+TIME",
-    urgency_color: "#ef4444",
+    urgency_color: t.colors.accent,
     categories: [
       {
         image: "https://placehold.co/180x180/1a1a1a/ffffff?text=Hoodies",
@@ -198,8 +201,7 @@ export function getDefaultVariables(): FlashSaleEmailProps {
 
 /* ─── Styles ─── */
 
-const fontFamily =
-  '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+const fontFamily = t.fonts.body;
 
 const main = {
   backgroundColor: "#0a0a0a",
@@ -218,6 +220,7 @@ const headerSection = {
 };
 
 const logo = {
+  fontFamily: t.fonts.display,
   fontSize: "32px",
   fontWeight: "700" as const,
   letterSpacing: "0.3em",
@@ -228,7 +231,7 @@ const logo = {
 const tagline = {
   fontSize: "10px",
   letterSpacing: "0.4em",
-  color: "#737373",
+  color: t.colors.accent,
   margin: "4px 0 0 0",
 };
 
@@ -243,6 +246,7 @@ const discountSection = {
 };
 
 const discountText = {
+  fontFamily: t.fonts.display,
   fontSize: "72px",
   fontWeight: "800" as const,
   letterSpacing: "-0.02em",
@@ -331,6 +335,7 @@ const couponBox = {
 };
 
 const couponCodeText = {
+  fontFamily: t.fonts.display,
   fontSize: "28px",
   fontWeight: "800" as const,
   letterSpacing: "0.15em",

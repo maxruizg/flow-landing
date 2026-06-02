@@ -13,6 +13,7 @@ import {
   Hr,
   Preview,
 } from "@react-email/components";
+import * as t from "./theme";
 
 interface ProductLaunchEmailProps {
   product_name: string;
@@ -35,7 +36,7 @@ export function ProductLaunchEmail({
   gallery_images,
   available_sizes,
   price,
-  accent_color,
+  accent_color = t.colors.accent,
   brand_story,
   preview,
   cta_text = "Buy Now",
@@ -43,7 +44,9 @@ export function ProductLaunchEmail({
 }: ProductLaunchEmailProps) {
   return (
     <Html>
-      <Head />
+      <Head>
+        <style dangerouslySetInnerHTML={{ __html: t.fontImportCss }} />
+      </Head>
       <Preview>{preview || `Introducing ${product_name} — Now available`}</Preview>
       <Body style={main}>
         <Container style={container}>
@@ -197,7 +200,7 @@ export function getDefaultVariables(): ProductLaunchEmailProps {
     ],
     available_sizes: ["S", "M", "L", "XL", "XXL"],
     price: "$2,890 MXN",
-    accent_color: "#a855f7",
+    accent_color: t.colors.accent,
     brand_story:
       "Every FLOW piece is born in a small workshop in Colonia Roma, Mexico City. We believe streetwear should tell a story — of late nights, loud music, and the restless energy of the city. The Shadow Bomber is our love letter to the concrete jungle we call home.",
     preview:
@@ -209,8 +212,7 @@ export function getDefaultVariables(): ProductLaunchEmailProps {
 
 /* ─── Styles ─── */
 
-const fontFamily =
-  '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+const fontFamily = t.fonts.body;
 
 const main = {
   backgroundColor: "#0a0a0a",
@@ -229,6 +231,7 @@ const headerSection = {
 };
 
 const logo = {
+  fontFamily: t.fonts.display,
   fontSize: "32px",
   fontWeight: "700" as const,
   letterSpacing: "0.3em",
@@ -239,7 +242,7 @@ const logo = {
 const tagline = {
   fontSize: "10px",
   letterSpacing: "0.4em",
-  color: "#737373",
+  color: t.colors.accent,
   margin: "4px 0 0 0",
 };
 
@@ -272,6 +275,7 @@ const productInfoSection = {
 };
 
 const productName = {
+  fontFamily: t.fonts.display,
   fontSize: "30px",
   fontWeight: "700" as const,
   color: "#ffffff",

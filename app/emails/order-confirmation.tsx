@@ -13,6 +13,7 @@ import {
   Row,
   Column,
 } from "@react-email/components";
+import * as t from "./theme";
 
 interface OrderItem {
   productName: string;
@@ -55,7 +56,9 @@ export function OrderConfirmationEmail({
 
   return (
     <Html>
-      <Head />
+      <Head>
+        <style dangerouslySetInnerHTML={{ __html: t.fontImportCss }} />
+      </Head>
       <Preview>{subject}</Preview>
       <Body style={main}>
         <Container style={container}>
@@ -228,8 +231,7 @@ export function OrderConfirmationEmail({
 
 /* ─── Styles ─── */
 
-const fontFamily =
-  '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+const fontFamily = t.fonts.body;
 
 const main = {
   backgroundColor: "#0a0a0a",
@@ -250,6 +252,7 @@ const header = {
 };
 
 const logo = {
+  fontFamily: t.fonts.display,
   fontSize: "32px",
   fontWeight: "800" as const,
   letterSpacing: "0.32em",
@@ -261,7 +264,7 @@ const logo = {
 const tagline = {
   fontSize: "10px",
   letterSpacing: "0.42em",
-  color: "#737373",
+  color: t.colors.accent,
   margin: "6px 0 0 0",
   textTransform: "uppercase" as const,
 };
@@ -289,9 +292,9 @@ const statusPill = {
   fontWeight: "600" as const,
   letterSpacing: "0.3em",
   textTransform: "uppercase" as const,
-  color: "#34d399",
-  backgroundColor: "rgba(52, 211, 153, 0.08)",
-  border: "1px solid rgba(52, 211, 153, 0.25)",
+  color: t.colors.accent,
+  backgroundColor: t.colors.accentSoftBg,
+  border: `1px solid ${t.colors.accentSoftBorder}`,
   borderRadius: "9999px",
   padding: "6px 14px",
   margin: "0",
@@ -302,6 +305,7 @@ const content = {
 };
 
 const heading = {
+  fontFamily: t.fonts.display,
   fontSize: "26px",
   fontWeight: "700" as const,
   color: "#ffffff",
@@ -432,7 +436,7 @@ const ctaSection = {
 };
 
 const ctaButton = {
-  backgroundColor: "#ffffff",
+  backgroundColor: t.colors.accent,
   color: "#0a0a0a",
   fontSize: "12px",
   fontWeight: "700" as const,
@@ -478,9 +482,9 @@ const stepBadge = {
 
 const stepBadgeActive = {
   ...stepBadge,
-  border: "1px solid rgba(52, 211, 153, 0.4)",
-  backgroundColor: "rgba(52, 211, 153, 0.12)",
-  color: "#34d399",
+  border: `1px solid ${t.colors.accentSoftBorder}`,
+  backgroundColor: t.colors.accentSoftBg,
+  color: t.colors.accent,
 };
 
 const stepLabel = {
@@ -491,7 +495,7 @@ const stepLabel = {
   margin: "0",
 };
 
-const stepLabelActive = { ...stepLabel, color: "#34d399" };
+const stepLabelActive = { ...stepLabel, color: t.colors.accent };
 
 const footer = {
   textAlign: "center" as const,

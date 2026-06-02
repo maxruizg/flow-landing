@@ -13,6 +13,7 @@ import {
   Hr,
   Preview,
 } from "@react-email/components";
+import * as t from "./theme";
 
 interface Product {
   image: string;
@@ -36,7 +37,7 @@ export function NewCollectionEmail({
   hero_title,
   hero_subtitle,
   hero_image,
-  primary_color,
+  primary_color = t.colors.accent,
   products,
   cta_text,
   cta_url,
@@ -44,7 +45,9 @@ export function NewCollectionEmail({
 }: NewCollectionEmailProps) {
   return (
     <Html>
-      <Head />
+      <Head>
+        <style dangerouslySetInnerHTML={{ __html: t.fontImportCss }} />
+      </Head>
       <Preview>{preview || hero_title}</Preview>
       <Body style={main}>
         <Container style={container}>
@@ -178,7 +181,7 @@ export function getDefaultVariables(): NewCollectionEmailProps {
     hero_subtitle:
       "Inspired by the neon-lit streets of Condesa. Oversized silhouettes meet raw textures.",
     hero_image: "https://placehold.co/600x400/1a1a1a/ffffff?text=NOCTURNA+COLLECTION",
-    primary_color: "#e11d48",
+    primary_color: t.colors.accent,
     products: [
       {
         image: "https://placehold.co/270x270/1a1a1a/ffffff?text=Oversized+Hoodie",
@@ -213,8 +216,7 @@ export function getDefaultVariables(): NewCollectionEmailProps {
 
 /* ─── Styles ─── */
 
-const fontFamily =
-  '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+const fontFamily = t.fonts.body;
 
 const main = {
   backgroundColor: "#0a0a0a",
@@ -233,6 +235,7 @@ const headerSection = {
 };
 
 const logo = {
+  fontFamily: t.fonts.display,
   fontSize: "32px",
   fontWeight: "700" as const,
   letterSpacing: "0.3em",
@@ -243,7 +246,7 @@ const logo = {
 const tagline = {
   fontSize: "10px",
   letterSpacing: "0.4em",
-  color: "#737373",
+  color: t.colors.accent,
   margin: "4px 0 0 0",
 };
 
@@ -263,6 +266,7 @@ const heroTextSection = {
 };
 
 const heroTitle = {
+  fontFamily: t.fonts.display,
   fontSize: "28px",
   fontWeight: "700" as const,
   color: "#ffffff",
@@ -325,7 +329,7 @@ const ctaSection = {
 };
 
 const ctaButton = {
-  backgroundColor: "#ffffff",
+  backgroundColor: t.colors.accent,
   color: "#0a0a0a",
   fontSize: "12px",
   fontWeight: "600" as const,

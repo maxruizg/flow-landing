@@ -96,6 +96,7 @@ export default function Showroom() {
   const activeCategory = searchParams.get("category") || "All";
   const activeGender = searchParams.get("gender") || "All";
   const sortBy = searchParams.get("sort") || "featured";
+  const query = (searchParams.get("q") || "").trim();
 
   const updateParams = useCallback(
     (updates: Record<string, string | null>) => {
@@ -129,6 +130,11 @@ export default function Showroom() {
     [updateParams]
   );
 
+  const onClearSearch = useCallback(
+    () => updateParams({ q: null }),
+    [updateParams]
+  );
+
   const onClearAll = useCallback(
     () =>
       setSearchParams(new URLSearchParams(), {
@@ -147,6 +153,26 @@ export default function Showroom() {
     if (activeGender !== "All") {
       const g = activeGender.toLowerCase();
       products = products.filter((p) => p.gender === g || p.gender === "unisex");
+    }
+
+    if (query) {
+      const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+      products = products.filter((p) => {
+        const haystack = [
+          p.name,
+          p.category,
+          p.gender,
+          p.material,
+          p.brand,
+          p.color,
+          p.tags.join(" "),
+          p.variants.map((v) => v.colorName).join(" "),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return terms.every((term) => haystack.includes(term));
+      });
     }
 
     let cards = expandToVariantCards(products);
@@ -168,7 +194,7 @@ export default function Showroom() {
     }
 
     return cards;
-  }, [allProducts, activeCategory, activeGender, sortBy]);
+  }, [allProducts, activeCategory, activeGender, sortBy, query]);
 
   // Normalize gender display (URL is lowercase, pills are capitalized)
   const displayGender =
@@ -190,10 +216,12 @@ export default function Showroom() {
           activeCategory={activeCategory}
           activeGender={displayGender}
           sortBy={sortBy}
+          searchQuery={query}
           productCount={filteredCards.length}
           onCategoryChange={onCategoryChange}
           onGenderChange={onGenderChange}
           onSortChange={onSortChange}
+          onClearSearch={onClearSearch}
           onClearAll={onClearAll}
         />
         <ShowroomGrid
