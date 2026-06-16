@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback } from "react";
 import type { ReactNode } from "react";
+import { useFetcher } from "@remix-run/react";
 
 type Currency = "USD" | "MXN";
 type Language = "en" | "es";
@@ -17,10 +18,53 @@ interface LocaleContextValue {
 
 const LocaleContext = createContext<LocaleContextValue | null>(null);
 
-export function LocaleProvider({ children }: { children: ReactNode }) {
-  const [currency, setCurrency] = useState<Currency>("MXN");
-  const [language, setLanguage] = useState<Language>("es");
-  const [country, setCountry] = useState<Country>("MX");
+export function LocaleProvider({
+  children,
+  initialCurrency = "MXN",
+  initialLanguage = "es",
+  initialCountry = "MX",
+}: {
+  children: ReactNode;
+  initialCurrency?: Currency;
+  initialLanguage?: Language;
+  initialCountry?: Country;
+}) {
+  const [currency, setCurrencyState] = useState<Currency>(initialCurrency);
+  const [language, setLanguageState] = useState<Language>(initialLanguage);
+  const [country, setCountryState] = useState<Country>(initialCountry);
+
+  // Persist each change to the signed, HttpOnly locale cookies via the
+  // /api/locale resource route (the cookies can't be written from client JS).
+  // This is why a manual currency pick survives reloads.
+  const fetcher = useFetcher();
+  const persist = useCallback(
+    (patch: Partial<{ currency: Currency; language: Language; country: Country }>) => {
+      fetcher.submit(patch, { method: "post", action: "/api/locale" });
+    },
+    [fetcher]
+  );
+
+  const setCurrency = useCallback(
+    (c: Currency) => {
+      setCurrencyState(c);
+      persist({ currency: c });
+    },
+    [persist]
+  );
+  const setLanguage = useCallback(
+    (l: Language) => {
+      setLanguageState(l);
+      persist({ language: l });
+    },
+    [persist]
+  );
+  const setCountry = useCallback(
+    (c: Country) => {
+      setCountryState(c);
+      persist({ country: c });
+    },
+    [persist]
+  );
 
   const formatLocalPrice = useCallback(
     (usdAmount: number, mxnAmount?: number) => {

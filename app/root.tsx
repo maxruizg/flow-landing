@@ -22,7 +22,7 @@ import { getTrendingProducts, getActiveBanner } from "~/data/queries.server";
 import { LocaleProvider } from "~/context/LocaleContext";
 import { CartProvider } from "~/context/CartContext";
 import { getFlashToast } from "~/lib/toast.server";
-import { getConsent, type CookieConsent } from "~/lib/cookies.server";
+import { getConsent, resolveLocale, type CookieConsent } from "~/lib/cookies.server";
 import { CookieBanner } from "~/components/layout/CookieBanner";
 import { GoogleAnalytics } from "~/components/analytics/GoogleAnalytics";
 import { GoogleTagManager } from "~/components/analytics/GoogleTagManager";
@@ -82,11 +82,12 @@ export const meta: MetaFunction = () => [
 ];
 
 export async function loader({ request }: { request: Request }) {
-  const [trendingProducts, banner, flash, consent] = await Promise.all([
+  const [trendingProducts, banner, flash, consent, locale] = await Promise.all([
     getTrendingProducts(),
     getActiveBanner(),
     getFlashToast(request),
     getConsent(request),
+    resolveLocale(request),
   ]);
 
   const responseInit = flash.commit
@@ -99,6 +100,7 @@ export async function loader({ request }: { request: Request }) {
       banner,
       flashToast: flash.toast,
       consent,
+      locale,
       ENV: {
         SUPABASE_URL: process.env.SUPABASE_URL!,
         SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY!,
@@ -188,10 +190,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  const { ENV } = useLoaderData<typeof loader>();
+  const { ENV, locale } = useLoaderData<typeof loader>();
   usePageViewBeacon();
   return (
-    <LocaleProvider>
+    <LocaleProvider
+      initialCurrency={locale.currency}
+      initialLanguage={locale.language}
+      initialCountry={locale.country}
+    >
       <CartProvider>
         <EnvScript env={ENV} />
         <Outlet />

@@ -5,7 +5,15 @@ import { createCookie, createCookieSessionStorage } from "@remix-run/node";
 // ───────────────────────────────────────────────────────────────────────────
 
 export type Currency = "MXN" | "USD";
+export type Language = "en" | "es";
+export type Country = "US" | "MX";
 export type CheckoutStep = "cart" | "shipping" | "payment" | "confirmation";
+
+export interface Locale {
+  currency: Currency;
+  language: Language;
+  country: Country;
+}
 export type SizePreference = "XS" | "S" | "M" | "L" | "XL" | "XXL" | (string & {});
 
 export interface CookieConsent {
@@ -24,6 +32,8 @@ export interface FilterPrefs {
 }
 
 export const DEFAULT_CURRENCY: Currency = "MXN";
+export const DEFAULT_LANGUAGE: Language = "es";
+export const DEFAULT_COUNTRY: Country = "MX";
 
 export const DEFAULT_CONSENT: CookieConsent = {
   analytics: false,
@@ -90,6 +100,18 @@ export const csrfCookie = createCookie("csrf_token", {
 
 // 4. currency — selected currency (1y, defaults to MXN)
 export const currencyCookie = createCookie("currency", {
+  ...ESSENTIAL_OPTIONS,
+  maxAge: 60 * 60 * 24 * 365,
+});
+
+// 4b. language — selected interface language (1y, defaults to es)
+export const languageCookie = createCookie("language", {
+  ...ESSENTIAL_OPTIONS,
+  maxAge: 60 * 60 * 24 * 365,
+});
+
+// 4c. country — selected shipping country/region (1y, defaults to MX)
+export const countryCookie = createCookie("country", {
   ...ESSENTIAL_OPTIONS,
   maxAge: 60 * 60 * 24 * 365,
 });
@@ -174,6 +196,52 @@ export async function getCurrency(request: Request): Promise<Currency> {
 
 export async function serializeCurrency(currency: Currency): Promise<string> {
   return currencyCookie.serialize(currency);
+}
+
+export async function getLanguage(request: Request): Promise<Language> {
+  const parsed = await languageCookie.parse(cookieHeader(request));
+  return parsed === "en" ? "en" : DEFAULT_LANGUAGE;
+}
+
+export async function serializeLanguage(language: Language): Promise<string> {
+  return languageCookie.serialize(language);
+}
+
+export async function getCountry(request: Request): Promise<Country> {
+  const parsed = await countryCookie.parse(cookieHeader(request));
+  return parsed === "US" ? "US" : DEFAULT_COUNTRY;
+}
+
+export async function serializeCountry(country: Country): Promise<string> {
+  return countryCookie.serialize(country);
+}
+
+/**
+ * Initial locale for a visitor: an explicit choice (cookie) always wins; any
+ * field without a valid cookie falls back to a geo default derived from Vercel's
+ * `x-vercel-ip-country` header. A US IP yields a full US profile (USD/en/US);
+ * everything else — including local dev where the header is absent — yields the
+ * MXN/es/MX defaults. We intentionally do not Set-Cookie here: the value is
+ * recomputed cheaply each load until the user explicitly picks in the panel.
+ */
+export async function resolveLocale(request: Request): Promise<Locale> {
+  const geo: Locale =
+    request.headers.get("x-vercel-ip-country") === "US"
+      ? { currency: "USD", language: "en", country: "US" }
+      : { currency: DEFAULT_CURRENCY, language: DEFAULT_LANGUAGE, country: DEFAULT_COUNTRY };
+
+  const header = cookieHeader(request);
+  const [currency, language, country] = await Promise.all([
+    currencyCookie.parse(header),
+    languageCookie.parse(header),
+    countryCookie.parse(header),
+  ]);
+
+  return {
+    currency: currency === "USD" || currency === "MXN" ? currency : geo.currency,
+    language: language === "en" || language === "es" ? language : geo.language,
+    country: country === "US" || country === "MX" ? country : geo.country,
+  };
 }
 
 export async function getCheckoutStep(request: Request): Promise<CheckoutStep | null> {
