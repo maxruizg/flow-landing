@@ -165,6 +165,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Meta />
         <Links />
         <JsonLdScripts />
+        {gaId && <GoogleAnalytics measurementId={gaId} />}
       </head>
       <body className="font-body antialiased bg-flow-black text-flow-100">
         <a
@@ -176,7 +177,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {children}
         <Analytics />
         <SpeedInsights />
-        {gaId && <GoogleAnalytics measurementId={gaId} />}
         {consent?.analytics && gtmId && <GoogleTagManager containerId={gtmId} />}
         {consent?.marketing && metaPixelId && <MetaPixel pixelId={metaPixelId} />}
         <CookieBanner initialConsent={consent} />
