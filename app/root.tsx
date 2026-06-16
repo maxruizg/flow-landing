@@ -176,7 +176,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {children}
         <Analytics />
         <SpeedInsights />
-        {consent?.analytics && gaId && <GoogleAnalytics measurementId={gaId} />}
+        {gaId && <GoogleAnalytics measurementId={gaId} />}
         {consent?.analytics && gtmId && <GoogleTagManager containerId={gtmId} />}
         {consent?.marketing && metaPixelId && <MetaPixel pixelId={metaPixelId} />}
         <CookieBanner initialConsent={consent} />
