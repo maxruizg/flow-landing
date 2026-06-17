@@ -98,23 +98,20 @@ export const csrfCookie = createCookie("csrf_token", {
   maxAge: 60 * 60 * 24,
 });
 
-// 4. currency — selected currency (1y, defaults to MXN)
-export const currencyCookie = createCookie("currency", {
-  ...ESSENTIAL_OPTIONS,
-  maxAge: 60 * 60 * 24 * 365,
-});
-
-// 4b. language — selected interface language (1y, defaults to es)
-export const languageCookie = createCookie("language", {
-  ...ESSENTIAL_OPTIONS,
-  maxAge: 60 * 60 * 24 * 365,
-});
-
-// 4c. country — selected shipping country/region (1y, defaults to MX)
-export const countryCookie = createCookie("country", {
-  ...ESSENTIAL_OPTIONS,
-  maxAge: 60 * 60 * 24 * 365,
-});
+// 4. locale (flow_currency / flow_language / flow_country) — selected UI prefs.
+//    These are plain, NON-HttpOnly, UNSIGNED cookies so the client can write them
+//    synchronously via document.cookie (see app/context/LocaleContext.tsx). They
+//    carry no security weight — a visitor can already pick any currency/language —
+//    and writing them client-side eliminates the read-after-navigation race that a
+//    server round-trip introduced. They are read back here in `resolveLocale`.
+//    The legacy signed `currency`/`language`/`country` HttpOnly cookies are no
+//    longer written; they simply expire unused.
+export const LOCALE_COOKIE_NAMES = {
+  currency: "flow_currency",
+  language: "flow_language",
+  country: "flow_country",
+} as const;
+export const LOCALE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
 
 // 5. checkout_step — last reached checkout step (7d)
 export const checkoutStepCookie = createCookie("checkout_step", {
@@ -189,40 +186,27 @@ export async function serializeConsent(consent: CookieConsent): Promise<string> 
   return consentCookie.serialize(consent);
 }
 
-export async function getCurrency(request: Request): Promise<Currency> {
-  const parsed = await currencyCookie.parse(cookieHeader(request));
-  return parsed === "USD" ? "USD" : DEFAULT_CURRENCY;
-}
-
-export async function serializeCurrency(currency: Currency): Promise<string> {
-  return currencyCookie.serialize(currency);
-}
-
-export async function getLanguage(request: Request): Promise<Language> {
-  const parsed = await languageCookie.parse(cookieHeader(request));
-  return parsed === "en" ? "en" : DEFAULT_LANGUAGE;
-}
-
-export async function serializeLanguage(language: Language): Promise<string> {
-  return languageCookie.serialize(language);
-}
-
-export async function getCountry(request: Request): Promise<Country> {
-  const parsed = await countryCookie.parse(cookieHeader(request));
-  return parsed === "US" ? "US" : DEFAULT_COUNTRY;
-}
-
-export async function serializeCountry(country: Country): Promise<string> {
-  return countryCookie.serialize(country);
+/** Read a single cookie's raw value out of a `Cookie:` header string. */
+function readCookie(header: string | null, name: string): string | undefined {
+  if (!header) return undefined;
+  for (const part of header.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq === -1) continue;
+    if (part.slice(0, eq).trim() === name) {
+      return decodeURIComponent(part.slice(eq + 1).trim());
+    }
+  }
+  return undefined;
 }
 
 /**
- * Initial locale for a visitor: an explicit choice (cookie) always wins; any
- * field without a valid cookie falls back to a geo default derived from Vercel's
- * `x-vercel-ip-country` header. A US IP yields a full US profile (USD/en/US);
- * everything else — including local dev where the header is absent — yields the
- * MXN/es/MX defaults. We intentionally do not Set-Cookie here: the value is
- * recomputed cheaply each load until the user explicitly picks in the panel.
+ * Initial locale for a visitor: an explicit choice (the plain `flow_*` cookie,
+ * written client-side) always wins; any field without a valid cookie falls back
+ * to a geo default derived from Vercel's `x-vercel-ip-country` header. A US IP
+ * yields a full US profile (USD/en/US); everything else — including local dev
+ * where the header is absent — yields the MXN/es/MX defaults. We intentionally do
+ * not Set-Cookie here: the value is recomputed cheaply each load until the user
+ * explicitly picks.
  */
 export async function resolveLocale(request: Request): Promise<Locale> {
   const geo: Locale =
@@ -231,11 +215,9 @@ export async function resolveLocale(request: Request): Promise<Locale> {
       : { currency: DEFAULT_CURRENCY, language: DEFAULT_LANGUAGE, country: DEFAULT_COUNTRY };
 
   const header = cookieHeader(request);
-  const [currency, language, country] = await Promise.all([
-    currencyCookie.parse(header),
-    languageCookie.parse(header),
-    countryCookie.parse(header),
-  ]);
+  const currency = readCookie(header, LOCALE_COOKIE_NAMES.currency);
+  const language = readCookie(header, LOCALE_COOKIE_NAMES.language);
+  const country = readCookie(header, LOCALE_COOKIE_NAMES.country);
 
   return {
     currency: currency === "USD" || currency === "MXN" ? currency : geo.currency,

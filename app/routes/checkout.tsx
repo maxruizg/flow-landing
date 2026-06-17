@@ -553,8 +553,17 @@ export default function Checkout() {
     });
   }, [itemCount, items, currency, subtotal, subtotalMxn]);
 
+  // Create (or recreate) the PaymentIntent whenever the cart contents OR the
+  // currency change. A PaymentIntent's currency is immutable, so switching
+  // currency mid-checkout MUST mint a fresh intent — otherwise the customer sees
+  // one currency but is charged the original. We drop the stale clientSecret
+  // first so Elements unmounts and re-initializes against the new secret.
   useEffect(() => {
     if (itemCount === 0) return;
+
+    let cancelled = false;
+    setClientSecret(null);
+    setInitError(null);
 
     fetch("/api/create-payment-intent", {
       method: "POST",
@@ -566,6 +575,7 @@ export default function Checkout() {
     })
       .then((res) => res.json())
       .then((data) => {
+        if (cancelled) return;
         if (data.clientSecret) {
           setClientSecret(data.clientSecret);
         } else {
@@ -573,9 +583,13 @@ export default function Checkout() {
         }
       })
       .catch(() => {
-        setInitError("Connection error. Please try again.");
+        if (!cancelled) setInitError("Connection error. Please try again.");
       });
-  }, [itemCount]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    return () => {
+      cancelled = true;
+    };
+  }, [itemCount, currency, items]);
 
   // Empty cart
   if (itemCount === 0) {
@@ -649,6 +663,7 @@ export default function Checkout() {
     <div id="main-content">
       <Navbar />
       <Elements
+        key={clientSecret}
         stripe={getStripe()}
         options={{
           clientSecret,
