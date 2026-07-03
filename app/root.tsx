@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Links,
   Meta,
@@ -22,8 +22,14 @@ import { getTrendingProducts, getActiveBanner } from "~/data/queries.server";
 import { LocaleProvider } from "~/context/LocaleContext";
 import { CartProvider } from "~/context/CartContext";
 import { getFlashToast } from "~/lib/toast.server";
-import { getConsent, resolveLocale, type CookieConsent } from "~/lib/cookies.server";
+import {
+  getConsent,
+  resolveLocale,
+  type CookieConsent,
+  type Locale,
+} from "~/lib/cookies.server";
 import { CookieBanner } from "~/components/layout/CookieBanner";
+import { WhatsAppButton } from "~/components/layout/WhatsAppButton";
 import { GoogleAnalytics } from "~/components/analytics/GoogleAnalytics";
 import { GoogleTagManager } from "~/components/analytics/GoogleTagManager";
 import { MetaPixel } from "~/components/analytics/MetaPixel";
@@ -40,7 +46,7 @@ import {
 import styles from "~/styles/global.css?url";
 
 const ROOT_TITLE =
-  "FLOW Urban Wear | Ropa Streetwear Mexicana CDMX - Hecho en México";
+  "FLOW Urban Wear | Streetwear Mexicano Hecho en CDMX";
 
 export const links: LinksFunction = () => [
   // Preload the latin subsets so the body text and hero heading don't FOIT.
@@ -60,9 +66,14 @@ export const links: LinksFunction = () => [
     href: "/fonts/space-grotesk-latin.woff2",
     crossOrigin: "anonymous",
   },
-  { rel: "icon", type: "image/png", href: "/images/logo/flow-wave-icon.png" },
-  { rel: "apple-touch-icon", href: "/images/logo/flow-wave-icon.png" },
-  { rel: "shortcut icon", href: "/images/logo/flow-wave-icon.png" },
+  // Favicons: Google requires a square icon, ≥48px, in a multiple of 48,
+  // at a stable crawlable URL. /favicon.ico also covers legacy UA requests
+  // that 404'd before (Google fell back to the default globe).
+  { rel: "icon", href: "/favicon.ico", sizes: "32x32" },
+  { rel: "icon", type: "image/png", sizes: "48x48", href: "/favicon-48.png" },
+  { rel: "icon", type: "image/png", sizes: "96x96", href: "/favicon-96.png" },
+  { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" },
+  { rel: "manifest", href: "/site.webmanifest" },
   { rel: "stylesheet", href: styles },
 ];
 
@@ -101,9 +112,14 @@ export async function loader({ request }: { request: Request }) {
       flashToast: flash.toast,
       consent,
       locale,
+      // Digits-only international number (e.g. 5215512345678). Empty string
+      // = feature off: WhatsAppButton renders nothing.
+      whatsappNumber: process.env.WHATSAPP_NUMBER || "",
+      // Only PUBLIC values belong here — ENV is injected into window.ENV
+      // (see EnvScript). Supabase URL/anon key were removed once the browser
+      // stopped creating a Supabase client; checkout still reads
+      // window.ENV.STRIPE_PUBLISHABLE_KEY.
       ENV: {
-        SUPABASE_URL: process.env.SUPABASE_URL!,
-        SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY!,
         STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY || "",
         GA_MEASUREMENT_ID: process.env.GA_MEASUREMENT_ID || "",
         GTM_CONTAINER_ID: process.env.GTM_CONTAINER_ID || "",
@@ -142,9 +158,9 @@ export const headers: HeadersFunction = () => ({
 
 type RootLoaderData = {
   consent: CookieConsent | null;
+  locale: Locale;
+  whatsappNumber: string;
   ENV: {
-    SUPABASE_URL: string;
-    SUPABASE_ANON_KEY: string;
     STRIPE_PUBLISHABLE_KEY: string;
     GA_MEASUREMENT_ID: string;
     GTM_CONTAINER_ID: string;
@@ -158,16 +174,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const gaId = rootData?.ENV?.GA_MEASUREMENT_ID ?? "";
   const gtmId = rootData?.ENV?.GTM_CONTAINER_ID ?? "";
   const metaPixelId = rootData?.ENV?.META_PIXEL_ID ?? "";
+  // Spanish-first storefront; the loader resolves the visitor's language
+  // (cookie choice, then geo default).
+  const lang = rootData?.locale?.language ?? "es";
 
   return (
-    <html lang="en">
+    <html lang={lang}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
         <JsonLdScripts />
-        {gaId && <GoogleAnalytics measurementId={gaId} />}
       </head>
       <body className="font-body antialiased bg-flow-black text-flow-100">
         <a
@@ -179,9 +197,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {children}
         <Analytics />
         <SpeedInsights />
-        {consent?.analytics && gtmId && <GoogleTagManager containerId={gtmId} />}
-        {consent?.marketing && metaPixelId && <MetaPixel pixelId={metaPixelId} />}
+        <ConsentGatedAnalytics
+          gaId={gaId}
+          gtmId={gtmId}
+          metaPixelId={metaPixelId}
+          loaderConsent={consent}
+        />
         <CookieBanner initialConsent={consent} />
+        <WhatsAppButton phone={rootData?.whatsappNumber ?? ""} />
         <ScrollRestoration />
         <Scripts />
       </body>
@@ -230,8 +253,9 @@ function usePageViewBeacon() {
       void fetch(url, { method: "POST", keepalive: true }).catch(() => {});
     }
 
-    // GA4 SPA pageview — skip the first mount, since gtag('config', id) in
-    // /scripts/ga-init.js already fires the initial page_view.
+    // GA4 SPA pageview — skip the first mount: gtag('config', id) inside
+    // <GoogleAnalytics /> fires the initial page_view when the consent-gated
+    // tag mounts.
     if (isFirstRender.current) {
       isFirstRender.current = false;
       return;
@@ -246,6 +270,85 @@ function usePageViewBeacon() {
       });
     }
   }, [pathname]);
+}
+
+/**
+ * Client-only, consent-gated analytics (GA4 + GTM + Meta Pixel).
+ *
+ * Why nothing renders on the server: public routes are edge-cached
+ * (`s-maxage`), while consent lives in an HttpOnly signed cookie read by the
+ * root loader — so any consent-dependent markup in the SSR output would be
+ * cross-served between users with different consent states. The server HTML
+ * is therefore byte-identical regardless of consent, and analytics only
+ * mount in the browser once THIS visitor's consent is confirmed.
+ *
+ * Consent sources, in order:
+ *  1. After hydration, fetch /api/cookie-consent (per-request, never
+ *     edge-cached) — the consent embedded in a cached document can belong to
+ *     another visitor, and the HttpOnly cookie is unreadable from
+ *     document.cookie by design.
+ *  2. Live changes: saving the cookie banner POSTs via a fetcher, which makes
+ *     Remix revalidate the root loader in this browser — that fresh value
+ *     arrives through `loaderConsent` and wins from then on.
+ */
+function ConsentGatedAnalytics({
+  gaId,
+  gtmId,
+  metaPixelId,
+  loaderConsent,
+}: {
+  gaId: string;
+  gtmId: string;
+  metaPixelId: string;
+  loaderConsent: CookieConsent | null;
+}) {
+  const [consent, setConsent] = useState<CookieConsent | null>(null);
+  // The value embedded in the (possibly cached) initial document — untrusted.
+  const hydratedConsent = useRef(loaderConsent);
+  const revalidated = useRef(false);
+
+  // Post-hydration loader revalidations are made with this browser's cookies
+  // and are trustworthy. Reference inequality is enough: revalidation always
+  // deserializes a fresh object.
+  useEffect(() => {
+    if (loaderConsent !== hydratedConsent.current) {
+      revalidated.current = true;
+      setConsent(loaderConsent);
+    }
+  }, [loaderConsent]);
+
+  // Initial mount: ask the server for this browser's actual consent.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/cookie-consent")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { consent: CookieConsent | null } | null) => {
+        if (cancelled || revalidated.current || !data) return;
+        setConsent(data.consent);
+      })
+      .catch(() => {
+        // No consent info — analytics simply stay off.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!consent) return null;
+
+  return (
+    <>
+      {consent.analytics && gaId ? (
+        <GoogleAnalytics measurementId={gaId} />
+      ) : null}
+      {consent.analytics && gtmId ? (
+        <GoogleTagManager containerId={gtmId} />
+      ) : null}
+      {consent.marketing && metaPixelId ? (
+        <MetaPixel pixelId={metaPixelId} />
+      ) : null}
+    </>
+  );
 }
 
 function EnvScript({ env }: { env: Record<string, string> }) {

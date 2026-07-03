@@ -41,9 +41,9 @@ export function OptimizedImage({
       className={className}
       loading={loading}
       decoding={decoding}
-      // React 18.3 accepts fetchPriority via the camelCased prop name; the
-      // type defs lag, so we widen via a typed spread.
-      {...({ fetchPriority } as { fetchPriority?: "high" | "low" | "auto" })}
+      // React 18 only forwards this as the lowercase DOM attribute (camelCase
+      // support landed in React 19); the type defs lack it, so widen the spread.
+      {...({ fetchpriority: fetchPriority } as Record<string, unknown>)}
       width={width}
       height={height}
     />

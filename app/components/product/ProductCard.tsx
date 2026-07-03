@@ -125,7 +125,7 @@ export function ProductCard({ product, index = 0, variant = "dark", initialVaria
             {product.name}
           </h3>
           <p className={cn("text-sm", variant === "light" ? "text-flow-600" : "text-flow-500")}>
-            {formatLocalPrice(view.price, view.priceMxn)}
+            {formatLocalPrice(view.price, view.priceMxn) ?? "Precio no disponible"}
           </p>
           {activeVariants.length > 1 && (
             <div

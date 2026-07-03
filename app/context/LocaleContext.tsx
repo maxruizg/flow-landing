@@ -30,7 +30,14 @@ interface LocaleContextValue {
   setLanguage: (l: Language) => void;
   country: Country;
   setCountry: (c: Country) => void;
-  formatLocalPrice: (usdAmount: number, mxnAmount?: number) => string;
+  /**
+   * Format a price in the active currency. Returns `null` when currency is
+   * MXN and no real MXN price exists — the server rejects MXN purchases for
+   * variants without `price_mxn > 0`, so fabricating a converted price would
+   * show customers a number they can never pay. Callers should render a
+   * "Precio no disponible" fallback for `null`.
+   */
+  formatLocalPrice: (usdAmount: number, mxnAmount?: number) => string | null;
 }
 
 const LocaleContext = createContext<LocaleContextValue | null>(null);
@@ -69,7 +76,13 @@ export function LocaleProvider({
   const formatLocalPrice = useCallback(
     (usdAmount: number, mxnAmount?: number) => {
       if (currency === "MXN") {
-        const amount = mxnAmount && mxnAmount > 0 ? mxnAmount : Math.round(usdAmount * 17);
+        // No fabricated ×17 conversion: if the variant has no real MXN price
+        // the server refuses the purchase, so signal "unavailable" instead of
+        // inventing a number. (NaN from `undefined * qty` callers is falsy.)
+        if (!(typeof mxnAmount === "number" && Number.isFinite(mxnAmount) && mxnAmount > 0)) {
+          return null;
+        }
+        const amount = mxnAmount;
         return new Intl.NumberFormat("es-MX", {
           style: "currency",
           currency: "MXN",

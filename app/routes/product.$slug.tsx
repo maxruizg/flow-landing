@@ -49,15 +49,19 @@ export const meta: MetaFunction<typeof loader> = ({ data, matches }) => {
 
   if (!data?.product) {
     const filtered = parentMeta.filter((t) => !("title" in (t as object)));
-    return [...filtered, { title: "Product Not Found — FLOW URBAN WEAR" }];
+    return [...filtered, { title: "Product Not Found — FLOW Urban Wear" }];
   }
 
   const product = data.product;
   const defaultVariant =
     product.variants.find((v) => v.id === product.defaultVariantId) ??
     product.variants[0];
-  const title = `${product.name} — FLOW URBAN WEAR`;
-  const description = defaultVariant?.description ?? "";
+  const title = `${product.name} — FLOW Urban Wear`;
+  // Generic Spanish fallback so pages without a variant description never
+  // ship an empty meta description.
+  const description =
+    defaultVariant?.description ||
+    `Compra ${product.name} de FLOW Urban Wear, streetwear mexicano hecho en CDMX. Envíos a todo México.`;
   const canonical = `${SITE_URL}/product/${product.slug}`;
   const ogImage = defaultVariant
     ? absoluteUrl(optimizedImageUrl(defaultVariant.image, 1280, 85))
@@ -635,7 +639,7 @@ function ProductModal({ product }: { product: Product }) {
                 </h1>
 
                 <p className="text-xl text-flow-200 font-display font-medium mb-1">
-                  {formatLocalPrice(selectedVariant.price, selectedVariant.priceMxn)}
+                  {formatLocalPrice(selectedVariant.price, selectedVariant.priceMxn) ?? "Precio no disponible"}
                 </p>
                 {selectedVariant.compareAtPrice && selectedVariant.compareAtPrice > selectedVariant.price && (
                   <p className="text-sm text-flow-500 line-through mb-3">

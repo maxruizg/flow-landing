@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { motion, useScroll, useTransform, useReducedMotion } from "framer-motion";
 import { Container } from "~/components/ui/Container";
 import { AnimatedText } from "~/components/ui/AnimatedText";
+import { OptimizedImage } from "~/components/ui/OptimizedImage";
 
 export function ShowroomHero({ heroImage, pieceCount }: { heroImage?: string; pieceCount?: number }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -19,10 +20,20 @@ export function ShowroomHero({ heroImage, pieceCount }: { heroImage?: string; pi
         className="absolute inset-0"
         style={prefersReducedMotion ? undefined : { y }}
       >
-        <img
+        {/* LCP element: eager + high priority, responsive srcset (Vercel
+            Image Optimization for the local fallback, Supabase Render for
+            CMS-provided heroes), intrinsic dimensions to avoid CLS. */}
+        <OptimizedImage
           src={heroImage || "/images/editorial/collection-ltmf.jpg"}
           alt="FLOW Urban Wear showroom"
           className="w-full h-[130%] object-cover"
+          widths={[640, 960, 1280, 1920]}
+          sizes="100vw"
+          loading="eager"
+          fetchPriority="high"
+          decoding="sync"
+          width={1280}
+          height={1920}
         />
       </motion.div>
 

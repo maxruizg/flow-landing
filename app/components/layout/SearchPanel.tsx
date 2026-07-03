@@ -112,7 +112,7 @@ export function SearchPanel({ isOpen, onClose }: SearchPanelProps) {
                   {product.name}
                 </p>
                 <p className="text-xs text-flow-500 mt-0.5">
-                  {formatLocalPrice(product.price, product.priceMxn)}
+                  {formatLocalPrice(product.price, product.priceMxn) ?? "Precio no disponible"}
                 </p>
               </div>
             </Link>

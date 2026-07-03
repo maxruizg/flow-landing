@@ -9,6 +9,8 @@
  * system fonts the templates used before.
  */
 
+import { SITE_URL, SOCIAL_URLS } from "~/lib/seo";
+
 export const colors = {
   // Surfaces (darkest → lighter), matching --color-flow-* tokens.
   black: "#0a0a0a", // --color-flow-black
@@ -45,12 +47,15 @@ export const fonts = {
 export const fontImportCss =
   "@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');";
 
+// Emails are rendered server-side (via @react-email/render in *.server.ts),
+// so importing the canonical SEO constants keeps every email link on the
+// same www host + social handles as the site itself.
 export const brand = {
   name: "FLOW",
   tagline: "URBAN WEAR",
-  site: "https://flowurbanwear.com",
-  instagram: "https://instagram.com/flowurbanwear",
-  tiktok: "https://tiktok.com/@flowurbanwear",
+  site: SITE_URL,
+  instagram: SOCIAL_URLS[0], // https://www.instagram.com/flow_urbanwear
+  tiktok: SOCIAL_URLS[1], // https://www.tiktok.com/@flowurbanwear
   email: "contact@flowurbanwear.com",
 } as const;
 

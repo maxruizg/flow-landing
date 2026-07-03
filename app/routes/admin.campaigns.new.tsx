@@ -11,6 +11,7 @@ import { cn } from "~/lib/utils";
 import { uploadImageClient } from "~/lib/supabase.client";
 import { requireAdmin } from "~/lib/session.server";
 import { jsonWithToast } from "~/lib/toast.server";
+import { sendCampaign } from "~/lib/campaigns.server";
 import {
   getEmailTemplates,
   getCampaign,
@@ -24,6 +25,11 @@ import {
 export const meta: MetaFunction = () => [
   { title: "FLOW Admin — Campaign Editor" },
 ];
+
+// "Send now" performs the actual send inline in the action.
+export const config = {
+  maxDuration: 60,
+};
 
 // ─── Shared Styles ──────────────────────────────────────────
 
@@ -182,6 +188,20 @@ function CampaignGalleryUpload({
   );
 }
 
+// ─── Helpers ────────────────────────────────────────────────
+
+/**
+ * Converts a stored UTC ISO timestamp to the local "YYYY-MM-DDTHH:mm" format
+ * expected by <input type="datetime-local">.
+ */
+function toDatetimeLocal(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 // ─── Types ──────────────────────────────────────────────────
 
 interface VariableField {
@@ -269,7 +289,6 @@ export async function action({ request }: ActionFunctionArgs) {
       return json({ error: "Campaign ID and subject are required" }, { status: 400 });
     }
 
-    const status = sendOption === "now" ? "sending" : "scheduled";
     const tags =
       targetType === "tags" && targetTags
         ? targetTags
@@ -278,21 +297,89 @@ export async function action({ request }: ActionFunctionArgs) {
             .filter(Boolean)
         : [];
 
-    await updateCampaign(campaignId, {
-      subject,
-      preheader,
-      status,
-      scheduledAt: sendOption === "later" && scheduledAt ? scheduledAt : null,
-      targetTags: tags,
-    });
+    if (sendOption === "draft") {
+      await updateCampaign(campaignId, {
+        subject,
+        preheader,
+        status: "draft",
+        scheduledAt: null,
+        targetTags: tags,
+      });
+      return jsonWithToast(
+        { campaignId, done: true },
+        { type: "success", message: "Draft saved." },
+      );
+    }
 
-    return jsonWithToast(
-      { campaignId, done: true },
-      {
-        type: "success",
-        message: sendOption === "now" ? "Campaign queued to send." : "Campaign scheduled.",
-      },
-    );
+    if (sendOption === "later") {
+      // The client submits a UTC ISO string (converted from datetime-local).
+      const when = scheduledAt ? new Date(scheduledAt) : null;
+      if (!when || Number.isNaN(when.getTime())) {
+        return json({ error: "A valid schedule date is required" }, { status: 400 });
+      }
+      if (when.getTime() <= Date.now()) {
+        return json({ error: "The schedule date must be in the future" }, { status: 400 });
+      }
+      await updateCampaign(campaignId, {
+        subject,
+        preheader,
+        status: "scheduled",
+        scheduledAt: when.toISOString(),
+        targetTags: tags,
+      });
+      return jsonWithToast(
+        { campaignId, done: true },
+        { type: "success", message: "Campaign scheduled." },
+      );
+    }
+
+    if (sendOption === "now") {
+      // Save the final fields first (without touching status), then send
+      // inline via the shared engine so the admin gets immediate feedback.
+      await updateCampaign(campaignId, {
+        subject,
+        preheader,
+        scheduledAt: null,
+        targetTags: tags,
+      });
+
+      const result = await sendCampaign(campaignId, {
+        claimFrom: ["draft", "scheduled", "failed"],
+      });
+
+      if (!result.claimed) {
+        return jsonWithToast(
+          { campaignId, error: result.error ?? "Campaign cannot be sent right now" },
+          { type: "error", message: result.error ?? "Campaign cannot be sent right now." },
+          { status: 409 },
+        );
+      }
+
+      if (result.status === "failed") {
+        const message = `Campaign failed to send${result.error ? `: ${result.error}` : "."}`;
+        return jsonWithToast(
+          { campaignId, error: message },
+          { type: "error", message },
+          { status: 500 },
+        );
+      }
+
+      const failedNote = result.totalFailed ? ` (${result.totalFailed} failed)` : "";
+      return jsonWithToast(
+        {
+          campaignId,
+          done: true,
+          totalSent: result.totalSent ?? 0,
+          totalFailed: result.totalFailed ?? 0,
+        },
+        {
+          type: "success",
+          message: `Campaign sent to ${result.totalSent ?? 0} subscribers${failedNote}.`,
+        },
+      );
+    }
+
+    return json({ error: "Invalid send option" }, { status: 400 });
   }
 
   return json({ error: "Invalid step" }, { status: 400 });
@@ -973,12 +1060,18 @@ function StepSchedule({
             <div className="border-t border-flow-800/50 pt-4 space-y-2">
               <button
                 type="button"
-                disabled={!subject.trim() || isSubmitting}
+                disabled={
+                  !subject.trim() ||
+                  isSubmitting ||
+                  (sendOption === "later" && !scheduledAt)
+                }
                 onClick={onSubmit}
                 className={cn(btnPrimary, "w-full")}
               >
                 {isSubmitting
-                  ? "Saving..."
+                  ? sendOption === "now"
+                    ? "Sending..."
+                    : "Saving..."
                   : sendOption === "now"
                     ? "Send Now"
                     : "Schedule Campaign"}
@@ -1010,7 +1103,13 @@ function StepSchedule({
 export default function CampaignEditor() {
   const { templates, campaign, content, subscriberCount } =
     useLoaderData<typeof loader>();
-  const fetcher = useFetcher<{ campaignId?: string; done?: boolean; error?: string }>();
+  const fetcher = useFetcher<{
+    campaignId?: string;
+    done?: boolean;
+    error?: string;
+    totalSent?: number;
+    totalFailed?: number;
+  }>();
 
   // Wizard state
   const [step, setStep] = useState(() => {
@@ -1072,8 +1171,8 @@ export default function CampaignEditor() {
   const [sendOption, setSendOption] = useState<"now" | "later">(
     campaign?.scheduled_at ? "later" : "now"
   );
-  const [scheduledAt, setScheduledAt] = useState(
-    campaign?.scheduled_at ?? ""
+  const [scheduledAt, setScheduledAt] = useState(() =>
+    toDatetimeLocal(campaign?.scheduled_at)
   );
 
   const isSubmitting = fetcher.state === "submitting";
@@ -1115,7 +1214,11 @@ export default function CampaignEditor() {
     formData.set("send_option", sendOption);
     formData.set("target_type", targetType);
     formData.set("target_tags", targetTags);
-    if (sendOption === "later") formData.set("scheduled_at", scheduledAt);
+    if (sendOption === "later" && scheduledAt) {
+      // datetime-local gives a timezone-less local string; convert to UTC ISO
+      // so the timestamptz column stores the moment the admin actually meant.
+      formData.set("scheduled_at", new Date(scheduledAt).toISOString());
+    }
     fetcher.submit(formData, { method: "post" });
   };
 
@@ -1176,7 +1279,11 @@ export default function CampaignEditor() {
       {fetcher.data?.done && (
         <div className="mb-6 bg-green-500/10 border border-green-500/30 rounded-lg px-4 py-3">
           <p className="text-sm text-green-400">
-            Campaign saved successfully.{" "}
+            {typeof fetcher.data.totalSent === "number"
+              ? `Campaign sent to ${fetcher.data.totalSent} subscribers${
+                  fetcher.data.totalFailed ? ` (${fetcher.data.totalFailed} failed)` : ""
+                }.`
+              : "Campaign saved successfully."}{" "}
             <Link to="/admin/newsletter" className="underline hover:text-green-300">
               Back to Newsletter
             </Link>

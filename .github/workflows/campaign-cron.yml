@@ -1,0 +1,38 @@
+# Plan-independent hourly trigger for scheduled email campaigns.
+#
+# Vercel Hobby crons can be infrequent/unreliable; this GitHub Actions cron
+# hits the same endpoint hourly. The endpoint's claim logic is atomic
+# (scheduled → sending), so overlapping with the Vercel cron is safe — a
+# second invocation just skips campaigns already taken.
+#
+# Security note: this workflow uses NO untrusted event input in run: commands;
+# the only interpolated value is a repository secret, passed via env.
+#
+# SETUP REQUIRED: add a repository Actions secret named CRON_SECRET with the
+# SAME value as the CRON_SECRET env var on Vercel
+# (GitHub repo → Settings → Secrets and variables → Actions → New repository secret).
+name: Campaign cron
+
+on:
+  schedule:
+    # Hourly at :07 — offset from the top of the hour to avoid GitHub's
+    # scheduler congestion (jobs at :00 are frequently delayed or dropped).
+    - cron: "7 * * * *"
+  # Allow manual runs from the Actions tab for testing.
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - name: Trigger scheduled campaign send
+        run: |
+          # The route is a Remix loader → GET, authorized via Bearer token.
+          curl -fsS \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "https://www.flowurbanwear.com/api/run-scheduled-campaigns"

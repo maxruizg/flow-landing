@@ -18,7 +18,8 @@ import { shippingFee } from "~/lib/shipping";
 import { trackBeginCheckout } from "~/lib/analytics";
 
 export const meta: MetaFunction = () => [
-  { title: "Checkout — FLOW URBAN WEAR" },
+  { title: "Checkout — FLOW Urban Wear" },
+  { name: "robots", content: "noindex" },
 ];
 
 let stripePromise: ReturnType<typeof loadStripe> | null = null;
@@ -143,7 +144,7 @@ function CheckoutForm() {
   const stripeHook = useStripe();
   const elements = useElements();
   const { items, subtotal, subtotalMxn } = useCart();
-  const { formatLocalPrice, currency } = useLocale();
+  const { formatLocalPrice, currency, language } = useLocale();
 
   const shippingUsd = shippingFee("usd");
   const shippingMxn = shippingFee("mxn");
@@ -197,6 +198,27 @@ function CheckoutForm() {
 
   const goToStep2 = () => {
     if (!validateStep1()) return;
+
+    // Abandoned-cart capture: this is the first moment we have a validated
+    // email, so snapshot the cart server-side (fire-and-forget — checkout
+    // never waits on it or surfaces its errors). If the shopper completes the
+    // purchase, order creation marks the cart recovered; if not, the hourly
+    // cron sends one reminder after ~3h. Prices are re-derived from the DB on
+    // the server, so nothing here is trusted.
+    fetch("/api/create-payment-intent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        intent: "capture-cart",
+        items,
+        currency: currency.toLowerCase(),
+        email: shipping.email,
+        name: `${shipping.firstName} ${shipping.lastName}`.trim(),
+        locale: language,
+      }),
+      keepalive: true,
+    }).catch(() => {});
+
     setStep(2);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -375,6 +397,17 @@ function CheckoutForm() {
                 <PaymentElement
                   options={{
                     layout: "tabs",
+                    // OXXO requires billing name + email at confirm time. The
+                    // Payment Element renders those fields on the OXXO tab;
+                    // prefill them from step 1 so the customer doesn't type
+                    // them twice (they stay editable).
+                    defaultValues: {
+                      billingDetails: {
+                        name: `${shipping.firstName} ${shipping.lastName}`.trim(),
+                        email: shipping.email,
+                        phone: shipping.phone || undefined,
+                      },
+                    },
                   }}
                 />
               </div>
@@ -475,7 +508,7 @@ function CheckoutForm() {
             <div className="space-y-3 mb-6">
               {items.map((item) => (
                 <div
-                  key={`${item.productId}-${item.size}`}
+                  key={`${item.variantId ?? item.productId}-${item.size}`}
                   className="flex items-center gap-3"
                 >
                   <img
@@ -534,6 +567,7 @@ export default function Checkout() {
   const { currency, language } = useLocale();
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [initError, setInitError] = useState<string | null>(null);
+  const [stripeKeyMissing, setStripeKeyMissing] = useState(false);
 
   // GA4 begin_checkout — fires once when the user reaches checkout with a
   // non-empty cart. Re-fires only if the cart contents change.
@@ -552,6 +586,15 @@ export default function Checkout() {
       })),
     });
   }, [itemCount, items, currency, subtotal, subtotalMxn]);
+
+  // If the Stripe publishable key never made it to the client, getStripe()
+  // returns null forever and the pay button would just stay silently disabled.
+  // Surface an explicit error instead.
+  useEffect(() => {
+    if (!(window as any).ENV?.STRIPE_PUBLISHABLE_KEY) {
+      setStripeKeyMissing(true);
+    }
+  }, []);
 
   // Create (or recreate) the PaymentIntent whenever the cart contents OR the
   // currency change. A PaymentIntent's currency is immutable, so switching
@@ -609,6 +652,42 @@ export default function Checkout() {
               className="inline-flex items-center px-6 py-3 bg-white text-flow-black font-display font-semibold text-sm rounded-full hover:bg-flow-200 transition-colors"
             >
               Browse Showroom
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Stripe publishable key never reached the client — without it Elements can
+  // never initialize and the pay button would stay silently disabled forever.
+  if (stripeKeyMissing) {
+    return (
+      <div id="main-content">
+        <Navbar />
+        <div className="min-h-screen flex items-center justify-center px-4 pt-20">
+          <div className="text-center max-w-md">
+            <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-6">
+              <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <h1 className="font-display text-2xl font-bold text-white mb-3">
+              Payments Unavailable
+            </h1>
+            <p className="text-flow-400 text-sm mb-6">
+              Our payment system is temporarily unavailable. Please try again
+              later, or write to us at{" "}
+              <a href="mailto:contact@flowurbanwear.com" className="text-flow-200 underline underline-offset-2">
+                contact@flowurbanwear.com
+              </a>{" "}
+              and we&apos;ll take care of your order.
+            </p>
+            <Link
+              to="/showroom"
+              className="inline-flex items-center px-6 py-3 bg-white text-flow-black font-display font-semibold text-sm rounded-full hover:bg-flow-200 transition-colors"
+            >
+              Back to Showroom
             </Link>
           </div>
         </div>

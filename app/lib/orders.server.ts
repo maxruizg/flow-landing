@@ -10,6 +10,7 @@ import {
   getOrderByStripeSession,
 } from "~/data/queries.server";
 import { getResend } from "~/lib/resend.server";
+import { markCartRecovered } from "~/lib/abandoned-carts.server";
 import { OrderConfirmationEmail } from "~/emails/order-confirmation";
 
 export interface WebhookOrderItem {
@@ -56,11 +57,10 @@ export async function ensureOrderFromPaymentIntent(
   const orderId = `ORD-${Date.now().toString(36).toUpperCase()}`;
   const total = pi.amount / 100;
 
-  // Create the order row FIRST — its primary-key / unique-stripe_session_id
-  // constraint is the atomic gate that serializes concurrent callers (webhook
-  // + success loader fallback). Only the caller that wins the insert runs the
-  // side effects — otherwise stock and customer stats would double-count.
-  let orderCreated = false;
+  // Create the order row FIRST — the unique index on orders(stripe_session_id)
+  // is the atomic gate that serializes concurrent callers (webhook + success
+  // loader fallback). Only the caller that wins the insert runs the side
+  // effects — otherwise stock and customer stats would double-count.
   try {
     await createOrder({
       id: orderId,
@@ -72,21 +72,24 @@ export async function ensureOrderFromPaymentIntent(
       shippingAddress,
       stripeSessionId: pi.id,
     });
-    orderCreated = true;
   } catch (err) {
+    if (isUniqueViolation(err)) {
+      // Another writer won the race — fetch and return their order.
+      const winner = await getOrderByStripeSession(pi.id).catch(() => null);
+      if (winner) return { orderId: winner.id, created: false };
+    }
+    // Genuine (likely transient) failure: return null so the webhook can
+    // respond 500 and Stripe retries the event.
     console.error(`[orders] createOrder failed for ${pi.id}:`, err);
-  }
-
-  if (!orderCreated) {
-    // Another caller already processed this PaymentIntent (or the insert
-    // genuinely failed — in which case the webhook will retry and succeed
-    // on its own). Don't double-decrement stock or double-count customer stats.
-    const winner = await getOrderByStripeSession(pi.id).catch(() => null);
-    return winner ? { orderId: winner.id, created: false } : null;
+    return null;
   }
 
   // We're the single winner → safe to run side effects exactly once.
   await decrementStockForItems(items);
+
+  // Fire-and-forget: the customer bought, so retire any abandoned-cart row
+  // before the recovery cron could email them. Never throws.
+  if (customerEmail) void markCartRecovered(customerEmail);
 
   let customerIsNew = false;
   try {
@@ -127,7 +130,6 @@ export async function ensureOrderFromCheckoutSession(
   const total = (session.amount_total || 0) / 100;
 
   const orderId = `ORD-${Date.now().toString(36).toUpperCase()}`;
-  let orderCreated = false;
   try {
     await createOrder({
       id: orderId,
@@ -139,19 +141,21 @@ export async function ensureOrderFromCheckoutSession(
       shippingAddress,
       stripeSessionId: session.id,
     });
-    orderCreated = true;
   } catch (err) {
+    if (isUniqueViolation(err)) {
+      // Race: another caller already processed this session — don't double-run
+      // stock / customer side effects.
+      const winner = await getOrderByStripeSession(session.id).catch(() => null);
+      if (winner) return { orderId: winner.id, created: false };
+    }
     console.error(`[orders] createOrder failed for session ${session.id}:`, err);
-  }
-
-  if (!orderCreated) {
-    // Race: another caller already processed this session — don't double-run
-    // stock / customer side effects.
-    const winner = await getOrderByStripeSession(session.id).catch(() => null);
-    return winner ? { orderId: winner.id, created: false } : null;
+    return null;
   }
 
   await decrementStockForItems(items);
+
+  // Fire-and-forget: retire any abandoned-cart row for this buyer. Never throws.
+  if (customerEmail) void markCartRecovered(customerEmail);
 
   let customerIsNew = false;
   try {
@@ -191,7 +195,46 @@ export async function ensureOrderFromPaymentIntentId(
   }
 }
 
+/**
+ * Surfaces a failed/expired PaymentIntent to the admin as a notification.
+ * Fired from the payment_intent.payment_failed webhook — for OXXO this means
+ * the customer never paid the voucher before it expired (no order row exists
+ * yet, since orders are only created on payment_intent.succeeded), so there
+ * is nothing to cancel; we just leave a trace for follow-up. Never throws.
+ */
+export async function notifyPaymentFailed(pi: Stripe.PaymentIntent): Promise<void> {
+  const methodType = pi.last_payment_error?.payment_method?.type ?? null;
+  const isOxxo = methodType === "oxxo";
+  const email = pi.receipt_email || pi.metadata?.customer_email || "unknown email";
+  const amount = formatAmount(pi.amount / 100, pi.currency);
+  const reason = isOxxo
+    ? "OXXO voucher expired without payment"
+    : pi.last_payment_error?.message || "payment failed";
+
+  try {
+    await createNotification({
+      type: "system",
+      title: isOxxo ? "OXXO voucher expired" : "Payment failed",
+      message: `${pi.id} · ${amount} · ${email} · ${reason}`,
+      linkTo: "/admin/orders",
+    });
+  } catch (err) {
+    console.error(`[orders] payment-failed notification failed for ${pi.id}:`, err);
+  }
+}
+
 // ───────────────────────────────────────────────────────────────────────────
+
+/** Postgres 23505 = unique_violation. Supabase surfaces it as a PostgrestError
+ *  with `.code`. Seeing it on orders(stripe_session_id) means another writer
+ *  (webhook vs. success loader) already created the order — not a failure. */
+function isUniqueViolation(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    (err as { code?: unknown }).code === "23505"
+  );
+}
 
 async function decrementStockForItems(items: WebhookOrderItem[]): Promise<void> {
   for (const it of items) {
@@ -323,10 +366,22 @@ async function sendOrderConfirmation(
       ctaUrl: settings.ctaUrl || undefined,
     }),
   );
-  await resend.emails.send({
+  // Resend v6 never throws — failures come back as { error }. Ignoring it
+  // means confirmation emails silently vanish. Log + surface an admin
+  // notification, but never fail order creation over an email.
+  const { error } = await resend.emails.send({
     from: process.env.RESEND_FROM_EMAIL || "Flow Urban Wear <contact@flowurbanwear.com>",
     to: email,
     subject: settings.subject || "Order Confirmed — FLOW",
     html,
   });
+  if (error) {
+    console.error(`[orders] confirmation email failed for ${orderId} (${email}):`, error);
+    await createNotification({
+      type: "system",
+      title: "Order confirmation email failed",
+      message: `Could not send the confirmation for ${orderId} to ${email}: ${error.message ?? error.name ?? "unknown error"}`,
+      linkTo: "/admin/orders",
+    }).catch(() => {});
+  }
 }

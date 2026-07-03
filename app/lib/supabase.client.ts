@@ -1,30 +1,44 @@
-import { createClient } from "@supabase/supabase-js";
+// Client-side upload helpers.
+//
+// SECURITY: these used to upload straight to Supabase Storage from the
+// browser using the anon key (no auth, no validation). They now POST to the
+// authenticated server resource route /api/admin-upload, which requires an
+// admin session, validates content type + size, and performs the storage
+// write server-side with the service-role client. No Supabase key is needed
+// in the browser anymore.
 
-declare global {
-  interface Window {
-    ENV?: { SUPABASE_URL: string; SUPABASE_ANON_KEY: string };
+async function uploadViaServer(
+  body: Blob,
+  fileName: string,
+  folder: string,
+): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", body, fileName);
+  formData.append("folder", folder);
+
+  const res = await fetch("/api/admin-upload", {
+    method: "POST",
+    body: formData,
+  });
+
+  let payload: { url?: string; error?: string } | null = null;
+  try {
+    payload = await res.json();
+  } catch {
+    // non-JSON response (e.g. redirect to login) — handled below
   }
-}
 
-function getClient() {
-  const url = window.ENV?.SUPABASE_URL ?? "";
-  const key = window.ENV?.SUPABASE_ANON_KEY ?? "";
-  return createClient(url, key);
+  if (!res.ok || !payload?.url) {
+    throw new Error(payload?.error || `Upload failed (${res.status})`);
+  }
+  return payload.url;
 }
 
 export async function uploadImageClient(
   file: File,
-  folder: string
+  folder: string,
 ): Promise<string> {
-  const supabase = getClient();
-  const ext = file.name.split(".").pop();
-  const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-  const { error } = await supabase.storage
-    .from("images")
-    .upload(fileName, file, { contentType: file.type });
-  if (error) throw error;
-  const { data } = supabase.storage.from("images").getPublicUrl(fileName);
-  return data.publicUrl;
+  return uploadViaServer(file, file.name, folder);
 }
 
 export async function uploadBlobClient(
@@ -32,12 +46,5 @@ export async function uploadBlobClient(
   folder: string,
   ext = "jpg",
 ): Promise<string> {
-  const supabase = getClient();
-  const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-  const { error } = await supabase.storage
-    .from("images")
-    .upload(fileName, blob, { contentType: blob.type || "image/jpeg" });
-  if (error) throw error;
-  const { data } = supabase.storage.from("images").getPublicUrl(fileName);
-  return data.publicUrl;
+  return uploadViaServer(blob, `upload.${ext}`, folder);
 }

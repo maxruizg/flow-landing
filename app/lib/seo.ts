@@ -5,17 +5,24 @@ import { optimizedImageUrl } from "~/lib/image";
 // see. Edit these values to change what shows up in search results, share
 // previews, and the knowledge panel.
 
-export const SITE_URL = "https://flowurbanwear.com";
+export const SITE_URL = "https://www.flowurbanwear.com";
 export const ORG_NAME = "FLOW Urban Wear";
 export const ORG_LEGAL_NAME = "FLOW Urban Wear";
 export const ORG_DESCRIPTION =
-  "Ropa streetwear mexicana 100% hecha en CDMX. Less thinking, more flow.";
+  "Streetwear mexicano creado en CDMX por Dany Flow: hoodies oversized, graphic tees, shorts y accesorios. Envío DHL a todo México. Less thinking, more flow.";
+export const ORG_SLOGAN = "Less Thinking More Flow";
+export const ORG_FOUNDER = {
+  name: "Daniela Flores",
+  alternateName: "Dany Flow",
+};
 export const ORG_FOUNDING_DATE = "2022";
 export const ORG_FOUNDING_LOCATION = "Mexico City, Mexico";
 
 export const LOGO_PATH = "/images/logo/flow-wave-icon.png";
 export const LOGO_URL = `${SITE_URL}${LOGO_PATH}`;
-export const DEFAULT_OG_IMAGE = LOGO_URL;
+// 1200×630 brand card (public/images/og-default.jpg) — social platforms
+// expect this ratio; the raw logo PNG is square and far too heavy for OG.
+export const DEFAULT_OG_IMAGE = `${SITE_URL}/images/og-default.jpg`;
 
 export const SOCIAL_URLS = [
   "https://www.instagram.com/flow_urbanwear",
@@ -36,6 +43,12 @@ export function organizationJsonLd() {
     url: SITE_URL,
     logo: LOGO_URL,
     description: ORG_DESCRIPTION,
+    slogan: ORG_SLOGAN,
+    founder: {
+      "@type": "Person",
+      name: ORG_FOUNDER.name,
+      alternateName: ORG_FOUNDER.alternateName,
+    },
     foundingDate: ORG_FOUNDING_DATE,
     foundingLocation: ORG_FOUNDING_LOCATION,
     sameAs: SOCIAL_URLS,
@@ -62,29 +75,35 @@ export function productJsonLd(
     absoluteUrl(optimizedImageUrl(url, 1280, 85)),
   );
 
-  const offer: Record<string, unknown> = {
-    "@type": "Offer",
-    price: variant.price.toFixed(2),
-    priceCurrency: "USD",
-    availability:
-      variant.stock > 0 && variant.status === "active"
-        ? "https://schema.org/InStock"
-        : "https://schema.org/OutOfStock",
-    url: canonicalUrl,
-  };
-
   const payload: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "Product",
     name: product.name,
-    description: variant.description ?? "",
+    description:
+      variant.description ||
+      `${product.name} — streetwear mexicano de ${ORG_NAME}, hecho en CDMX.`,
     image: imageUrls,
     brand: {
       "@type": "Brand",
       name: product.brand ?? ORG_NAME,
     },
-    offers: offer,
   };
+
+  // The storefront displays MXN by default, so the structured-data price must
+  // be the MXN one. If no valid MXN price exists, omit `offers` entirely —
+  // Google penalizes structured data that contradicts the visible page.
+  if (variant.priceMxn > 0) {
+    payload.offers = {
+      "@type": "Offer",
+      price: variant.priceMxn.toFixed(2),
+      priceCurrency: "MXN",
+      availability:
+        variant.stock > 0 && variant.status === "active"
+          ? "https://schema.org/InStock"
+          : "https://schema.org/OutOfStock",
+      url: canonicalUrl,
+    };
+  }
 
   if (variant.sku) payload.sku = variant.sku;
 

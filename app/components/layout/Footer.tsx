@@ -1,9 +1,8 @@
 import { useState } from "react";
+import { Link } from "@remix-run/react";
 import { Container } from "~/components/ui/Container";
 import { brand } from "~/data/brand";
-import { AboutPanel } from "./AboutPanel";
 import { ContactPanel } from "./ContactPanel";
-import { ShippingPanel } from "./ShippingPanel";
 import { PolicyPanel } from "./PolicyPanel";
 
 const socialLinks: { label: string; href: string }[] = [
@@ -15,20 +14,17 @@ const socialLinks: { label: string; href: string }[] = [
   { label: "Pinterest", href: "https://pin.it/4kEAnnRjx" },
 ];
 
-interface CompanyLink {
-  label: string;
-  action: "about" | "contact";
-}
-
-const companyLinks: CompanyLink[] = [
-  { label: "About Us", action: "about" },
-  { label: "Contact", action: "contact" },
+// Real, indexable pages (replaced the old About/Shipping/Policy panel
+// triggers so customers and crawlers get linkable URLs).
+const infoLinks: { label: string; to: string }[] = [
+  { label: "Nosotros", to: "/nosotros" },
+  { label: "Envíos", to: "/envios" },
+  { label: "Devoluciones", to: "/devoluciones" },
+  { label: "Aviso de Privacidad", to: "/privacidad" },
 ];
 
 export function Footer() {
-  const [aboutOpen, setAboutOpen] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
-  const [shippingOpen, setShippingOpen] = useState(false);
   const [policyOpen, setPolicyOpen] = useState(false);
 
   return (
@@ -49,27 +45,32 @@ export function Footer() {
             </div>
 
             {/* Links */}
-            <div className="flex gap-16 sm:gap-24">
-              {/* Company */}
+            <div className="flex flex-wrap gap-x-16 gap-y-10 sm:gap-x-24">
+              {/* Información */}
               <div>
                 <h4 className="text-xs uppercase tracking-[0.25em] text-flow-300 font-medium mb-4">
-                  Company
+                  Información
                 </h4>
                 <ul className="space-y-2.5">
-                  {companyLinks.map((link) => (
-                    <li key={link.label}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (link.action === "about") setAboutOpen(true);
-                          else if (link.action === "contact") setContactOpen(true);
-                        }}
+                  {infoLinks.map((link) => (
+                    <li key={link.to}>
+                      <Link
+                        to={link.to}
                         className="text-sm text-flow-500 hover:text-white transition-colors"
                       >
                         {link.label}
-                      </button>
+                      </Link>
                     </li>
                   ))}
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => setContactOpen(true)}
+                      className="text-sm text-flow-500 hover:text-white transition-colors"
+                    >
+                      Contacto
+                    </button>
+                  </li>
                 </ul>
               </div>
 
@@ -101,13 +102,9 @@ export function Footer() {
               &copy; 2026 FLOW URBAN WEAR. All rights reserved.
             </p>
             <div className="flex items-center gap-6 text-xs text-flow-600">
-              <button
-                type="button"
-                onClick={() => setPolicyOpen(true)}
-                className="hover:text-flow-300 transition-colors"
-              >
-                Privacy
-              </button>
+              <Link to="/privacidad" className="hover:text-flow-300 transition-colors">
+                Privacidad
+              </Link>
               <button
                 type="button"
                 onClick={() => setPolicyOpen(true)}
@@ -115,13 +112,9 @@ export function Footer() {
               >
                 Terms
               </button>
-              <button
-                type="button"
-                onClick={() => setShippingOpen(true)}
-                className="hover:text-flow-300 transition-colors"
-              >
-                Shipping
-              </button>
+              <Link to="/envios" className="hover:text-flow-300 transition-colors">
+                Envíos
+              </Link>
               <button
                 type="button"
                 onClick={() => setPolicyOpen(true)}
@@ -134,9 +127,7 @@ export function Footer() {
         </Container>
       </footer>
 
-      <AboutPanel isOpen={aboutOpen} onClose={() => setAboutOpen(false)} />
       <ContactPanel isOpen={contactOpen} onClose={() => setContactOpen(false)} />
-      <ShippingPanel isOpen={shippingOpen} onClose={() => setShippingOpen(false)} />
       <PolicyPanel isOpen={policyOpen} onClose={() => setPolicyOpen(false)} />
     </>
   );

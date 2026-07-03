@@ -2,7 +2,7 @@ import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
-import { collections, bestSellers, newArrivals, dailyFlowImages } from "./mock.ts";
+import { collections, bestSellers, newArrivals, dailyFlowImages } from "./mock";
 // Mock admin data no longer seeded — only real data from the admin panel
 
 const supabaseUrl = process.env.SUPABASE_URL!;
@@ -72,6 +72,8 @@ async function uploadAllImages(): Promise<Map<string, string>> {
   const localPaths = collectLocalPaths();
   const urlMap = new Map<string, string>();
   const publicDir = path.resolve(process.cwd(), "public");
+  // menswear/womenswear seed images live outside public/ so they don't ship in the deploy bundle
+  const seedAssetsDir = path.resolve(process.cwd(), "seed-assets");
 
   console.log(`Uploading ${localPaths.size} unique images to Supabase Storage...\n`);
 
@@ -83,7 +85,9 @@ async function uploadAllImages(): Promise<Map<string, string>> {
     const results = await Promise.all(
       batch.map(async (localPath) => {
         const storagePath = toStoragePath(localPath);
-        const filePath = path.join(publicDir, localPath);
+        const isSeedAsset =
+          localPath.startsWith("/images/menswear/") || localPath.startsWith("/images/womenswear/");
+        const filePath = path.join(isSeedAsset ? seedAssetsDir : publicDir, localPath);
         try {
           const fileBuffer = fs.readFileSync(filePath);
           const { error } = await supabase.storage

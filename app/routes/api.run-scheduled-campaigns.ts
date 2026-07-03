@@ -1,32 +1,20 @@
 import { json } from "@remix-run/node";
 import type { LoaderFunctionArgs } from "@remix-run/node";
-import { render } from "@react-email/render";
+import { supabase } from "~/lib/supabase.server";
+import {
+  sendCampaign,
+  recoverStuckCampaigns,
+  type SendCampaignResult,
+} from "~/lib/campaigns.server";
+import { sendAbandonedCartReminders } from "~/lib/abandoned-carts.server";
 
 export const config = {
   maxDuration: 60,
 };
-import { getResend } from "~/lib/resend.server";
-import {
-  getCampaign,
-  getCampaignContent,
-  updateCampaign,
-  createCampaignLog,
-  getActiveSubscribers,
-  getSubscribersByTags,
-} from "~/data/queries.server";
-import { supabase } from "~/lib/supabase.server";
-import NewCollectionEmail from "~/emails/new-collection";
-import FlashSaleEmail from "~/emails/flash-sale";
-import ProductLaunchEmail from "~/emails/product-launch";
 
-const templateMap: Record<string, React.FC<any>> = {
-  "new-collection": NewCollectionEmail,
-  "flash-sale": FlashSaleEmail,
-  "product-launch": ProductLaunchEmail,
-};
-
-const BATCH_SIZE = 50;
-
+// Runs on the Vercel cron (hourly). Safe to fire concurrently or more often:
+// each campaign is claimed atomically (scheduled → sending) before sending,
+// so a second invocation simply skips campaigns already taken.
 export async function loader({ request }: LoaderFunctionArgs) {
   // Verify the request comes from Vercel Cron
   const authHeader = request.headers.get("Authorization");
@@ -36,7 +24,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Find campaigns that are scheduled and due to send
+  // Recover campaigns stuck in "sending" (crashed run) before processing.
+  const recovered = await recoverStuckCampaigns();
+
+  // Find campaigns that are scheduled and due to send. Drafts are excluded by
+  // the status filter; rows without a scheduled_at never match the lte filter.
   const now = new Date().toISOString();
   const { data: dueCampaigns, error: queryError } = await supabase
     .from("email_campaigns")
@@ -49,139 +41,39 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return json({ error: "Failed to query campaigns" }, { status: 500 });
   }
 
-  if (!dueCampaigns || dueCampaigns.length === 0) {
-    return json({ success: true, processed: 0, message: "No campaigns due" });
+  const results: SendCampaignResult[] = [];
+  for (const { id: campaignId } of dueCampaigns ?? []) {
+    const result = await sendCampaign(campaignId, { claimFrom: ["scheduled"] });
+    if (!result.claimed) {
+      // Another invocation claimed it between the query and the claim — skip.
+      console.log(`[cron] Skipping campaign ${campaignId}: ${result.error}`);
+    }
+    results.push(result);
   }
 
-  const results: Array<{
-    campaignId: string;
-    status: "sent" | "failed";
-    totalSent?: number;
-    totalFailed?: number;
-    error?: string;
-  }> = [];
+  // Abandoned-cart reminders piggyback on the same hourly cron (no extra
+  // infra). Runs after campaign processing; fails soft internally, so a
+  // broken reminders pass can never fail the campaign run. Each cart is
+  // claimed with a compare-and-set before sending, so overlapping cron
+  // invocations can't double-send.
+  const abandonedCarts = await sendAbandonedCartReminders();
 
-  for (const { id: campaignId } of dueCampaigns) {
-    const startedAt = new Date().toISOString();
-
-    try {
-      // Load the full campaign with template info
-      const campaign = await getCampaign(campaignId);
-      if (!campaign) {
-        results.push({ campaignId, status: "failed", error: "Campaign not found" });
-        continue;
-      }
-
-      // Update status to sending to prevent double-send
-      await updateCampaign(campaignId, { status: "sending" });
-
-      // Load campaign content (saved template variables)
-      const content = await getCampaignContent(campaignId);
-      if (!content?.variables) {
-        await updateCampaign(campaignId, { status: "failed" });
-        results.push({ campaignId, status: "failed", error: "No campaign content" });
-        continue;
-      }
-
-      // Resolve the template component
-      const componentName = campaign.email_templates?.component_name;
-      if (!componentName || !templateMap[componentName]) {
-        await updateCampaign(campaignId, { status: "failed" });
-        results.push({
-          campaignId,
-          status: "failed",
-          error: `Unknown template: ${componentName}`,
-        });
-        continue;
-      }
-
-      // Get subscribers (filtered by tags if applicable)
-      const targetTags: string[] = campaign.target_tags || [];
-      const subscribers =
-        targetTags.length > 0
-          ? await getSubscribersByTags(targetTags)
-          : await getActiveSubscribers();
-
-      if (subscribers.length === 0) {
-        await updateCampaign(campaignId, { status: "failed" });
-        results.push({ campaignId, status: "failed", error: "No matching subscribers" });
-        continue;
-      }
-
-      // Render the email template
-      const Component = templateMap[componentName];
-      const renderedHtml = await render(Component(content.variables));
-
-      // Send in batches via Resend
-      const resend = getResend();
-      let totalSent = 0;
-      let totalFailed = 0;
-
-      for (let i = 0; i < subscribers.length; i += BATCH_SIZE) {
-        const batch = subscribers.slice(i, i + BATCH_SIZE).map((sub) => ({
-          from: process.env.RESEND_FROM_EMAIL || "Flow Urban Wear <contact@flowurbanwear.com>",
-          to: sub.email,
-          subject: campaign.subject,
-          html: renderedHtml,
-        }));
-
-        try {
-          await resend.batch.send(batch);
-          totalSent += batch.length;
-        } catch (batchError) {
-          console.error(`[cron] Batch error for campaign ${campaignId} at offset ${i}:`, batchError);
-          totalFailed += batch.length;
-        }
-      }
-
-      const finishedAt = new Date().toISOString();
-
-      // Create campaign log
-      await createCampaignLog({
-        campaignId,
-        totalSent,
-        totalFailed,
-        startedAt,
-        finishedAt,
-      });
-
-      // Update campaign status to sent
-      await updateCampaign(campaignId, {
-        status: "sent",
-        sentAt: finishedAt,
-      });
-
-      results.push({ campaignId, status: "sent", totalSent, totalFailed });
-    } catch (error) {
-      console.error(`[cron] Error processing campaign ${campaignId}:`, error);
-
-      const finishedAt = new Date().toISOString();
-
-      try {
-        await updateCampaign(campaignId, { status: "failed" });
-        await createCampaignLog({
-          campaignId,
-          totalSent: 0,
-          totalFailed: 0,
-          startedAt,
-          finishedAt,
-          errorDetails: error instanceof Error ? error.message : String(error),
-        });
-      } catch (logError) {
-        console.error(`[cron] Failed to log error for campaign ${campaignId}:`, logError);
-      }
-
-      results.push({
-        campaignId,
-        status: "failed",
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
+  if ((!dueCampaigns || dueCampaigns.length === 0) && recovered.length === 0) {
+    return json({
+      success: true,
+      processed: 0,
+      recovered: 0,
+      abandonedCarts,
+      message: "No campaigns due",
+    });
   }
 
   return json({
     success: true,
-    processed: dueCampaigns.length,
+    processed: results.length,
+    recovered: recovered.length,
+    recoveredIds: recovered,
     results,
+    abandonedCarts,
   });
 }

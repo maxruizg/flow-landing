@@ -9,13 +9,19 @@ export function slugify(name: string, color: string, gender: string): string {
   return `${name}-${color}-${gender}`.toLowerCase().replace(/\s+/g, "-");
 }
 
-export function formatPrice(amount: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
+export function formatPrice(amount: number, currency: string = "USD"): string {
+  const code = (currency || "USD").toUpperCase();
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: code,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  } catch {
+    // Unknown/garbage currency code — never crash a render over formatting.
+    return `${code} ${Math.round(amount).toLocaleString("en-US")}`;
+  }
 }
 
 export function formatShippingAddress(raw: string): string[] {

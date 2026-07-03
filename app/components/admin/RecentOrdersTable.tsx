@@ -5,7 +5,8 @@ import { AdminStatusBadge } from "./AdminStatusBadge";
 import { formatPrice } from "~/lib/utils";
 
 interface RecentOrdersTableProps {
-  orders: AdminOrder[];
+  /** `currency` is what the order was actually charged in (mxn/usd). */
+  orders: (AdminOrder & { currency?: string })[];
 }
 
 export function RecentOrdersTable({ orders }: RecentOrdersTableProps) {
@@ -46,7 +47,7 @@ export function RecentOrdersTable({ orders }: RecentOrdersTableProps) {
                 <td className="px-5 py-3 text-sm text-white font-medium">{order.id}</td>
                 <td className="px-5 py-3 text-sm text-flow-300">{order.customerName}</td>
                 <td className="px-5 py-3 text-sm text-flow-400">{order.date}</td>
-                <td className="px-5 py-3 text-sm text-white">{formatPrice(order.total)}</td>
+                <td className="px-5 py-3 text-sm text-white">{formatPrice(order.total, order.currency ?? "usd")}</td>
                 <td className="px-5 py-3"><AdminStatusBadge status={order.status} /></td>
               </tr>
             ))}
@@ -64,7 +65,7 @@ export function RecentOrdersTable({ orders }: RecentOrdersTableProps) {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-flow-400">{order.customerName}</span>
-              <span className="text-sm text-white">{formatPrice(order.total)}</span>
+              <span className="text-sm text-white">{formatPrice(order.total, order.currency ?? "usd")}</span>
             </div>
             <p className="text-xs text-flow-500">{order.date}</p>
           </div>

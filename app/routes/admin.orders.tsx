@@ -1,15 +1,21 @@
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
-import type { MetaFunction, LoaderFunctionArgs } from "@remix-run/node";
+import type {
+  MetaFunction,
+  LoaderFunctionArgs,
+  ActionFunctionArgs,
+} from "@remix-run/node";
 import { requireAdmin } from "~/lib/session.server";
+import { jsonWithToast } from "~/lib/toast.server";
 import { motion } from "framer-motion";
 import { useState, useMemo } from "react";
 import { cn, formatPrice } from "~/lib/utils";
 import { getAdminOrders } from "~/data/queries.server";
+import { updateOrderStatus } from "~/lib/orders-admin.server";
+import { isOrderStatus } from "~/lib/order-status";
 import { AdminStatusBadge } from "~/components/admin/AdminStatusBadge";
 import { OrderDetailPanel } from "~/components/admin/OrderDetailPanel";
 import { AdminEmptyState } from "~/components/admin/AdminEmptyState";
-import type { AdminOrder } from "~/lib/types";
 
 export const meta: MetaFunction = () => [{ title: "FLOW Admin — Orders" }];
 
@@ -21,11 +27,65 @@ export async function loader({ request }: LoaderFunctionArgs) {
   return json({ adminOrders });
 }
 
+export async function action({ request }: ActionFunctionArgs) {
+  await requireAdmin(request);
+  const form = await request.formData();
+  const intent = form.get("intent") as string;
+
+  if (intent === "update-status") {
+    const id = form.get("id") as string;
+    const status = form.get("status");
+    const trackingNumberRaw = form.get("trackingNumber");
+    const trackingNumber =
+      typeof trackingNumberRaw === "string" ? trackingNumberRaw.trim() : "";
+
+    if (!id || !isOrderStatus(status)) {
+      return jsonWithToast(
+        { error: "Invalid status update request" },
+        { type: "error", message: "Invalid status update request." },
+        { status: 400 },
+      );
+    }
+
+    const result = await updateOrderStatus(id, status, {
+      trackingNumber: trackingNumber || null,
+    });
+    if (!result.ok) {
+      return jsonWithToast(
+        { error: result.error },
+        { type: "error", message: result.error },
+        { status: 400 },
+      );
+    }
+
+    // Email problems are non-blocking: the status change already succeeded.
+    if (result.warning) {
+      return jsonWithToast(
+        { ok: true, warning: result.warning },
+        { type: "info", message: result.warning },
+      );
+    }
+
+    return jsonWithToast(
+      { ok: true },
+      { type: "success", message: `Order ${id} marked as ${status}.` },
+    );
+  }
+
+  return json({ error: "Unknown intent" }, { status: 400 });
+}
+
 export default function AdminOrders() {
   const { adminOrders } = useLoaderData<typeof loader>();
   const [activeTab, setActiveTab] = useState<string>("all");
   const [search, setSearch] = useState("");
-  const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+
+  // Derive from loader data so the panel reflects status updates after revalidation.
+  const selectedOrder = useMemo(
+    () => adminOrders.find((o) => o.id === selectedOrderId) ?? null,
+    [adminOrders, selectedOrderId],
+  );
 
   const filtered = useMemo(() => {
     return adminOrders.filter((o) => {
@@ -100,7 +160,7 @@ export default function AdminOrders() {
                 {filtered.map((order) => (
                   <tr
                     key={order.id}
-                    onClick={() => setSelectedOrder(order)}
+                    onClick={() => setSelectedOrderId(order.id)}
                     className="border-b border-flow-800/30 last:border-0 hover:bg-flow-800/50 transition-colors cursor-pointer"
                   >
                     <td className="px-5 py-3 text-sm text-white font-medium">{order.id}</td>
@@ -120,7 +180,7 @@ export default function AdminOrders() {
             {filtered.map((order) => (
               <div
                 key={order.id}
-                onClick={() => setSelectedOrder(order)}
+                onClick={() => setSelectedOrderId(order.id)}
                 className="p-4 space-y-2 cursor-pointer hover:bg-flow-800/50 transition-colors"
               >
                 <div className="flex items-center justify-between">
@@ -143,7 +203,7 @@ export default function AdminOrders() {
 
       <OrderDetailPanel
         isOpen={!!selectedOrder}
-        onClose={() => setSelectedOrder(null)}
+        onClose={() => setSelectedOrderId(null)}
         order={selectedOrder}
       />
     </motion.div>

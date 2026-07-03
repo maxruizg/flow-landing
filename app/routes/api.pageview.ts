@@ -2,10 +2,16 @@ import type { ActionFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { getOrCreateVisitorId } from "~/lib/cookies.server";
 import { recordPageView } from "~/data/queries.server";
+import { checkRateLimit, getClientIp } from "~/lib/rate-limit.server";
 
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== "POST") {
     return json({ ok: false }, { status: 405 });
+  }
+
+  const rl = await checkRateLimit(`pageview:${getClientIp(request)}`, 60, 60);
+  if (!rl.allowed) {
+    return json({ ok: false, error: "Too many requests" }, { status: 429 });
   }
 
   const url = new URL(request.url);

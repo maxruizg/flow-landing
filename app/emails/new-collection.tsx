@@ -145,17 +145,11 @@ export function NewCollectionEmail({
           {/* Footer */}
           <Section style={footerSection}>
             <Text style={socialLinks}>
-              <Link
-                href="https://instagram.com/flowurbanwear"
-                style={socialLink}
-              >
+              <Link href={t.brand.instagram} style={socialLink}>
                 Instagram
               </Link>
               {"  ·  "}
-              <Link
-                href="https://tiktok.com/@flowurbanwear"
-                style={socialLink}
-              >
+              <Link href={t.brand.tiktok} style={socialLink}>
                 TikTok
               </Link>
             </Text>
@@ -164,7 +158,7 @@ export function NewCollectionEmail({
             </Text>
             <Text style={unsubscribeText}>
               You received this because you subscribed to Flow updates.{" "}
-              <Link href="https://flowurbanwear.com/unsubscribe" style={unsubscribeLink}>
+              <Link href={`${t.brand.site}/unsubscribe`} style={unsubscribeLink}>
                 Unsubscribe
               </Link>
             </Text>
@@ -209,7 +203,7 @@ export function getDefaultVariables(): NewCollectionEmailProps {
       },
     ],
     cta_text: "Shop the Collection",
-    cta_url: "https://flowurbanwear.com/collections/nocturna",
+    cta_url: `${t.brand.site}/collections/nocturna`,
     preview: "The NOCTURNA collection just dropped. Dark silhouettes, limited stock.",
   };
 }

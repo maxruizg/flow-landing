@@ -40,7 +40,7 @@ export function ProductLaunchEmail({
   brand_story,
   preview,
   cta_text = "Buy Now",
-  cta_url = "https://flowurbanwear.com/shop",
+  cta_url = `${t.brand.site}/shop`,
 }: ProductLaunchEmailProps) {
   return (
     <Html>
@@ -153,17 +153,11 @@ export function ProductLaunchEmail({
           {/* Footer */}
           <Section style={footerSection}>
             <Text style={socialLinks}>
-              <Link
-                href="https://instagram.com/flowurbanwear"
-                style={socialLink}
-              >
+              <Link href={t.brand.instagram} style={socialLink}>
                 Instagram
               </Link>
               {"  ·  "}
-              <Link
-                href="https://tiktok.com/@flowurbanwear"
-                style={socialLink}
-              >
+              <Link href={t.brand.tiktok} style={socialLink}>
                 TikTok
               </Link>
             </Text>
@@ -173,7 +167,7 @@ export function ProductLaunchEmail({
             <Text style={unsubscribeText}>
               You received this because you subscribed to Flow updates.{" "}
               <Link
-                href="https://flowurbanwear.com/unsubscribe"
+                href={`${t.brand.site}/unsubscribe`}
                 style={unsubscribeLink}
               >
                 Unsubscribe
@@ -206,7 +200,7 @@ export function getDefaultVariables(): ProductLaunchEmailProps {
     preview:
       "The Shadow Bomber Jacket is here. Limited run. Once it's gone, it's gone.",
     cta_text: "Reserve Yours",
-    cta_url: "https://flowurbanwear.com/products/shadow-bomber",
+    cta_url: `${t.brand.site}/products/shadow-bomber`,
   };
 }
 

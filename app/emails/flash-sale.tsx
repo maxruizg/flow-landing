@@ -42,7 +42,7 @@ export function FlashSaleEmail({
   coupon_code,
   preview,
   cta_text = "Shop the Sale",
-  cta_url = "https://flowurbanwear.com/sale",
+  cta_url = `${t.brand.site}/sale`,
 }: FlashSaleEmailProps) {
   return (
     <Html>
@@ -155,7 +155,7 @@ export function FlashSaleEmail({
             <Text style={unsubscribeText}>
               You received this because you subscribed to Flow updates.{" "}
               <Link
-                href="https://flowurbanwear.com/unsubscribe"
+                href={`${t.brand.site}/unsubscribe`}
                 style={unsubscribeLink}
               >
                 Unsubscribe
@@ -195,7 +195,7 @@ export function getDefaultVariables(): FlashSaleEmailProps {
     coupon_code: "FLASH50",
     preview: "50% OFF everything. This weekend only. Don't sleep on it.",
     cta_text: "Shop the Sale",
-    cta_url: "https://flowurbanwear.com/sale",
+    cta_url: `${t.brand.site}/sale`,
   };
 }
 

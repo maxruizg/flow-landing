@@ -4,11 +4,13 @@ interface StatCardProps {
   icon: React.ReactNode;
   label: string;
   value: string;
+  /** Optional secondary line under the value (e.g. revenue in another currency). */
+  subValue?: string;
   change: number;
   index: number;
 }
 
-export function StatCard({ icon, label, value, change, index }: StatCardProps) {
+export function StatCard({ icon, label, value, subValue, change, index }: StatCardProps) {
   const isPositive = change >= 0;
 
   return (
@@ -30,6 +32,7 @@ export function StatCard({ icon, label, value, change, index }: StatCardProps) {
         </span>
       </div>
       <p className="text-2xl font-display font-bold text-white">{value}</p>
+      {subValue && <p className="text-xs text-flow-400 mt-0.5">{subValue}</p>}
       <p className="text-xs text-flow-500 mt-1">{label}</p>
     </motion.div>
   );

@@ -29,8 +29,14 @@ export default function AdminDashboard() {
 
   const stats = [
     {
-      label: "Total Revenue",
-      value: formatPrice(dashboardStats.totalRevenue),
+      // Revenue is aggregated per currency — MXN is the store's primary
+      // currency; USD revenue (if any) is shown as a secondary line.
+      label: "Total Revenue (MXN)",
+      value: formatPrice(dashboardStats.totalRevenueMxn, "MXN"),
+      subValue:
+        dashboardStats.totalRevenueUsd > 0
+          ? `+ ${formatPrice(dashboardStats.totalRevenueUsd, "USD")} USD`
+          : undefined,
       change: dashboardStats.revenueChange,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

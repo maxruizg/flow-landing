@@ -1,9 +1,80 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "pnpm install",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "flowurbanwear.com"
+        }
+      ],
+      "destination": "https://www.flowurbanwear.com/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "flow-landing-theta.vercel.app"
+        }
+      ],
+      "destination": "https://www.flowurbanwear.com/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/collections/:path*",
+      "destination": "/showroom",
+      "permanent": true
+    },
+    {
+      "source": "/products/:path*",
+      "destination": "/showroom",
+      "permanent": true
+    },
+    {
+      "source": "/pages/about-us",
+      "destination": "/nosotros",
+      "permanent": true
+    },
+    {
+      "source": "/pages/:path*",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/policies/refund-policy",
+      "destination": "/devoluciones",
+      "permanent": true
+    },
+    {
+      "source": "/policies/shipping-policy",
+      "destination": "/envios",
+      "permanent": true
+    },
+    {
+      "source": "/policies/privacy-policy",
+      "destination": "/privacidad",
+      "permanent": true
+    },
+    {
+      "source": "/policies/:path*",
+      "destination": "/privacidad",
+      "permanent": true
+    }
+  ],
   "crons": [
     {
       "path": "/api/run-scheduled-campaigns",
       "schedule": "0 9 * * *"
     }
-  ]
+  ],
+  "images": {
+    "sizes": [160, 320, 480, 640, 828, 960, 1080, 1280, 1600, 1920],
+    "domains": [],
+    "formats": ["image/avif", "image/webp"],
+    "minimumCacheTTL": 2678400
+  }
 }

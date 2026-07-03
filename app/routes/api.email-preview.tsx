@@ -1,6 +1,7 @@
 import { json } from "@remix-run/node";
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { render } from "@react-email/render";
+import { requireAdmin } from "~/lib/session.server";
 import { NewCollectionEmail } from "~/emails/new-collection";
 import { FlashSaleEmail } from "~/emails/flash-sale";
 import { ProductLaunchEmail } from "~/emails/product-launch";
@@ -12,6 +13,8 @@ const templateMap: Record<string, React.FC<any>> = {
 };
 
 export async function action({ request }: ActionFunctionArgs) {
+  await requireAdmin(request);
+
   if (request.method !== "POST") {
     return json({ error: "Method not allowed" }, { status: 405 });
   }

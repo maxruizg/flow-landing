@@ -2,7 +2,7 @@ import { Link } from "@remix-run/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { SlidePanel } from "./SlidePanel";
 import { Button } from "~/components/ui/Button";
-import { useCart } from "~/context/CartContext";
+import { useCart, MAX_ITEM_QUANTITY } from "~/context/CartContext";
 import { useLocale } from "~/context/LocaleContext";
 
 interface CartPanelProps {
@@ -46,7 +46,7 @@ export function CartPanel({ isOpen, onClose }: CartPanelProps) {
             <AnimatePresence initial={false}>
               {items.map((item) => (
                 <motion.div
-                  key={`${item.productId}-${item.size}`}
+                  key={`${item.variantId ?? item.productId}-${item.size}`}
                   layout
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
@@ -118,14 +118,16 @@ export function CartPanel({ isOpen, onClose }: CartPanelProps) {
                                 item.quantity + 1
                               )
                             }
-                            className="w-6 h-6 rounded-full border border-flow-700 flex items-center justify-center text-flow-300 hover:border-white hover:text-white transition-colors text-xs"
+                            disabled={item.quantity >= MAX_ITEM_QUANTITY}
+                            className="w-6 h-6 rounded-full border border-flow-700 flex items-center justify-center text-flow-300 hover:border-white hover:text-white transition-colors text-xs disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-flow-700 disabled:hover:text-flow-300"
                             aria-label="Increase quantity"
                           >
                             +
                           </button>
                         </div>
                         <p className="text-sm text-flow-200 font-medium">
-                          {formatLocalPrice(item.price * item.quantity, item.priceMxn * item.quantity)}
+                          {formatLocalPrice(item.price * item.quantity, item.priceMxn * item.quantity) ??
+                            "Precio no disponible"}
                         </p>
                       </div>
                     </div>
@@ -142,7 +144,7 @@ export function CartPanel({ isOpen, onClose }: CartPanelProps) {
                 Subtotal
               </span>
               <span className="text-xl font-display font-semibold text-white">
-                {formatLocalPrice(subtotal, subtotalMxn)}
+                {formatLocalPrice(subtotal, subtotalMxn) ?? "Precio no disponible"}
               </span>
             </div>
             <div className="flex flex-col gap-3">

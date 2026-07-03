@@ -1,4 +1,14 @@
 import { createCookieSessionStorage, redirect } from "@remix-run/node";
+import { supabase } from "~/lib/supabase.server";
+
+const sessionSecret = process.env.SESSION_SECRET;
+
+if (!sessionSecret && process.env.NODE_ENV === "production") {
+  // A predictable fallback secret would make admin session cookies forgeable.
+  throw new Error(
+    "SESSION_SECRET environment variable must be set in production.",
+  );
+}
 
 const sessionStorage = createCookieSessionStorage({
   cookie: {
@@ -7,7 +17,7 @@ const sessionStorage = createCookieSessionStorage({
     maxAge: 60 * 60 * 24 * 7, // 7 days
     path: "/",
     sameSite: "lax",
-    secrets: [process.env.SESSION_SECRET || "dev-secret-change-in-production"],
+    secrets: [sessionSecret || "dev-secret-change-in-production"],
     secure: process.env.NODE_ENV === "production",
   },
 });
@@ -34,6 +44,24 @@ export async function requireAdmin(request: Request) {
   if (!adminId) {
     throw redirect("/admin");
   }
+
+  // Verify the admin still exists — a signed cookie alone is not enough if
+  // the admin row has been removed (revoked access, deleted account).
+  const { data: admin, error } = await supabase
+    .from("admins")
+    .select("id")
+    .eq("id", adminId)
+    .maybeSingle();
+
+  if (error || !admin) {
+    const session = await sessionStorage.getSession(
+      request.headers.get("Cookie"),
+    );
+    throw redirect("/admin", {
+      headers: { "Set-Cookie": await sessionStorage.destroySession(session) },
+    });
+  }
+
   return { adminId, adminName: adminName || "Admin" };
 }
 

@@ -163,7 +163,17 @@ function mapDailyFlowImage(row: any): DailyFlowImage {
   };
 }
 
-function mapOrder(row: any): AdminOrder {
+/** AdminOrder plus the currency the order was actually charged in and the
+ *  shipping-tracking columns (null until the tracking migration is applied
+ *  and the order is marked as shipped). */
+export type AdminOrderWithCurrency = AdminOrder & {
+  currency: string;
+  trackingNumber: string | null;
+  carrier: string | null;
+  shippedAt: string | null;
+};
+
+function mapOrder(row: any): AdminOrderWithCurrency {
   return {
     id: row.id,
     customerName: row.customer_name,
@@ -173,6 +183,11 @@ function mapOrder(row: any): AdminOrder {
     total: row.total,
     status: row.status,
     shippingAddress: row.shipping_address,
+    currency: row.currency ?? "usd",
+    // Tolerate the pre-migration schema where these columns don't exist yet.
+    trackingNumber: row.tracking_number ?? null,
+    carrier: row.carrier ?? null,
+    shippedAt: row.shipped_at ?? null,
   };
 }
 
@@ -293,23 +308,44 @@ export async function getDailyFlowImages(): Promise<DailyFlowImage[]> {
 }
 
 /**
+ * In-memory TTL cache for data the root loader fetches on EVERY document
+ * request (trending strip, top banner). Per warm serverless instance only —
+ * admin edits may take up to the TTL to appear, which is acceptable for
+ * marketing content and saves 3 Supabase round-trips of TTFB per request.
+ */
+const ttlCache = new Map<string, { value: unknown; expires: number }>();
+async function withTtlCache<T>(
+  key: string,
+  ttlMs: number,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const hit = ttlCache.get(key);
+  if (hit && hit.expires > Date.now()) return hit.value as T;
+  const value = await fn();
+  ttlCache.set(key, { value, expires: Date.now() + ttlMs });
+  return value;
+}
+
+/**
  * Fetch the products that have at least one variant flagged "Best Seller",
  * limited to a small N. Avoids pulling the full catalog when only a couple
  * of cards are needed (root loader trending strip).
  */
 export async function getTrendingProducts(limit = 3): Promise<Product[]> {
-  const { data: bestSellerVariants, error: vErr } = await supabase
-    .from("product_variants")
-    .select("product_id")
-    .eq("badge", "Best Seller")
-    .eq("status", "active");
-  if (vErr) throw vErr;
-  const productIds = Array.from(
-    new Set((bestSellerVariants ?? []).map((v: any) => v.product_id)),
-  ).slice(0, limit);
-  if (productIds.length === 0) return [];
-  const products = await fetchProductsWithVariants(productIds);
-  return products.filter(visibleForShop).slice(0, limit);
+  return withTtlCache(`trending:${limit}`, 60_000, async () => {
+    const { data: bestSellerVariants, error: vErr } = await supabase
+      .from("product_variants")
+      .select("product_id")
+      .eq("badge", "Best Seller")
+      .eq("status", "active");
+    if (vErr) throw vErr;
+    const productIds = Array.from(
+      new Set((bestSellerVariants ?? []).map((v: any) => v.product_id)),
+    ).slice(0, limit);
+    if (productIds.length === 0) return [];
+    const products = await fetchProductsWithVariants(productIds);
+    return products.filter(visibleForShop).slice(0, limit);
+  });
 }
 
 /**
@@ -345,7 +381,7 @@ export async function getAdminProducts(): Promise<AdminProduct[]> {
   return products.map(toAdminProduct);
 }
 
-export async function getAdminOrders(): Promise<AdminOrder[]> {
+export async function getAdminOrders(): Promise<AdminOrderWithCurrency[]> {
   const { data, error } = await supabase
     .from("orders")
     .select("*")
@@ -434,13 +470,66 @@ export async function createOrUpdateCustomer(customer: {
   return { isNew: true };
 }
 
-export async function getOrderByStripeSession(sessionId: string): Promise<AdminOrder | null> {
+export async function getOrderByStripeSession(sessionId: string): Promise<AdminOrderWithCurrency | null> {
   const { data } = await supabase
     .from("orders")
     .select("*")
     .eq("stripe_session_id", sessionId)
     .maybeSingle();
   return data ? mapOrder(data) : null;
+}
+
+/** Update an order's status by its Stripe session / payment-intent id.
+ *  Returns true when a matching order existed and was updated. */
+export async function updateOrderStatusByStripeSession(
+  sessionId: string,
+  status: AdminOrder["status"],
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("orders")
+    .update({ status })
+    .eq("stripe_session_id", sessionId)
+    .select("id");
+  if (error) throw error;
+  return (data?.length ?? 0) > 0;
+}
+
+/** Minimal server-trusted view of a variant, used to price and stock-check
+ *  checkout carts. Prices here come from the DB — never from the client. */
+export interface CheckoutVariant {
+  id: string;
+  productId: string;
+  colorName: string;
+  price: number;
+  priceMxn: number;
+  sizeStock: Record<string, number>;
+  status: VariantStatusRow;
+}
+type VariantStatusRow = "active" | "draft" | "archived";
+
+export async function getVariantsByIds(ids: string[]): Promise<Map<string, CheckoutVariant>> {
+  const map = new Map<string, CheckoutVariant>();
+  if (ids.length === 0) return map;
+  const { data, error } = await supabase
+    .from("product_variants")
+    .select("id, product_id, color_name, price, price_mxn, size_stock, status")
+    .in("id", ids);
+  if (error) throw error;
+  for (const row of data ?? []) {
+    map.set(row.id, {
+      id: row.id,
+      productId: row.product_id,
+      colorName: row.color_name,
+      price: Number(row.price),
+      priceMxn: Number(row.price_mxn ?? 0),
+      sizeStock:
+        typeof row.size_stock === "string"
+          ? JSON.parse(row.size_stock || "{}")
+          : (row.size_stock ?? {}),
+      status: row.status,
+    });
+  }
+  return map;
 }
 
 export async function getAdminNotifications(): Promise<AdminNotification[]> {
@@ -484,7 +573,20 @@ export async function createNotification(n: {
   if (error) console.error("[notifications] createNotification failed:", error);
 }
 
-export async function getDashboardStats(): Promise<DashboardStats> {
+/** DashboardStats, with revenue split by real order currency instead of the
+ *  old behavior of summing MXN pesos and USD dollars into one number.
+ *  `totalRevenue` / `revenueChange` now refer to MXN (the store's primary
+ *  currency); USD is reported separately. */
+export interface DashboardStatsByCurrency extends DashboardStats {
+  totalRevenueMxn: number;
+  totalRevenueUsd: number;
+}
+
+function isMxn(currency: unknown): boolean {
+  return String(currency ?? "usd").toLowerCase() === "mxn";
+}
+
+export async function getDashboardStats(): Promise<DashboardStatsByCurrency> {
   const [
     { count: totalProducts },
     { count: totalCustomers },
@@ -492,17 +594,23 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   ] = await Promise.all([
     supabase.from("products").select("*", { count: "exact", head: true }),
     supabase.from("customers").select("*", { count: "exact", head: true }),
-    supabase.from("orders").select("total, date, status"),
+    supabase.from("orders").select("total, date, status, currency"),
   ]);
 
   const allOrders = orders || [];
   const validOrders = allOrders.filter((o: any) => o.status !== "cancelled");
-  const totalRevenue = validOrders.reduce((sum: number, o: any) => sum + o.total, 0);
+  let totalRevenueMxn = 0;
+  let totalRevenueUsd = 0;
+  for (const o of validOrders) {
+    if (isMxn(o.currency)) totalRevenueMxn += o.total;
+    else totalRevenueUsd += o.total;
+  }
 
   const today = new Date().toISOString().slice(0, 10);
   const ordersToday = allOrders.filter((o: any) => o.date === today).length;
 
-  // Calculate month-over-month changes from real data
+  // Month-over-month changes. Revenue change tracks the primary currency
+  // (MXN) only — mixing currencies in one delta is meaningless.
   const now = new Date();
   const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -516,10 +624,10 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   for (const o of validOrders) {
     const orderMonth = (o.date as string).slice(0, 7);
     if (orderMonth === thisMonth) {
-      thisMonthRevenue += o.total;
+      if (isMxn(o.currency)) thisMonthRevenue += o.total;
       thisMonthOrders++;
     } else if (orderMonth === prevMonth) {
-      prevMonthRevenue += o.total;
+      if (isMxn(o.currency)) prevMonthRevenue += o.total;
       prevMonthOrders++;
     }
   }
@@ -532,7 +640,9 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     : 0;
 
   return {
-    totalRevenue,
+    totalRevenue: totalRevenueMxn,
+    totalRevenueMxn,
+    totalRevenueUsd,
     ordersToday,
     totalProducts: totalProducts || 0,
     totalCustomers: totalCustomers || 0,
@@ -541,24 +651,32 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   };
 }
 
-export async function getRevenueData(): Promise<RevenueDataPoint[]> {
+/** RevenueDataPoint with the two currencies kept separate: `revenue` stays
+ *  the primary MXN series (backward compatible), USD is carried alongside. */
+export type RevenueDataPointByCurrency = RevenueDataPoint & { revenueUsd: number };
+
+export async function getRevenueData(): Promise<RevenueDataPointByCurrency[]> {
   const { data: orders, error } = await supabase
     .from("orders")
-    .select("total, date, status")
+    .select("total, date, status, currency")
     .neq("status", "cancelled")
     .order("date");
   if (error) throw error;
 
-  const monthMap = new Map<string, number>();
+  const monthMap = new Map<string, { revenue: number; revenueUsd: number }>();
   for (const o of orders) {
     const d = new Date(o.date);
     const key = d.toLocaleString("en-US", { month: "short" });
-    monthMap.set(key, (monthMap.get(key) || 0) + o.total);
+    const bucket = monthMap.get(key) ?? { revenue: 0, revenueUsd: 0 };
+    if (isMxn(o.currency)) bucket.revenue += o.total;
+    else bucket.revenueUsd += o.total;
+    monthMap.set(key, bucket);
   }
 
-  return Array.from(monthMap.entries()).map(([month, revenue]) => ({
+  return Array.from(monthMap.entries()).map(([month, v]) => ({
     month,
-    revenue,
+    revenue: v.revenue,
+    revenueUsd: v.revenueUsd,
   }));
 }
 
@@ -711,14 +829,41 @@ export async function decrementVariantStock(
   size: string,
   qty: number,
 ): Promise<{ nextStock: number } | null> {
-  const { data, error } = await supabase
+  // Atomic path: a single UPDATE inside Postgres (see
+  // supabase/migrations/2026-07-02-atomic-stock-decrement.sql), so two
+  // concurrent orders can't lose a decrement the way the old
+  // read-modify-write did.
+  const { data, error } = await supabase.rpc("decrement_size_stock", {
+    p_variant_id: variantId,
+    p_size_key: size,
+    p_qty: qty,
+  });
+  if (!error) {
+    // A scalar-returning SQL function yields NULL when the variant row
+    // doesn't exist (UPDATE matched nothing).
+    if (data === null || data === undefined) return null;
+    return { nextStock: Number(data) };
+  }
+
+  // 42883 = undefined function, PGRST202 = PostgREST can't find the RPC —
+  // the migration hasn't been applied yet. Fall back to the legacy
+  // read-modify-write so orders keep fulfilling, but warn loudly.
+  const code = (error as { code?: string }).code;
+  if (code !== "42883" && code !== "PGRST202") throw error;
+  console.warn(
+    "[decrementVariantStock] decrement_size_stock RPC missing — falling back to " +
+      "NON-ATOMIC read-modify-write (concurrent orders may lose a decrement). " +
+      "Apply supabase/migrations/2026-07-02-atomic-stock-decrement.sql.",
+  );
+
+  const { data: row, error: sErr } = await supabase
     .from("product_variants")
     .select("size_stock")
     .eq("id", variantId)
     .maybeSingle();
-  if (error) throw error;
-  if (!data) return null;
-  const current = (data.size_stock ?? {}) as Record<string, number>;
+  if (sErr) throw sErr;
+  if (!row) return null;
+  const current = (row.size_stock ?? {}) as Record<string, number>;
   const nextStock = Math.max(0, (current[size] ?? 0) - qty);
   const next = { ...current, [size]: nextStock };
   const { error: uErr } = await supabase
@@ -881,16 +1026,21 @@ function mapBanner(row: any): Banner {
 
 export async function getActiveBanner(): Promise<Banner | null> {
   // Fetch all active banners and filter schedule in JS — avoids fragile
-  // Supabase .or() chaining and handles null dates cleanly.
-  const { data, error } = await supabase
-    .from("banners")
-    .select("*")
-    .eq("active", true)
-    .order("created_at", { ascending: false });
-  if (error || !data || data.length === 0) return null;
+  // Supabase .or() chaining and handles null dates cleanly. Schedule is
+  // evaluated AFTER the cache so start/end dates stay accurate within the TTL.
+  const rows = await withTtlCache("banners:active", 60_000, async () => {
+    const { data, error } = await supabase
+      .from("banners")
+      .select("*")
+      .eq("active", true)
+      .order("created_at", { ascending: false });
+    if (error || !data) return [] as any[];
+    return data;
+  });
+  if (rows.length === 0) return null;
 
   const now = Date.now();
-  const valid = data.find((row: any) => {
+  const valid = rows.find((row: any) => {
     if (row.start_date && new Date(row.start_date).getTime() > now) return false;
     if (row.end_date && new Date(row.end_date).getTime() < now) return false;
     return true;

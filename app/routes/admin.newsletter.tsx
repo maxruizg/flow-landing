@@ -273,7 +273,7 @@ export default function AdminNewsletter() {
                     name="ctaUrl"
                     value={ctaUrl}
                     onChange={(e) => setCtaUrl(e.target.value)}
-                    placeholder="https://flowurbanwear.com/showroom"
+                    placeholder="https://www.flowurbanwear.com/showroom"
                     type="url"
                   />
                 </div>

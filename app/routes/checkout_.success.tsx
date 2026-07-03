@@ -15,7 +15,8 @@ import { useLocale } from "~/context/LocaleContext";
 import { trackPurchase } from "~/lib/analytics";
 
 export const meta: MetaFunction = () => [
-  { title: "Order Confirmed — FLOW URBAN WEAR" },
+  { title: "Order Confirmed — FLOW Urban Wear" },
+  { name: "robots", content: "noindex" },
 ];
 
 interface OrderSummaryItem {
@@ -43,9 +44,36 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return redirect(`/checkout/failed?payment_intent=${paymentIntentId ?? ""}`);
   }
   if (redirectStatus === "processing" || redirectStatus === "requires_action") {
+    // Retrieve the PI to distinguish OXXO (cash voucher, pending until the
+    // customer pays in store) from a card payment still being verified. The
+    // detection is server-side against Stripe — never trust the query string.
+    let paymentMethod: "oxxo" | null = null;
+    let voucherUrl: string | null = null;
+    let email: string | null = null;
+    if (paymentIntentId) {
+      try {
+        const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+        // If Stripe already reports success (the redirect param was just
+        // stale), run the normal verified-success path instead.
+        if (pi.status === "succeeded") {
+          return redirect(
+            `/checkout/success?payment_intent=${pi.id}&redirect_status=succeeded`,
+          );
+        }
+        if (pi.next_action?.type === "oxxo_display_details") {
+          paymentMethod = "oxxo";
+          voucherUrl = pi.next_action.oxxo_display_details?.hosted_voucher_url ?? null;
+        }
+        email = pi.receipt_email || null;
+      } catch (err) {
+        console.error("[checkout.success] PI lookup for pending state failed:", err);
+      }
+    }
     return json({
       status: "processing" as const,
-      email: null,
+      paymentMethod,
+      voucherUrl,
+      email,
       orderId: null,
       items: null as OrderSummaryItem[] | null,
       total: 0,
@@ -53,12 +81,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
     });
   }
 
-  const trustedSuccess = redirectStatus === "succeeded";
-
   let email: string | null = null;
   let paymentStatus: string | null = null;
   let total = 0;
   let currency = "usd";
+  let pendingPaymentMethod: "oxxo" | null = null;
+  let pendingVoucherUrl: string | null = null;
 
   try {
     if (paymentIntentId) {
@@ -67,6 +95,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
       email = pi.receipt_email || null;
       total = pi.amount / 100;
       currency = pi.currency;
+      if (pi.next_action?.type === "oxxo_display_details") {
+        pendingPaymentMethod = "oxxo";
+        pendingVoucherUrl =
+          pi.next_action.oxxo_display_details?.hosted_voucher_url ?? null;
+      }
 
       // Fallback path: if the webhook hasn't run yet (or isn't configured),
       // create the order + decrement stock synchronously here.
@@ -86,12 +119,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
   } catch (err) {
     console.error("[checkout.success] Stripe/order sync failed:", err);
-    // If the URL already says the payment succeeded, still show the success
-    // page — don't strand the user on an error screen when their card was
-    // just charged. The webhook will reconcile the order row eventually.
-    if (!trustedSuccess) {
+    // We could NOT verify the payment with Stripe. The redirect_status query
+    // param is client-controlled, so it must never unlock the confirmed
+    // success screen (which also clears the cart). If the URL claims success,
+    // show the neutral "processing / confirming" state instead — the webhook
+    // will reconcile the order, and the cart stays intact.
+    if (redirectStatus === "succeeded") {
       return json({
-        status: "error" as const,
+        status: "processing" as const,
+        paymentMethod: null as "oxxo" | null,
+        voucherUrl: null as string | null,
         email: null,
         orderId: null,
         items: null as OrderSummaryItem[] | null,
@@ -99,11 +136,21 @@ export async function loader({ request }: LoaderFunctionArgs) {
         currency: "usd",
       });
     }
+    return json({
+      status: "error" as const,
+      email: null,
+      orderId: null,
+      items: null as OrderSummaryItem[] | null,
+      total: 0,
+      currency: "usd",
+    });
   }
 
   if (paymentStatus === "processing" || paymentStatus === "requires_action") {
     return json({
       status: "processing" as const,
+      paymentMethod: pendingPaymentMethod,
+      voucherUrl: pendingVoucherUrl,
       email,
       orderId: null,
       items: null as OrderSummaryItem[] | null,
@@ -112,7 +159,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
     });
   }
 
-  if (!trustedSuccess && paymentStatus !== "succeeded" && paymentStatus !== "paid") {
+  // Only a Stripe-verified status can unlock the confirmed-success screen —
+  // never the client-controlled redirect_status param.
+  if (paymentStatus !== "succeeded" && paymentStatus !== "paid") {
     return redirect(`/checkout/failed?payment_intent=${paymentIntentId ?? ""}`);
   }
 
@@ -203,9 +252,83 @@ function AutoRedirect({ to, seconds }: { to: string; seconds: number }) {
 
 export default function CheckoutSuccess() {
   const data = useLoaderData<typeof loader>();
-  const { formatLocalPrice } = useLocale();
+  const { formatLocalPrice, language } = useLocale();
 
   if (data.status === "processing") {
+    const isOxxo = data.paymentMethod === "oxxo";
+
+    if (isOxxo) {
+      const es = language !== "en";
+      return (
+        <div id="main-content" className="min-h-screen bg-flow-black">
+          <Navbar />
+          {/* OXXO: the customer already holds a live payment voucher, so the
+              purchase intent is committed. OXXO payments can't be refunded —
+              keeping the cart would invite a second checkout and a double
+              charge. Clearing it here is safe because this branch only renders
+              after the loader verified the voucher against Stripe server-side
+              (never from the client-controlled redirect_status param). */}
+          <ClearCartOnMount />
+          <div className="min-h-[calc(100vh-80px)] flex items-center justify-center px-4 py-12">
+            <div className="max-w-md w-full text-center">
+              <div className="w-20 h-20 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto mb-8">
+                <svg className="w-10 h-10 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <h1 className="font-display text-2xl font-bold text-white mb-3">
+                {es ? "Tu voucher OXXO está listo" : "Your OXXO voucher is ready"}
+              </h1>
+              <p className="text-flow-400 text-sm mb-4">
+                {es ? (
+                  <>
+                    Paga en efectivo en cualquier tienda OXXO mostrando el
+                    voucher. Tu pedido se confirmará automáticamente cuando
+                    pagues — la confirmación puede tardar hasta 1 día hábil.
+                  </>
+                ) : (
+                  <>
+                    Pay in cash at any OXXO store using your voucher. Your
+                    order is confirmed automatically once you pay — it can take
+                    up to 1 business day to register.
+                  </>
+                )}
+              </p>
+              <p className="text-flow-500 text-xs mb-8">
+                {es
+                  ? "Te enviaremos un correo de confirmación en cuanto recibamos tu pago."
+                  : "We'll email your order confirmation as soon as we receive your payment."}
+                {data.email ? (
+                  <>
+                    {" "}
+                    <span className="text-flow-300">{data.email}</span>
+                  </>
+                ) : null}
+              </p>
+              <div className="space-y-3">
+                {data.voucherUrl && (
+                  <a
+                    href={data.voucherUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block w-full px-6 py-3 bg-white text-flow-black font-display font-semibold text-sm uppercase tracking-wide rounded-full hover:bg-flow-200 transition-colors"
+                  >
+                    {es ? "Ver mi voucher OXXO" : "View my OXXO voucher"}
+                  </a>
+                )}
+                <Link
+                  to="/showroom"
+                  className="inline-flex items-center px-6 py-3 border border-flow-700 text-flow-300 font-display font-medium text-sm uppercase tracking-wide rounded-full hover:border-flow-500 hover:text-white transition-colors"
+                >
+                  {es ? "Seguir comprando" : "Continue Shopping"}
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div id="main-content" className="min-h-screen bg-flow-black">
         <Navbar />

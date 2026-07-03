@@ -48,7 +48,7 @@ export function OrderConfirmationEmail({
   bodyText = "We're preparing your pieces and will send a tracking link the moment they ship.",
   heroImage,
   ctaText = "View Showroom",
-  ctaUrl = "https://flowurbanwear.com/showroom",
+  ctaUrl = `${t.brand.site}/showroom`,
 }: OrderConfirmationProps) {
   const currencySymbol = currency.toLowerCase() === "mxn" ? "MX$" : "$";
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
@@ -205,11 +205,11 @@ export function OrderConfirmationEmail({
           {/* Footer */}
           <Section style={footer}>
             <Text style={socialLinks}>
-              <Link href="https://instagram.com/flowurbanwear" style={socialLink}>
+              <Link href={t.brand.instagram} style={socialLink}>
                 Instagram
               </Link>
               {"   ·   "}
-              <Link href="https://tiktok.com/@flowurbanwear" style={socialLink}>
+              <Link href={t.brand.tiktok} style={socialLink}>
                 TikTok
               </Link>
             </Text>

@@ -16,6 +16,10 @@ interface CartContextValue {
 
 const STORAGE_KEY = "flow-cart";
 
+/** UX cap on per-item quantity. The server independently validates 1-50 plus
+ *  real stock at payment time; this just keeps the cart sane. */
+export const MAX_ITEM_QUANTITY = 10;
+
 const CartContext = createContext<CartContextValue | null>(null);
 
 /** Item identity. Prefer variantId (variants-era); fall back to productId for
@@ -35,11 +39,23 @@ function loadCart(): CartItem[] {
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>(loadCart);
+  // Start empty on BOTH server and client so the SSR HTML matches the first
+  // client render (reading localStorage in the initializer caused hydration
+  // mismatches). The persisted cart is loaded after mount.
+  const [items, setItems] = useState<CartItem[]>([]);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    setItems(loadCart());
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    // Don't persist until the stored cart has been loaded — otherwise the
+    // initial empty state would overwrite it before the load effect runs.
+    if (!hydrated) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-  }, [items]);
+  }, [items, hydrated]);
 
   const addItem = useCallback((item: Omit<CartItem, "quantity">) => {
     setItems((prev) => {
@@ -49,7 +65,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
       );
       if (idx !== -1) {
         const updated = [...prev];
-        updated[idx] = { ...updated[idx], quantity: updated[idx].quantity + 1 };
+        updated[idx] = {
+          ...updated[idx],
+          quantity: Math.min(updated[idx].quantity + 1, MAX_ITEM_QUANTITY),
+        };
         return updated;
       }
       return [...prev, { ...item, quantity: 1 }];
@@ -74,8 +93,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       setItems((prev) => prev.filter((i) => !(itemKey(i) === key && i.size === size)));
       return;
     }
+    const capped = Math.min(quantity, MAX_ITEM_QUANTITY);
     setItems((prev) =>
-      prev.map((i) => (itemKey(i) === key && i.size === size ? { ...i, quantity } : i)),
+      prev.map((i) => (itemKey(i) === key && i.size === size ? { ...i, quantity: capped } : i)),
     );
   }, []);
 

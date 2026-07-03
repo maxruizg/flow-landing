@@ -1,9 +1,8 @@
 import { json } from "@remix-run/node";
 import { useLoaderData, useSearchParams } from "@remix-run/react";
-import { useMemo, useCallback } from "react";
+import { lazy, Suspense, useMemo, useCallback } from "react";
 import { Navbar } from "~/components/layout/Navbar";
 import { Footer } from "~/components/layout/Footer";
-import { Newsletter } from "~/components/home/Newsletter";
 import { ShowroomHero } from "~/components/showroom/ShowroomHero";
 import { ShowroomFilters } from "~/components/showroom/ShowroomFilters";
 import { ShowroomGrid } from "~/components/showroom/ShowroomGrid";
@@ -13,12 +12,19 @@ import { optimizedImageUrl, buildSrcSet } from "~/lib/image";
 import { SITE_URL, DEFAULT_OG_IMAGE } from "~/lib/seo";
 import type { HeadersFunction, MetaFunction } from "@remix-run/node";
 
+// Below-the-fold — lazy-loaded with the same pattern as _index.tsx so the
+// framer-motion-heavy Newsletter chunk stays out of the initial bundle (a
+// static import here would also defeat _index's dynamic import of it).
+const Newsletter = lazy(() =>
+  import("~/components/home/Newsletter").then((m) => ({ default: m.Newsletter })),
+);
+
 const GRID_WIDTHS = [320, 480, 640];
 const PRELOAD_COUNT = 4;
 const SHOWROOM_URL = `${SITE_URL}/showroom`;
-const SHOWROOM_TITLE = "Showroom — FLOW URBAN WEAR";
+const SHOWROOM_TITLE = "Showroom — FLOW Urban Wear";
 const SHOWROOM_DESC =
-  "Explore the full FLOW Urban Wear collection. 36 pieces made in Mexico, curated for those who move with intention.";
+  "Explora la colección completa de FLOW Urban Wear: streetwear hecho en México, curado para quienes se mueven con intención.";
 
 // Tag identifiers we redefine for this route — filter them out of the parent
 // meta before re-adding so the head doesn't end up with duplicates.
@@ -228,7 +234,9 @@ export default function Showroom() {
           cards={filteredCards}
           onClearFilters={onClearAll}
         />
-        <Newsletter />
+        <Suspense fallback={<div className="h-96" aria-hidden />}>
+          <Newsletter />
+        </Suspense>
         <Footer />
       </div>
   );

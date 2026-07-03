@@ -1,7 +1,14 @@
 import { getAllProducts } from "~/data/queries.server";
 import { SITE_URL } from "~/lib/seo";
 
-const STATIC_PATHS = ["/", "/showroom"];
+const STATIC_PATHS = [
+  "/",
+  "/showroom",
+  "/nosotros",
+  "/envios",
+  "/devoluciones",
+  "/privacidad",
+];
 
 function escapeXml(value: string): string {
   return value

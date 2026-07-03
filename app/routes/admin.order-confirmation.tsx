@@ -38,7 +38,7 @@ export async function action({ request }: ActionFunctionArgs) {
     bodyText: (form.get("bodyText") as string)?.trim() || "We are processing your order and will notify you when it ships.",
     heroImage: (form.get("heroImage") as string) || "",
     ctaText: (form.get("ctaText") as string)?.trim() || "View Showroom",
-    ctaUrl: (form.get("ctaUrl") as string)?.trim() || "https://flowurbanwear.com/showroom",
+    ctaUrl: (form.get("ctaUrl") as string)?.trim() || "https://www.flowurbanwear.com/showroom",
   };
 
   if (intent === "test") {
@@ -107,7 +107,7 @@ export default function OrderConfirmationSettings() {
   const [bodyText, setBodyText] = useState(settings.bodyText || "We are processing your order and will notify you when it ships.");
   const [heroImage, setHeroImage] = useState(settings.heroImage || "");
   const [ctaText, setCtaText] = useState(settings.ctaText || "View Showroom");
-  const [ctaUrl, setCtaUrl] = useState(settings.ctaUrl || "https://flowurbanwear.com/showroom");
+  const [ctaUrl, setCtaUrl] = useState(settings.ctaUrl || "https://www.flowurbanwear.com/showroom");
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -250,7 +250,7 @@ export default function OrderConfirmationSettings() {
                   name="ctaUrl"
                   value={ctaUrl}
                   onChange={(e) => setCtaUrl(e.target.value)}
-                  placeholder="https://flowurbanwear.com/showroom"
+                  placeholder="https://www.flowurbanwear.com/showroom"
                   type="url"
                 />
               </div>

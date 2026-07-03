@@ -6,7 +6,8 @@ import { stripe } from "~/lib/stripe.server";
 import { Navbar } from "~/components/layout/Navbar";
 
 export const meta: MetaFunction = () => [
-  { title: "Payment Failed — FLOW URBAN WEAR" },
+  { title: "Payment Failed — FLOW Urban Wear" },
+  { name: "robots", content: "noindex" },
 ];
 
 interface FailureReason {
