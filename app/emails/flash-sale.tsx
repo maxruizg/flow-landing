@@ -18,7 +18,10 @@ import * as t from "./theme";
 interface Category {
   image: string;
   name: string;
-  discount: string;
+  // The admin editor / schema store this as `discount_pct`; older sample data
+  // used `discount`. Accept either so the text never renders blank.
+  discount_pct?: string;
+  discount?: string;
 }
 
 interface FlashSaleEmailProps {
@@ -107,7 +110,7 @@ export function FlashSaleEmail({
                         <Text
                           style={{ ...categoryDiscount, color: urgency_color }}
                         >
-                          {cat.discount}
+                          {cat.discount_pct ?? cat.discount}
                         </Text>
                       </Column>
                     ))}
@@ -179,17 +182,17 @@ export function getDefaultVariables(): FlashSaleEmailProps {
       {
         image: "https://placehold.co/180x180/1a1a1a/ffffff?text=Hoodies",
         name: "Hoodies",
-        discount: "Up to 50% off",
+        discount_pct: "Up to 50% off",
       },
       {
         image: "https://placehold.co/180x180/1a1a1a/ffffff?text=Pants",
         name: "Pants",
-        discount: "Up to 40% off",
+        discount_pct: "Up to 40% off",
       },
       {
         image: "https://placehold.co/180x180/1a1a1a/ffffff?text=Tees",
         name: "Graphic Tees",
-        discount: "Up to 35% off",
+        discount_pct: "Up to 35% off",
       },
     ],
     coupon_code: "FLASH50",

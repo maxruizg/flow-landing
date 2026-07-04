@@ -119,7 +119,7 @@ values (
     {"key": "hero_title",    "type": "text",  "label": "Hero Title",    "default": "",        "group": "hero"},
     {"key": "hero_subtitle", "type": "text",  "label": "Hero Subtitle", "default": "",        "group": "hero"},
     {"key": "hero_image",    "type": "image", "label": "Hero Image",    "default": "",        "group": "hero"},
-    {"key": "primary_color", "type": "color", "label": "Primary Color", "default": "#000000", "group": "style"},
+    {"key": "primary_color", "type": "color", "label": "Primary Color", "default": "#b8a490", "group": "style"},
     {"key": "cta_text",      "type": "text",  "label": "CTA Text",      "default": "",        "group": "cta"},
     {"key": "cta_url",       "type": "url",   "label": "CTA URL",       "default": "",        "group": "cta"},
     {"key": "products",      "type": "array", "label": "Products",      "default": "[]",      "group": "products",
@@ -143,7 +143,7 @@ values (
     {"key": "discount_percentage", "type": "text",  "label": "Discount Percentage", "default": "",        "group": "offer"},
     {"key": "expiration_text",     "type": "text",  "label": "Expiration Text",     "default": "",        "group": "offer"},
     {"key": "banner_image",        "type": "image", "label": "Banner Image",        "default": "",        "group": "hero"},
-    {"key": "urgency_color",       "type": "color", "label": "Urgency Color",       "default": "#ef4444", "group": "style"},
+    {"key": "urgency_color",       "type": "color", "label": "Urgency Color",       "default": "#b8a490", "group": "style"},
     {"key": "coupon_code",         "type": "text",  "label": "Coupon Code",         "default": "",        "group": "offer"},
     {"key": "categories",          "type": "array", "label": "Categories",          "default": "[]",      "group": "categories",
      "items": {"image": "image", "name": "text", "discount_pct": "text", "url": "url"}}
@@ -169,7 +169,7 @@ values (
     {"key": "gallery_images",      "type": "image-array", "label": "Gallery Images",      "default": "[]",      "group": "gallery"},
     {"key": "available_sizes",     "type": "text",        "label": "Available Sizes",     "default": "",        "group": "product"},
     {"key": "price",               "type": "text",        "label": "Price",               "default": "",        "group": "product"},
-    {"key": "accent_color",        "type": "color",       "label": "Accent Color",        "default": "#8B5CF6", "group": "style"},
+    {"key": "accent_color",        "type": "color",       "label": "Accent Color",        "default": "#b8a490", "group": "style"},
     {"key": "brand_story",         "type": "textarea",    "label": "Brand Story",         "default": "",        "group": "story"}
   ]'::jsonb
 )

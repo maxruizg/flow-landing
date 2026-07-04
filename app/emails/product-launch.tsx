@@ -20,7 +20,9 @@ interface ProductLaunchEmailProps {
   product_description: string;
   hero_image: string;
   gallery_images: string[];
-  available_sizes: string[];
+  // The admin editor saves this as a comma-separated string ("S, M, L"),
+  // but seed/programmatic callers may pass an array. Accept both.
+  available_sizes: string | string[];
   price: string;
   accent_color: string;
   brand_story: string;
@@ -42,6 +44,15 @@ export function ProductLaunchEmail({
   cta_text = "Buy Now",
   cta_url = `${t.brand.site}/shop`,
 }: ProductLaunchEmailProps) {
+  // Tolerate both the editor's comma-separated string and an array so a
+  // "Product Launch" campaign never throws at render time (which would make
+  // sendCampaign mark it failed and email nobody).
+  const sizes = Array.isArray(available_sizes)
+    ? available_sizes
+    : String(available_sizes || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
   return (
     <Html>
       <Head>
@@ -121,10 +132,10 @@ export function ProductLaunchEmail({
           <Section style={sizesSection}>
             <Text style={sectionLabel}>AVAILABLE SIZES</Text>
             <Text style={sizeBadgesRow}>
-              {available_sizes.map((size, i) => (
+              {sizes.map((size, i) => (
                 <span key={i}>
                   <span style={sizeBadge}>{size}</span>
-                  {i < available_sizes.length - 1 ? "  " : ""}
+                  {i < sizes.length - 1 ? "  " : ""}
                 </span>
               ))}
             </Text>
