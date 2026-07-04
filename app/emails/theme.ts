@@ -196,3 +196,38 @@ export const footerLink = {
   textDecoration: "underline",
   textUnderlineOffset: "2px",
 };
+
+/* ─── Email-safe image URLs ─── */
+
+/**
+ * Rewrite Supabase Storage OBJECT URLs to Supabase's image-transform (Render)
+ * endpoint so emails pull a properly sized + compressed variant. Deliberately
+ * standalone (NOT importing app/lib/image.ts): that helper's Vercel branch
+ * returns a RELATIVE `/_vercel/image?...` URL, which breaks in email — email
+ * clients need absolute URLs. Everything that isn't a Supabase object URL
+ * (placehold.co, www.flowurbanwear.com, data: URIs, already-transformed
+ * render URLs) passes through unchanged.
+ *
+ * Verified prod pattern (returns 200, ~5x smaller):
+ *   https://<ref>.supabase.co/storage/v1/render/image/public/images/<path>?width=600&quality=80&resize=contain
+ */
+export function emailImageUrl(src: string, width?: number): string {
+  if (!src) return src;
+
+  // Already transformed — idempotent, don't double-append params.
+  if (src.includes("/storage/v1/render/image/public/")) return src;
+
+  if (src.includes("/storage/v1/object/public/")) {
+    const url = src.replace(
+      "/storage/v1/object/public/",
+      "/storage/v1/render/image/public/",
+    );
+    const params = new URLSearchParams();
+    if (width) params.set("width", String(width));
+    params.set("quality", "80");
+    params.set("resize", "contain");
+    return `${url}${url.includes("?") ? "&" : "?"}${params.toString()}`;
+  }
+
+  return src;
+}

@@ -49,7 +49,12 @@ export function NewDropEmail({
 
           {heroImage && (
             <Section>
-              <Img src={heroImage} alt="" width="100%" style={heroImageStyle} />
+              <Img
+                src={t.emailImageUrl(heroImage, 1200)}
+                alt=""
+                width="100%"
+                style={heroImageStyle}
+              />
             </Section>
           )}
 

@@ -259,6 +259,7 @@ export async function sendAbandonedCartReminders(): Promise<AbandonedCartReminde
     const resend = getResend();
     const from =
       process.env.RESEND_FROM_EMAIL || "Flow Urban Wear <contact@flowurbanwear.com>";
+    const replyTo = process.env.RESEND_REPLY_TO || "contact@flowurbanwear.com";
 
     for (const cart of carts) {
       // Atomic claim: set reminder_sent_at only if still null. A concurrent
@@ -311,20 +312,22 @@ export async function sendAbandonedCartReminders(): Promise<AbandonedCartReminde
       if (items.length === 0) continue;
 
       try {
-        const html = await render(
-          AbandonedCartEmail({
-            customerName: cart.customer_name,
-            items,
-            total: cart.total != null ? Number(cart.total) : null,
-            currency: cart.currency,
-          }),
-        );
+        const emailProps = {
+          customerName: cart.customer_name,
+          items,
+          total: cart.total != null ? Number(cart.total) : null,
+          currency: cart.currency,
+        };
+        const html = await render(AbandonedCartEmail(emailProps));
+        const text = await render(AbandonedCartEmail(emailProps), { plainText: true });
         // Resend v6 never throws — inspect { error }.
         const { error: sendError } = await resend.emails.send({
           from,
           to: cart.email,
           subject: "Dejaste algo en tu carrito — FLOW",
           html,
+          text,
+          replyTo,
         });
         if (sendError) {
           stats.failed++;

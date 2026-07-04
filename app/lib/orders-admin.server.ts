@@ -151,15 +151,16 @@ async function sendOrderShippedEmail(
 
   try {
     const resend = getResend();
-    const html = await render(
-      OrderShippedEmail({
-        orderId: order.id,
-        customerName: order.customer_name || "cliente",
-        items: Array.isArray(order.items) ? order.items : [],
-        trackingNumber,
-        carrier: "DHL",
-      }),
-    );
+    const emailProps = {
+      orderId: order.id,
+      customerName: order.customer_name || "cliente",
+      items: Array.isArray(order.items) ? order.items : [],
+      trackingNumber,
+      carrier: "DHL",
+    };
+    const html = await render(OrderShippedEmail(emailProps));
+    const text = await render(OrderShippedEmail(emailProps), { plainText: true });
+    const replyTo = process.env.RESEND_REPLY_TO || "contact@flowurbanwear.com";
 
     // Resend v6 never throws — failures come back as { error }.
     const { error } = await resend.emails.send({
@@ -169,6 +170,8 @@ async function sendOrderShippedEmail(
       to: email,
       subject: `¡Tu pedido va en camino! — FLOW (${order.id})`,
       html,
+      text,
+      replyTo,
     });
 
     if (error) {

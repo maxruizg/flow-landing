@@ -124,9 +124,14 @@ export async function sendCampaign(
     // 3. Render once, send in batches. Resend v6 does NOT throw — it returns
     //    { data, error }, so every batch's error field must be inspected.
     const renderedHtml = await render(Component(content.variables as Record<string, any>));
+    const renderedText = await render(
+      Component(content.variables as Record<string, any>),
+      { plainText: true },
+    );
     const resend = getResend();
     const from =
       process.env.RESEND_FROM_EMAIL || "Flow Urban Wear <contact@flowurbanwear.com>";
+    const replyTo = process.env.RESEND_REPLY_TO || "contact@flowurbanwear.com";
 
     let totalSent = 0;
     let totalFailed = 0;
@@ -138,6 +143,8 @@ export async function sendCampaign(
         to: sub.email,
         subject: campaign.subject,
         html: renderedHtml,
+        text: renderedText,
+        replyTo,
       }));
 
       try {

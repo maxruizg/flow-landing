@@ -34,7 +34,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const settings = {
     subject: (form.get("subject") as string)?.trim() || "Order Confirmed — FLOW",
-    headerText: (form.get("headerText") as string)?.trim() || "Thank you for your order",
+    headerText: (form.get("headerText") as string)?.trim() || "Your order is confirmed",
     bodyText: (form.get("bodyText") as string)?.trim() || "We are processing your order and will notify you when it ships.",
     heroImage: (form.get("heroImage") as string) || "",
     ctaText: (form.get("ctaText") as string)?.trim() || "View Showroom",

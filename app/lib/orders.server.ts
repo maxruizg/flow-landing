@@ -351,21 +351,22 @@ async function sendOrderConfirmation(
 ): Promise<void> {
   const settings = await getEmailSettings("order_confirmation");
   const resend = getResend();
-  const html = await render(
-    OrderConfirmationEmail({
-      orderId,
-      customerName,
-      items,
-      total,
-      currency,
-      subject: settings.subject || undefined,
-      headerText: settings.headerText || undefined,
-      bodyText: settings.bodyText || undefined,
-      heroImage: settings.heroImage || undefined,
-      ctaText: settings.ctaText || undefined,
-      ctaUrl: settings.ctaUrl || undefined,
-    }),
-  );
+  const emailProps = {
+    orderId,
+    customerName,
+    items,
+    total,
+    currency,
+    subject: settings.subject || undefined,
+    headerText: settings.headerText || undefined,
+    bodyText: settings.bodyText || undefined,
+    heroImage: settings.heroImage || undefined,
+    ctaText: settings.ctaText || undefined,
+    ctaUrl: settings.ctaUrl || undefined,
+  };
+  const html = await render(OrderConfirmationEmail(emailProps));
+  const text = await render(OrderConfirmationEmail(emailProps), { plainText: true });
+  const replyTo = process.env.RESEND_REPLY_TO || "contact@flowurbanwear.com";
   // Resend v6 never throws — failures come back as { error }. Ignoring it
   // means confirmation emails silently vanish. Log + surface an admin
   // notification, but never fail order creation over an email.
@@ -374,6 +375,8 @@ async function sendOrderConfirmation(
     to: email,
     subject: settings.subject || "Order Confirmed — FLOW",
     html,
+    text,
+    replyTo,
   });
   if (error) {
     console.error(`[orders] confirmation email failed for ${orderId} (${email}):`, error);

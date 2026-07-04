@@ -77,7 +77,7 @@ export function ProductLaunchEmail({
           {/* Hero Product Image */}
           <Section style={{ padding: "0" }}>
             <Img
-              src={hero_image}
+              src={t.emailImageUrl(hero_image, 1200)}
               alt={product_name}
               width="600"
               style={heroImage}
@@ -100,7 +100,7 @@ export function ProductLaunchEmail({
               <Row>
                 <Column style={galleryColumn}>
                   <Img
-                    src={gallery_images[0]}
+                    src={t.emailImageUrl(gallery_images[0], 360)}
                     alt={`${product_name} detail 1`}
                     width="180"
                     style={galleryImage}
@@ -108,7 +108,7 @@ export function ProductLaunchEmail({
                 </Column>
                 <Column style={galleryColumn}>
                   <Img
-                    src={gallery_images[1]}
+                    src={t.emailImageUrl(gallery_images[1], 360)}
                     alt={`${product_name} detail 2`}
                     width="180"
                     style={galleryImage}
@@ -116,7 +116,7 @@ export function ProductLaunchEmail({
                 </Column>
                 <Column style={galleryColumn}>
                   <Img
-                    src={gallery_images[2]}
+                    src={t.emailImageUrl(gallery_images[2], 360)}
                     alt={`${product_name} detail 3`}
                     width="180"
                     style={galleryImage}

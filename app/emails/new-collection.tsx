@@ -43,6 +43,9 @@ export function NewCollectionEmail({
   cta_url,
   preview,
 }: NewCollectionEmailProps) {
+  // Guard against a non-array `products` prop (e.g. malformed campaign
+  // variables) so the template never throws at render time.
+  const items = Array.isArray(products) ? products : [];
   return (
     <Html>
       <Head>
@@ -62,7 +65,7 @@ export function NewCollectionEmail({
           {/* Hero Image */}
           <Section style={{ padding: "0" }}>
             <Img
-              src={hero_image}
+              src={t.emailImageUrl(hero_image, 1200)}
               alt={hero_title}
               width="600"
               style={heroImage}
@@ -79,17 +82,17 @@ export function NewCollectionEmail({
 
           {/* Product Grid */}
           <Section style={productGridSection}>
-            {products.length > 0 &&
+            {items.length > 0 &&
               Array.from(
-                { length: Math.ceil(products.length / 2) },
+                { length: Math.ceil(items.length / 2) },
                 (_, rowIndex) => {
-                  const left = products[rowIndex * 2];
-                  const right = products[rowIndex * 2 + 1];
+                  const left = items[rowIndex * 2];
+                  const right = items[rowIndex * 2 + 1];
                   return (
                     <Row key={rowIndex} style={{ marginBottom: "24px" }}>
                       <Column style={productColumn}>
                         <Img
-                          src={left.image}
+                          src={t.emailImageUrl(left.image, 540)}
                           alt={left.name}
                           width="270"
                           style={productImage}
@@ -107,7 +110,7 @@ export function NewCollectionEmail({
                       {right ? (
                         <Column style={productColumn}>
                           <Img
-                            src={right.image}
+                            src={t.emailImageUrl(right.image, 540)}
                             alt={right.name}
                             width="270"
                             style={productImage}

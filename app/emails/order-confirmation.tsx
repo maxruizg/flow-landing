@@ -72,7 +72,7 @@ export function OrderConfirmationEmail({
           {heroImage ? (
             <Section style={heroSection}>
               <Img
-                src={heroImage}
+                src={t.emailImageUrl(heroImage, 1200)}
                 alt="Flow Urban Wear"
                 width="560"
                 style={heroImageStyle}

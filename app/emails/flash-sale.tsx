@@ -47,6 +47,10 @@ export function FlashSaleEmail({
   cta_text = "Shop the Sale",
   cta_url = `${t.brand.site}/sale`,
 }: FlashSaleEmailProps) {
+  // Guard against a non-array `categories` prop so the template never throws
+  // at render time. (Named `cats` to avoid colliding with the per-row `items`
+  // slice used inside the category grid below.)
+  const cats = Array.isArray(categories) ? categories : [];
   return (
     <Html>
       <Head>
@@ -77,7 +81,7 @@ export function FlashSaleEmail({
           {/* Banner Image */}
           <Section style={{ padding: "0" }}>
             <Img
-              src={banner_image}
+              src={t.emailImageUrl(banner_image, 1200)}
               alt="Flash Sale"
               width="600"
               style={bannerImage}
@@ -90,9 +94,9 @@ export function FlashSaleEmail({
           <Section style={categoriesSection}>
             <Text style={sectionTitle}>SHOP BY CATEGORY</Text>
             {Array.from(
-              { length: Math.ceil(categories.length / 3) },
+              { length: Math.ceil(cats.length / 3) },
               (_, rowIndex) => {
-                const items = categories.slice(
+                const items = cats.slice(
                   rowIndex * 3,
                   rowIndex * 3 + 3
                 );
@@ -101,7 +105,7 @@ export function FlashSaleEmail({
                     {items.map((cat, i) => (
                       <Column key={i} style={categoryColumn}>
                         <Img
-                          src={cat.image}
+                          src={t.emailImageUrl(cat.image, 360)}
                           alt={cat.name}
                           width="180"
                           style={categoryImage}
