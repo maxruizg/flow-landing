@@ -4,3 +4,6 @@ node_modules
 /build
 .env
 .vercel
+
+# Documento interno de pendientes (no subir a GitHub)
+PENDIENTES-GO-LIVE.md

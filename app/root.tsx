@@ -29,7 +29,6 @@ import {
   type Locale,
 } from "~/lib/cookies.server";
 import { CookieBanner } from "~/components/layout/CookieBanner";
-import { WhatsAppButton } from "~/components/layout/WhatsAppButton";
 import { GoogleAnalytics } from "~/components/analytics/GoogleAnalytics";
 import { GoogleTagManager } from "~/components/analytics/GoogleTagManager";
 import { MetaPixel } from "~/components/analytics/MetaPixel";
@@ -112,9 +111,6 @@ export async function loader({ request }: { request: Request }) {
       flashToast: flash.toast,
       consent,
       locale,
-      // Digits-only international number (e.g. 5215512345678). Empty string
-      // = feature off: WhatsAppButton renders nothing.
-      whatsappNumber: process.env.WHATSAPP_NUMBER || "",
       // Only PUBLIC values belong here — ENV is injected into window.ENV
       // (see EnvScript). Supabase URL/anon key were removed once the browser
       // stopped creating a Supabase client; checkout still reads
@@ -159,7 +155,6 @@ export const headers: HeadersFunction = () => ({
 type RootLoaderData = {
   consent: CookieConsent | null;
   locale: Locale;
-  whatsappNumber: string;
   ENV: {
     STRIPE_PUBLISHABLE_KEY: string;
     GA_MEASUREMENT_ID: string;
@@ -204,7 +199,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
           loaderConsent={consent}
         />
         <CookieBanner initialConsent={consent} />
-        <WhatsAppButton phone={rootData?.whatsappNumber ?? ""} />
         <ScrollRestoration />
         <Scripts />
       </body>
