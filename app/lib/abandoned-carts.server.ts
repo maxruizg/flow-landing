@@ -1,6 +1,7 @@
 import { render } from "@react-email/render";
 import { supabase } from "~/lib/supabase.server";
 import { getResend } from "~/lib/resend.server";
+import { getEmailBrand } from "~/data/queries.server";
 import {
   AbandonedCartEmail,
   type AbandonedCartItem,
@@ -100,7 +101,9 @@ function itemsFingerprint(items: AbandonedCartItem[]): string {
  * recovered_at (a fresh capture means a new, not-yet-recovered session).
  * Never throws.
  */
-export async function upsertAbandonedCart(input: AbandonedCartInput): Promise<void> {
+export async function upsertAbandonedCart(
+  input: AbandonedCartInput,
+): Promise<void> {
   try {
     const email = normalizeEmail(input.email || "");
     if (!EMAIL_RE.test(email)) return;
@@ -114,8 +117,12 @@ export async function upsertAbandonedCart(input: AbandonedCartInput): Promise<vo
       .maybeSingle();
 
     if (selectError) {
-      if (isMissingTable(selectError)) return warnMissingTable("upsertAbandonedCart");
-      console.warn("[abandoned-carts] upsert select failed:", selectError.message);
+      if (isMissingTable(selectError))
+        return warnMissingTable("upsertAbandonedCart");
+      console.warn(
+        "[abandoned-carts] upsert select failed:",
+        selectError.message,
+      );
       return;
     }
 
@@ -137,23 +144,29 @@ export async function upsertAbandonedCart(input: AbandonedCartInput): Promise<vo
         })
         .eq("id", existing.id);
       if (updateError) {
-        console.warn("[abandoned-carts] upsert update failed:", updateError.message);
+        console.warn(
+          "[abandoned-carts] upsert update failed:",
+          updateError.message,
+        );
       }
       return;
     }
 
-    const { error: insertError } = await supabase.from("abandoned_carts").insert({
-      email,
-      customer_name: input.name ?? null,
-      items: input.items,
-      total: input.total ?? null,
-      currency: input.currency ?? null,
-      locale: input.locale ?? null,
-      created_at: now,
-      updated_at: now,
-    });
+    const { error: insertError } = await supabase
+      .from("abandoned_carts")
+      .insert({
+        email,
+        customer_name: input.name ?? null,
+        items: input.items,
+        total: input.total ?? null,
+        currency: input.currency ?? null,
+        locale: input.locale ?? null,
+        created_at: now,
+        updated_at: now,
+      });
     if (insertError) {
-      if (isMissingTable(insertError)) return warnMissingTable("upsertAbandonedCart");
+      if (isMissingTable(insertError))
+        return warnMissingTable("upsertAbandonedCart");
       // 23505 = another request inserted this email between our select and
       // insert. Fall through to a plain refresh of the row they created.
       if ((insertError as { code?: string }).code === "23505") {
@@ -170,14 +183,23 @@ export async function upsertAbandonedCart(input: AbandonedCartInput): Promise<vo
           })
           .eq("email", email);
         if (retryError) {
-          console.warn("[abandoned-carts] upsert race retry failed:", retryError.message);
+          console.warn(
+            "[abandoned-carts] upsert race retry failed:",
+            retryError.message,
+          );
         }
         return;
       }
-      console.warn("[abandoned-carts] upsert insert failed:", insertError.message);
+      console.warn(
+        "[abandoned-carts] upsert insert failed:",
+        insertError.message,
+      );
     }
   } catch (err) {
-    console.warn("[abandoned-carts] upsertAbandonedCart unexpected error:", err);
+    console.warn(
+      "[abandoned-carts] upsertAbandonedCart unexpected error:",
+      err,
+    );
   }
 }
 
@@ -196,7 +218,10 @@ export async function markCartRecovered(email: string): Promise<void> {
       .is("recovered_at", null);
     if (error) {
       if (isMissingTable(error)) return warnMissingTable("markCartRecovered");
-      console.warn("[abandoned-carts] markCartRecovered failed:", error.message);
+      console.warn(
+        "[abandoned-carts] markCartRecovered failed:",
+        error.message,
+      );
     }
   } catch (err) {
     console.warn("[abandoned-carts] markCartRecovered unexpected error:", err);
@@ -218,7 +243,9 @@ export async function sendAbandonedCartReminders(): Promise<AbandonedCartReminde
     const cutoff = new Date(Date.now() - ABANDONED_AFTER_MS).toISOString();
     const { data: carts, error: queryError } = await supabase
       .from("abandoned_carts")
-      .select("id, email, customer_name, items, total, currency, locale, updated_at")
+      .select(
+        "id, email, customer_name, items, total, currency, locale, updated_at",
+      )
       .is("reminder_sent_at", null)
       .is("recovered_at", null)
       .lt("updated_at", cutoff)
@@ -230,7 +257,10 @@ export async function sendAbandonedCartReminders(): Promise<AbandonedCartReminde
         warnMissingTable("sendAbandonedCartReminders");
         return { ...stats, error: "abandoned_carts table missing" };
       }
-      console.error("[abandoned-carts] reminder query failed:", queryError.message);
+      console.error(
+        "[abandoned-carts] reminder query failed:",
+        queryError.message,
+      );
       return { ...stats, error: queryError.message };
     }
 
@@ -248,18 +278,27 @@ export async function sendAbandonedCartReminders(): Promise<AbandonedCartReminde
         .in("email", emails)
         .eq("active", false);
       if (subsError) {
-        console.warn("[abandoned-carts] unsubscribe lookup failed:", subsError.message);
+        console.warn(
+          "[abandoned-carts] unsubscribe lookup failed:",
+          subsError.message,
+        );
       } else {
         for (const s of subs ?? []) unsubscribed.add(normalizeEmail(s.email));
       }
     } catch (err) {
-      console.warn("[abandoned-carts] unsubscribe lookup unexpected error:", err);
+      console.warn(
+        "[abandoned-carts] unsubscribe lookup unexpected error:",
+        err,
+      );
     }
 
     const resend = getResend();
     const from =
-      process.env.RESEND_FROM_EMAIL || "Flow Urban Wear <contact@flowurbanwear.com>";
+      process.env.RESEND_FROM_EMAIL ||
+      "Flow Urban Wear <contact@flowurbanwear.com>";
     const replyTo = process.env.RESEND_REPLY_TO || "contact@flowurbanwear.com";
+    // Shared brand base — fetched once, applied to every reminder in this run.
+    const brand = await getEmailBrand();
 
     for (const cart of carts) {
       // Atomic claim: set reminder_sent_at only if still null. A concurrent
@@ -272,7 +311,10 @@ export async function sendAbandonedCartReminders(): Promise<AbandonedCartReminde
         .is("reminder_sent_at", null)
         .select("id");
       if (claimError) {
-        console.error(`[abandoned-carts] claim failed for ${cart.id}:`, claimError.message);
+        console.error(
+          `[abandoned-carts] claim failed for ${cart.id}:`,
+          claimError.message,
+        );
         continue;
       }
       if (!claimedRows || claimedRows.length === 0) continue; // lost the race
@@ -305,7 +347,10 @@ export async function sendAbandonedCartReminders(): Promise<AbandonedCartReminde
         }
       } catch (err) {
         // Order check is best-effort — proceed with the reminder.
-        console.warn(`[abandoned-carts] order check failed for ${cart.id}:`, err);
+        console.warn(
+          `[abandoned-carts] order check failed for ${cart.id}:`,
+          err,
+        );
       }
 
       const items = (cart.items as AbandonedCartItem[]) ?? [];
@@ -317,9 +362,17 @@ export async function sendAbandonedCartReminders(): Promise<AbandonedCartReminde
           items,
           total: cart.total != null ? Number(cart.total) : null,
           currency: cart.currency,
+          // Shared brand base.
+          accent: brand.accent,
+          logoImage: brand.logoImage,
+          backgroundImage: brand.backgroundImage,
+          footerTagline: brand.footerTagline,
+          unsubscribeUrl: brand.unsubscribeUrl,
         };
         const html = await render(AbandonedCartEmail(emailProps));
-        const text = await render(AbandonedCartEmail(emailProps), { plainText: true });
+        const text = await render(AbandonedCartEmail(emailProps), {
+          plainText: true,
+        });
         // Resend v6 never throws — inspect { error }.
         const { error: sendError } = await resend.emails.send({
           from,
@@ -342,14 +395,20 @@ export async function sendAbandonedCartReminders(): Promise<AbandonedCartReminde
         // Network/render errors can still throw. The claim stays set so a
         // flapping mailbox can't be spammed on every cron run.
         stats.failed++;
-        console.error(`[abandoned-carts] reminder send threw for ${cart.email}:`, err);
+        console.error(
+          `[abandoned-carts] reminder send threw for ${cart.email}:`,
+          err,
+        );
       }
     }
 
     return stats;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error("[abandoned-carts] sendAbandonedCartReminders unexpected error:", err);
+    console.error(
+      "[abandoned-carts] sendAbandonedCartReminders unexpected error:",
+      err,
+    );
     return { ...stats, error: message };
   }
 }

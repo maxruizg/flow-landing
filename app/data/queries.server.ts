@@ -30,9 +30,10 @@ function mapVariant(row: any): ProductVariant {
       row.compare_at_price !== null && row.compare_at_price !== undefined
         ? Number(row.compare_at_price)
         : null,
-    sizeStock: typeof row.size_stock === "string"
-      ? JSON.parse(row.size_stock || "{}")
-      : (row.size_stock ?? {}),
+    sizeStock:
+      typeof row.size_stock === "string"
+        ? JSON.parse(row.size_stock || "{}")
+        : (row.size_stock ?? {}),
     stock: row.stock ?? 0,
     status: row.status,
     image: row.image,
@@ -63,8 +64,13 @@ function pickDefaultVariant(
  *  from the default (or first active) variant. PR 2 replaces consumers that
  *  read the legacy fields with direct `variants` access. */
 function hydrateProduct(productRow: any, variantRows: any[]): Product {
-  const variants = variantRows.map(mapVariant).sort((a, b) => a.sortOrder - b.sortOrder);
-  const dflt = pickDefaultVariant(variants, productRow.default_variant_id ?? null);
+  const variants = variantRows
+    .map(mapVariant)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+  const dflt = pickDefaultVariant(
+    variants,
+    productRow.default_variant_id ?? null,
+  );
   const colorVariants = variants
     .filter((v) => v.status === "active")
     .map((v) => ({ color: v.colorName, slug: v.slug }));
@@ -99,7 +105,9 @@ function hydrateProduct(productRow: any, variantRows: any[]): Product {
   };
 }
 
-async function fetchProductsWithVariants(productIds?: string[]): Promise<Product[]> {
+async function fetchProductsWithVariants(
+  productIds?: string[],
+): Promise<Product[]> {
   let q = supabase.from("products").select("*").order("position");
   if (productIds) q = q.in("id", productIds);
   const { data: productRows, error: pErr } = await q;
@@ -470,7 +478,9 @@ export async function createOrUpdateCustomer(customer: {
   return { isNew: true };
 }
 
-export async function getOrderByStripeSession(sessionId: string): Promise<AdminOrderWithCurrency | null> {
+export async function getOrderByStripeSession(
+  sessionId: string,
+): Promise<AdminOrderWithCurrency | null> {
   const { data } = await supabase
     .from("orders")
     .select("*")
@@ -507,7 +517,9 @@ export interface CheckoutVariant {
 }
 type VariantStatusRow = "active" | "draft" | "archived";
 
-export async function getVariantsByIds(ids: string[]): Promise<Map<string, CheckoutVariant>> {
+export async function getVariantsByIds(
+  ids: string[],
+): Promise<Map<string, CheckoutVariant>> {
   const map = new Map<string, CheckoutVariant>();
   if (ids.length === 0) return map;
   const { data, error } = await supabase
@@ -632,12 +644,14 @@ export async function getDashboardStats(): Promise<DashboardStatsByCurrency> {
     }
   }
 
-  const revenueChange = prevMonthRevenue > 0
-    ? ((thisMonthRevenue - prevMonthRevenue) / prevMonthRevenue) * 100
-    : 0;
-  const ordersChange = prevMonthOrders > 0
-    ? ((thisMonthOrders - prevMonthOrders) / prevMonthOrders) * 100
-    : 0;
+  const revenueChange =
+    prevMonthRevenue > 0
+      ? ((thisMonthRevenue - prevMonthRevenue) / prevMonthRevenue) * 100
+      : 0;
+  const ordersChange =
+    prevMonthOrders > 0
+      ? ((thisMonthOrders - prevMonthOrders) / prevMonthOrders) * 100
+      : 0;
 
   return {
     totalRevenue: totalRevenueMxn,
@@ -653,7 +667,9 @@ export async function getDashboardStats(): Promise<DashboardStatsByCurrency> {
 
 /** RevenueDataPoint with the two currencies kept separate: `revenue` stays
  *  the primary MXN series (backward compatible), USD is carried alongside. */
-export type RevenueDataPointByCurrency = RevenueDataPoint & { revenueUsd: number };
+export type RevenueDataPointByCurrency = RevenueDataPoint & {
+  revenueUsd: number;
+};
 
 export async function getRevenueData(): Promise<RevenueDataPointByCurrency[]> {
   const { data: orders, error } = await supabase
@@ -680,7 +696,10 @@ export async function getRevenueData(): Promise<RevenueDataPointByCurrency[]> {
   }));
 }
 
-export async function getProductSiblingsByName(name: string, gender: string): Promise<AdminProduct[]> {
+export async function getProductSiblingsByName(
+  name: string,
+  gender: string,
+): Promise<AdminProduct[]> {
   const { data: products } = await supabase
     .from("products")
     .select("*")
@@ -698,13 +717,21 @@ export async function getProductSiblingsByName(name: string, gender: string): Pr
     arr.push(v);
     byProduct.set(v.product_id, arr);
   }
-  return products.map((p) => toAdminProduct(hydrateProduct(p, byProduct.get(p.id) ?? [])));
+  return products.map((p) =>
+    toAdminProduct(hydrateProduct(p, byProduct.get(p.id) ?? [])),
+  );
 }
 
-export async function getAdminProductById(id: string): Promise<AdminProduct | null> {
+export async function getAdminProductById(
+  id: string,
+): Promise<AdminProduct | null> {
   // `id` can be either a base product id or (legacy) a variant id.
   let baseRow: any | null = null;
-  const byBase = await supabase.from("products").select("*").eq("id", id).maybeSingle();
+  const byBase = await supabase
+    .from("products")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
   if (byBase.data) {
     baseRow = byBase.data;
   } else {
@@ -817,7 +844,10 @@ export async function upsertVariants(variants: VariantInput[]): Promise<void> {
 
 export async function deleteVariants(ids: string[]): Promise<void> {
   if (ids.length === 0) return;
-  const { error } = await supabase.from("product_variants").delete().in("id", ids);
+  const { error } = await supabase
+    .from("product_variants")
+    .delete()
+    .in("id", ids);
   if (error) throw error;
 }
 
@@ -874,14 +904,16 @@ export async function decrementVariantStock(
   return { nextStock };
 }
 
-export async function setDefaultVariant(productId: string, variantId: string | null): Promise<void> {
+export async function setDefaultVariant(
+  productId: string,
+  variantId: string | null,
+): Promise<void> {
   const { error } = await supabase
     .from("products")
     .update({ default_variant_id: variantId })
     .eq("id", productId);
   if (error) throw error;
 }
-
 
 export async function deleteProduct(id: string) {
   const { error } = await supabase.from("products").delete().eq("id", id);
@@ -914,7 +946,10 @@ export async function updateCollectionImage(id: string, imageUrl: string) {
   if (error) throw error;
 }
 
-export async function updateCollectionVideo(id: string, videoUrl: string | null) {
+export async function updateCollectionVideo(
+  id: string,
+  videoUrl: string | null,
+) {
   const { error } = await supabase
     .from("collections")
     .update({ video: videoUrl })
@@ -930,7 +965,10 @@ export async function updateDailyFlowImage(id: string, srcUrl: string) {
   if (error) throw error;
 }
 
-export async function updateDailyFlowVideo(id: string, videoUrl: string | null) {
+export async function updateDailyFlowVideo(
+  id: string,
+  videoUrl: string | null,
+) {
   const { error } = await supabase
     .from("editorial_images")
     .update({ video: videoUrl })
@@ -939,7 +977,7 @@ export async function updateDailyFlowVideo(id: string, videoUrl: string | null) 
 }
 
 export async function updateProductPositions(
-  positions: { id: string; position: number }[]
+  positions: { id: string; position: number }[],
 ) {
   for (const { id, position } of positions) {
     const { error } = await supabase
@@ -951,7 +989,7 @@ export async function updateProductPositions(
 }
 
 export async function updateNewArrivalsPositions(
-  positions: { id: string; position: number }[]
+  positions: { id: string; position: number }[],
 ) {
   for (const { id, position } of positions) {
     const { error } = await supabase
@@ -975,7 +1013,9 @@ export async function getMaxProductPosition(): Promise<number> {
 
 // ─── Subscriber queries ──────────────────────────────────────
 
-export async function addSubscriber(email: string): Promise<{ success: boolean; error?: string }> {
+export async function addSubscriber(
+  email: string,
+): Promise<{ success: boolean; error?: string }> {
   const id = `sub-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const { error } = await supabase
     .from("subscribers")
@@ -1041,7 +1081,8 @@ export async function getActiveBanner(): Promise<Banner | null> {
 
   const now = Date.now();
   const valid = rows.find((row: any) => {
-    if (row.start_date && new Date(row.start_date).getTime() > now) return false;
+    if (row.start_date && new Date(row.start_date).getTime() > now)
+      return false;
     if (row.end_date && new Date(row.end_date).getTime() < now) return false;
     return true;
   });
@@ -1113,7 +1154,11 @@ export async function getAllAdmins() {
   return data || [];
 }
 
-export async function createAdmin(name: string, email: string, passwordHash: string) {
+export async function createAdmin(
+  name: string,
+  email: string,
+  passwordHash: string,
+) {
   const { error } = await supabase.from("admins").insert({
     id: crypto.randomUUID(),
     name,
@@ -1128,7 +1173,10 @@ export async function deleteAdmin(id: string) {
   if (error) throw error;
 }
 
-export async function updateAdminUser(id: string, updates: { name?: string; email?: string; passwordHash?: string }) {
+export async function updateAdminUser(
+  id: string,
+  updates: { name?: string; email?: string; passwordHash?: string },
+) {
   const row: Record<string, any> = {};
   if (updates.name) row.name = updates.name;
   if (updates.email) row.email = updates.email.toLowerCase();
@@ -1219,12 +1267,18 @@ export async function updateCampaign(id: string, updates: Record<string, any>) {
   if (updates.scheduledAt !== undefined) row.scheduled_at = updates.scheduledAt;
   if (updates.sentAt !== undefined) row.sent_at = updates.sentAt;
   if (updates.targetTags !== undefined) row.target_tags = updates.targetTags;
-  const { error } = await supabase.from("email_campaigns").update(row).eq("id", id);
+  const { error } = await supabase
+    .from("email_campaigns")
+    .update(row)
+    .eq("id", id);
   if (error) throw error;
 }
 
 export async function deleteCampaign(id: string) {
-  const { error } = await supabase.from("email_campaigns").delete().eq("id", id);
+  const { error } = await supabase
+    .from("email_campaigns")
+    .delete()
+    .eq("id", id);
   if (error) throw error;
 }
 
@@ -1239,7 +1293,10 @@ export async function getCampaignContent(campaignId: string) {
   return data;
 }
 
-export async function upsertCampaignContent(campaignId: string, variables: Record<string, any>) {
+export async function upsertCampaignContent(
+  campaignId: string,
+  variables: Record<string, any>,
+) {
   const { data: existing } = await supabase
     .from("campaign_content")
     .select("id")
@@ -1364,12 +1421,20 @@ export async function getSubscribersByTags(tags: string[]) {
   return data || [];
 }
 
-export async function updateSubscriber(id: string, updates: { name?: string; active?: boolean; tags?: string[] }) {
-  const { error } = await supabase.from("subscribers").update(updates).eq("id", id);
+export async function updateSubscriber(
+  id: string,
+  updates: { name?: string; active?: boolean; tags?: string[] },
+) {
+  const { error } = await supabase
+    .from("subscribers")
+    .update(updates)
+    .eq("id", id);
   if (error) throw error;
 }
 
-export async function getEmailSettings(key: string): Promise<Record<string, any>> {
+export async function getEmailSettings(
+  key: string,
+): Promise<Record<string, any>> {
   const { data } = await supabase
     .from("email_settings")
     .select("value")
@@ -1378,13 +1443,42 @@ export async function getEmailSettings(key: string): Promise<Record<string, any>
   return (data?.value as Record<string, any>) ?? {};
 }
 
-export async function saveEmailSettings(key: string, value: Record<string, any>): Promise<void> {
+export async function saveEmailSettings(
+  key: string,
+  value: Record<string, any>,
+): Promise<void> {
   const { error } = await supabase.from("email_settings").upsert({
     key,
     value,
     updated_at: new Date().toISOString(),
   });
   if (error) throw error;
+}
+
+/** Admin-editable brand base shared by EVERY email (structurally an EmailBrand
+ *  from ~/emails/EmailLayout). Empty strings collapse to undefined so each
+ *  template falls back to its ./theme tokens when the admin hasn't set a value. */
+export interface EmailBrandSettings {
+  accent?: string;
+  logoImage?: string;
+  backgroundImage?: string;
+  defaultHeroImage?: string;
+  footerTagline?: string;
+  unsubscribeUrl?: string;
+}
+
+export async function getEmailBrand(): Promise<EmailBrandSettings> {
+  const s = await getEmailSettings("email_brand");
+  const clean = (v: unknown) =>
+    typeof v === "string" && v.trim() ? v.trim() : undefined;
+  return {
+    accent: clean(s.accentColor),
+    logoImage: clean(s.logoImage),
+    backgroundImage: clean(s.backgroundImage),
+    defaultHeroImage: clean(s.defaultHeroImage),
+    footerTagline: clean(s.footerTagline),
+    unsubscribeUrl: clean(s.unsubscribeUrl),
+  };
 }
 
 // ─── Visitor Analytics ─────────────────────────────────────────
@@ -1480,8 +1574,13 @@ export async function getCampaignStats() {
     .from("campaign_logs")
     .select("total_sent");
 
-  const totalSent = (logs || []).reduce((sum, l) => sum + (l.total_sent || 0), 0);
-  const pending = (campaigns || []).filter(c => c.status === "scheduled").length;
+  const totalSent = (logs || []).reduce(
+    (sum, l) => sum + (l.total_sent || 0),
+    0,
+  );
+  const pending = (campaigns || []).filter(
+    (c) => c.status === "scheduled",
+  ).length;
   const total = (campaigns || []).length;
 
   return { totalSent, pending, total };

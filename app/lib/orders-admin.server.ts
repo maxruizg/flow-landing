@@ -2,7 +2,7 @@ import { render } from "@react-email/render";
 import { supabase } from "~/lib/supabase.server";
 import { getResend } from "~/lib/resend.server";
 import { OrderShippedEmail } from "~/emails/order-shipped";
-import { createNotification } from "~/data/queries.server";
+import { createNotification, getEmailBrand } from "~/data/queries.server";
 import {
   canTransitionOrderStatus,
   isOrderStatus,
@@ -52,7 +52,10 @@ export async function updateOrderStatus(
     .maybeSingle<OrderRow>();
 
   if (fetchError) {
-    console.error(`[orders-admin] Failed to load order ${orderId}:`, fetchError);
+    console.error(
+      `[orders-admin] Failed to load order ${orderId}:`,
+      fetchError,
+    );
     return { ok: false, error: "Failed to load order" };
   }
   if (!order) {
@@ -61,7 +64,10 @@ export async function updateOrderStatus(
 
   const currentStatus = order.status;
   if (!isOrderStatus(currentStatus)) {
-    return { ok: false, error: `Order has an unknown status: "${currentStatus}"` };
+    return {
+      ok: false,
+      error: `Order has an unknown status: "${currentStatus}"`,
+    };
   }
   if (currentStatus === nextStatus) {
     return { ok: false, error: `Order is already ${nextStatus}` };
@@ -108,7 +114,10 @@ export async function updateOrderStatus(
   }
 
   if (updateError) {
-    console.error(`[orders-admin] Failed to update order ${orderId}:`, updateError);
+    console.error(
+      `[orders-admin] Failed to update order ${orderId}:`,
+      updateError,
+    );
     return { ok: false, error: "Failed to update order status" };
   }
   if (!updated || updated.length === 0) {
@@ -151,15 +160,23 @@ async function sendOrderShippedEmail(
 
   try {
     const resend = getResend();
+    const brand = await getEmailBrand();
     const emailProps = {
       orderId: order.id,
       customerName: order.customer_name || "cliente",
       items: Array.isArray(order.items) ? order.items : [],
       trackingNumber,
       carrier: "DHL",
+      // Shared brand base.
+      accent: brand.accent,
+      logoImage: brand.logoImage,
+      backgroundImage: brand.backgroundImage,
+      footerTagline: brand.footerTagline,
     };
     const html = await render(OrderShippedEmail(emailProps));
-    const text = await render(OrderShippedEmail(emailProps), { plainText: true });
+    const text = await render(OrderShippedEmail(emailProps), {
+      plainText: true,
+    });
     const replyTo = process.env.RESEND_REPLY_TO || "contact@flowurbanwear.com";
 
     // Resend v6 never throws — failures come back as { error }.

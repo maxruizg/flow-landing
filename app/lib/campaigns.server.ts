@@ -9,6 +9,7 @@ import {
   createCampaignLog,
   getActiveSubscribers,
   getSubscribersByTags,
+  getEmailBrand,
 } from "~/data/queries.server";
 import { NewCollectionEmail } from "~/emails/new-collection";
 import { FlashSaleEmail } from "~/emails/flash-sale";
@@ -72,7 +73,11 @@ export async function sendCampaign(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[campaigns] Failed to claim campaign ${campaignId}:`, error);
-    return { campaignId, claimed: false, error: `Failed to claim campaign: ${message}` };
+    return {
+      campaignId,
+      claimed: false,
+      error: `Failed to claim campaign: ${message}`,
+    };
   }
   if (!claimed) {
     return {
@@ -96,41 +101,77 @@ export async function sendCampaign(
         errorDetails: message,
       });
     } catch (logError) {
-      console.error(`[campaigns] Failed to record failure for ${campaignId}:`, logError);
+      console.error(
+        `[campaigns] Failed to record failure for ${campaignId}:`,
+        logError,
+      );
     }
-    return { campaignId, claimed: true, status: "failed", totalSent: 0, totalFailed: 0, error: message };
+    return {
+      campaignId,
+      claimed: true,
+      status: "failed",
+      totalSent: 0,
+      totalFailed: 0,
+      error: message,
+    };
   };
 
   try {
     // 2. Load and validate everything needed to send.
     const campaign = await getCampaign(campaignId);
     if (!campaign) return failCampaign("Campaign not found");
-    if (!campaign.subject?.trim()) return failCampaign("Campaign has no subject line");
+    if (!campaign.subject?.trim())
+      return failCampaign("Campaign has no subject line");
 
     const content = await getCampaignContent(campaignId);
     if (!content?.variables) return failCampaign("Campaign has no content");
 
     const componentName = campaign.email_templates?.component_name;
     const Component = componentName ? templateMap[componentName] : undefined;
-    if (!Component) return failCampaign(`Unknown or missing template: ${componentName ?? "(none)"}`);
+    if (!Component)
+      return failCampaign(
+        `Unknown or missing template: ${componentName ?? "(none)"}`,
+      );
 
     const targetTags: string[] = campaign.target_tags || [];
     const subscribers =
       targetTags.length > 0
         ? await getSubscribersByTags(targetTags)
         : await getActiveSubscribers();
-    if (subscribers.length === 0) return failCampaign("No subscribers match the campaign target");
+    if (subscribers.length === 0)
+      return failCampaign("No subscribers match the campaign target");
 
     // 3. Render once, send in batches. Resend v6 does NOT throw — it returns
     //    { data, error }, so every batch's error field must be inspected.
-    const renderedHtml = await render(Component(content.variables as Record<string, any>));
-    const renderedText = await render(
-      Component(content.variables as Record<string, any>),
-      { plainText: true },
-    );
+    //    The shared brand base seeds logo/footer/unsubscribe and the accent
+    //    (mapped to each template's own colour field); the campaign's own
+    //    variables always win on top.
+    const brand = await getEmailBrand();
+    const brandDefaults: Record<string, any> = {
+      logoImage: brand.logoImage,
+      backgroundImage: brand.backgroundImage,
+      footerTagline: brand.footerTagline,
+      unsubscribeUrl: brand.unsubscribeUrl,
+      ...(brand.accent
+        ? {
+            primary_color: brand.accent,
+            urgency_color: brand.accent,
+            accent_color: brand.accent,
+          }
+        : {}),
+    };
+    const variables = {
+      ...brandDefaults,
+      ...(content.variables as Record<string, any>),
+    };
+    const renderedHtml = await render(Component(variables));
+    const renderedText = await render(Component(variables), {
+      plainText: true,
+    });
     const resend = getResend();
     const from =
-      process.env.RESEND_FROM_EMAIL || "Flow Urban Wear <contact@flowurbanwear.com>";
+      process.env.RESEND_FROM_EMAIL ||
+      "Flow Urban Wear <contact@flowurbanwear.com>";
     const replyTo = process.env.RESEND_REPLY_TO || "contact@flowurbanwear.com";
 
     let totalSent = 0;
@@ -151,7 +192,9 @@ export async function sendCampaign(
         const { error } = await resend.batch.send(batch);
         if (error) {
           totalFailed += batch.length;
-          batchErrors.push(`Batch at offset ${i} (${batch.length} emails): ${error.message}`);
+          batchErrors.push(
+            `Batch at offset ${i} (${batch.length} emails): ${error.message}`,
+          );
           console.error(
             `[campaigns] Resend batch error for campaign ${campaignId} at offset ${i}:`,
             error,
@@ -161,9 +204,12 @@ export async function sendCampaign(
         }
       } catch (batchError) {
         // Network/unexpected errors can still throw.
-        const message = batchError instanceof Error ? batchError.message : String(batchError);
+        const message =
+          batchError instanceof Error ? batchError.message : String(batchError);
         totalFailed += batch.length;
-        batchErrors.push(`Batch at offset ${i} (${batch.length} emails): ${message}`);
+        batchErrors.push(
+          `Batch at offset ${i} (${batch.length} emails): ${message}`,
+        );
         console.error(
           `[campaigns] Unexpected batch error for campaign ${campaignId} at offset ${i}:`,
           batchError,
@@ -232,7 +278,9 @@ export async function recoverStuckCampaigns(
 
   const ids = (data ?? []).map((row: { id: string }) => row.id);
   for (const campaignId of ids) {
-    console.error(`[campaigns] Recovered stuck campaign ${campaignId} (sending > 2h) — marked failed`);
+    console.error(
+      `[campaigns] Recovered stuck campaign ${campaignId} (sending > 2h) — marked failed`,
+    );
     try {
       await createCampaignLog({
         campaignId,
@@ -244,7 +292,10 @@ export async function recoverStuckCampaigns(
           "Campaign was stuck in 'sending' for over 2 hours and was marked failed by the recovery job. Some emails may have been delivered before the interruption.",
       });
     } catch (logError) {
-      console.error(`[campaigns] Failed to log recovery for ${campaignId}:`, logError);
+      console.error(
+        `[campaigns] Failed to log recovery for ${campaignId}:`,
+        logError,
+      );
     }
   }
   return ids;

@@ -44,9 +44,11 @@
    Do instead: compute amounts + validate stock from the DB in `api.create-payment-intent.ts`; never trust client price. Keep `stripe_session_id` unique-index idempotency and the atomic stock RPC intact.
 3. **[2026-07-03] RLS is ON + service_role.** Any module-scope `throw` 500s the whole app.
    Do instead: server reads via `SUPABASE_SERVICE_ROLE_KEY` (bypasses RLS); keep env/secret checks lazy (see `session.server.ts` getSessionStorage pattern), never at module top level.
-4. **[2026-07-03] Email brand = text logo + taupe `#b8a490`; images via `emailImageUrl()`.**
-   Do instead: wrap every Supabase `<Img src>` with `t.emailImageUrl(url, width)` (emails/theme.ts); keep HTML+plainText+replyTo on all 4 send paths; Resend v6 returns `{error}` (never throws) — always check it.
-5. **[2026-07-03] Tailwind v4 (CSS-first).**
+4. **[2026-07-04] ALL emails share one branded frame: `app/emails/EmailLayout.tsx`.**
+   Do instead: every template (7) renders its unique content as `children` inside `<EmailLayout>` — never hand-roll `<Html>/<Head>/<Container>`/header/footer again. Tokens live in `emails/theme.ts`; wrap Supabase `<Img>` with `t.emailImageUrl(url,w)`; derive accent washes with `t.accentAlpha(hex,alpha)` (parse hex via `slice`, NOT a regex match — the security hook false-flags that as child_process). Keep HTML+plainText+replyTo on all send paths; Resend v6 returns `{error}` (never throws) — check it.
+5. **[2026-07-04] Admin-editable brand base cascades to EVERY email: `email_settings["email_brand"]`.**
+   Do instead: edited at `/admin/email-design` (accent, logo image, **backgroundImage** = hero-band photo, default hero, footer, unsubscribe); read via `getEmailBrand()` (queries.server.ts) and spread into template props by the 4 send paths (`orders.server`, `orders-admin.server`, `abandoned-carts.server`, `campaigns.server`). `backgroundImage` renders a full-bleed hero band (gradient overlay + logo) in EmailLayout — works in Gmail/Apple Mail, Outlook desktop falls back to the dark `backgroundColor` (no VML). Seeded default = site SS26 collection hero. Empty fields → `undefined` → theme fallback, so nothing breaks unset. Campaigns: brand seeds `primary_color/urgency_color/accent_color` + logo/footer, but `campaign_content.variables` win on top. `email_settings` table migration: `supabase/migrations/2026-07-04-email-settings-table.sql` (idempotent; table already existed in prod). `/admin/email-design` has a LIVE preview (right column: template selector + desktop/mobile toggle) and a **send-test-to-any-email** flow — both render via `renderEmailPreview()` in `app/lib/email-preview.server.tsx` (server-only; keys/labels in the client-safe `app/lib/email-templates.ts`). Preview uses a `useFetcher` posting `intent=preview` with the CURRENT (unsaved) form values.
+6. **[2026-07-03] Tailwind v4 (CSS-first).**
    Do instead: `@tailwindcss/vite`, `@theme` in global.css; no v3 `tailwind.config.js` patterns.
 
 ## User Directives

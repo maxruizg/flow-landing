@@ -1,6 +1,11 @@
 import { json } from "@remix-run/node";
 import type { HeadersFunction, LoaderFunctionArgs } from "@remix-run/node";
-import { Outlet, useLoaderData, useLocation, useRouteLoaderData } from "@remix-run/react";
+import {
+  Outlet,
+  useLoaderData,
+  useLocation,
+  useRouteLoaderData,
+} from "@remix-run/react";
 import { useState } from "react";
 import { AdminSidebar } from "~/components/admin/AdminSidebar";
 import { AdminTopbar } from "~/components/admin/AdminTopbar";
@@ -21,6 +26,7 @@ const pageTitles: Record<string, string> = {
   "/admin/subscribers": "Subscribers",
   "/admin/newsletter": "Newsletter",
   "/admin/order-confirmation": "Emails",
+  "/admin/email-design": "Emails",
   "/admin/notifications": "Notifications",
   "/admin/settings": "Settings",
 };
@@ -41,14 +47,20 @@ export const headers: HeadersFunction = () => ({
 
 export default function AdminLayout() {
   const { adminName, unreadNotifications } = useLoaderData<typeof loader>();
-  const rootData = useRouteLoaderData("root") as { flashToast?: Toast | null } | undefined;
+  const rootData = useRouteLoaderData("root") as
+    | { flashToast?: Toast | null }
+    | undefined;
   const location = useLocation();
-  const isLoginPage = location.pathname === "/admin" || location.pathname === "/admin/";
+  const isLoginPage =
+    location.pathname === "/admin" || location.pathname === "/admin/";
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const title = pageTitles[location.pathname]
-    ?? (location.pathname.startsWith("/admin/products/") ? "Products"
-      : location.pathname.startsWith("/admin/campaigns/") ? "Campaigns"
-      : "Admin");
+  const title =
+    pageTitles[location.pathname] ??
+    (location.pathname.startsWith("/admin/products/")
+      ? "Products"
+      : location.pathname.startsWith("/admin/campaigns/")
+        ? "Campaigns"
+        : "Admin");
 
   if (isLoginPage) {
     return (
@@ -65,7 +77,10 @@ export default function AdminLayout() {
   return (
     <ToastProvider flash={rootData?.flashToast ?? null}>
       <div className="min-h-screen bg-flow-950">
-        <AdminSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <AdminSidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+        />
         <div className="lg:pl-64">
           <AdminTopbar
             title={title}

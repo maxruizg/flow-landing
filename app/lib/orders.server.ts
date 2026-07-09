@@ -7,6 +7,7 @@ import {
   createOrUpdateCustomer,
   decrementVariantStock,
   getEmailSettings,
+  getEmailBrand,
   getOrderByStripeSession,
 } from "~/data/queries.server";
 import { getResend } from "~/lib/resend.server";
@@ -93,17 +94,35 @@ export async function ensureOrderFromPaymentIntent(
 
   let customerIsNew = false;
   try {
-    const result = await createOrUpdateCustomer({ name: customerName, email: customerEmail, orderTotal: total });
+    const result = await createOrUpdateCustomer({
+      name: customerName,
+      email: customerEmail,
+      orderTotal: total,
+    });
     customerIsNew = result.isNew;
   } catch (err) {
     console.error(`[orders] createOrUpdateCustomer failed for ${pi.id}:`, err);
   }
 
-  await emitOrderNotifications({ orderId, customerName, total, currency, itemCount: items.length, customerIsNew });
+  await emitOrderNotifications({
+    orderId,
+    customerName,
+    total,
+    currency,
+    itemCount: items.length,
+    customerIsNew,
+  });
 
   if (customerEmail) {
     try {
-      await sendOrderConfirmation(customerEmail, customerName, orderId, items, total, currency);
+      await sendOrderConfirmation(
+        customerEmail,
+        customerName,
+        orderId,
+        items,
+        total,
+        currency,
+      );
     } catch (err) {
       console.error(`[orders] sendOrderConfirmation failed for ${pi.id}:`, err);
     }
@@ -145,10 +164,15 @@ export async function ensureOrderFromCheckoutSession(
     if (isUniqueViolation(err)) {
       // Race: another caller already processed this session — don't double-run
       // stock / customer side effects.
-      const winner = await getOrderByStripeSession(session.id).catch(() => null);
+      const winner = await getOrderByStripeSession(session.id).catch(
+        () => null,
+      );
       if (winner) return { orderId: winner.id, created: false };
     }
-    console.error(`[orders] createOrder failed for session ${session.id}:`, err);
+    console.error(
+      `[orders] createOrder failed for session ${session.id}:`,
+      err,
+    );
     return null;
   }
 
@@ -159,19 +183,43 @@ export async function ensureOrderFromCheckoutSession(
 
   let customerIsNew = false;
   try {
-    const result = await createOrUpdateCustomer({ name: customerName, email: customerEmail, orderTotal: total });
+    const result = await createOrUpdateCustomer({
+      name: customerName,
+      email: customerEmail,
+      orderTotal: total,
+    });
     customerIsNew = result.isNew;
   } catch (err) {
-    console.error(`[orders] createOrUpdateCustomer failed for session ${session.id}:`, err);
+    console.error(
+      `[orders] createOrUpdateCustomer failed for session ${session.id}:`,
+      err,
+    );
   }
 
-  await emitOrderNotifications({ orderId, customerName, total, currency, itemCount: items.length, customerIsNew });
+  await emitOrderNotifications({
+    orderId,
+    customerName,
+    total,
+    currency,
+    itemCount: items.length,
+    customerIsNew,
+  });
 
   if (customerEmail) {
     try {
-      await sendOrderConfirmation(customerEmail, customerName, orderId, items, total, currency);
+      await sendOrderConfirmation(
+        customerEmail,
+        customerName,
+        orderId,
+        items,
+        total,
+        currency,
+      );
     } catch (err) {
-      console.error(`[orders] sendOrderConfirmation failed for session ${session.id}:`, err);
+      console.error(
+        `[orders] sendOrderConfirmation failed for session ${session.id}:`,
+        err,
+      );
     }
   }
 
@@ -190,7 +238,10 @@ export async function ensureOrderFromPaymentIntentId(
     const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
     return await ensureOrderFromPaymentIntent(pi);
   } catch (err) {
-    console.error(`[orders] ensureOrderFromPaymentIntentId failed for ${paymentIntentId}:`, err);
+    console.error(
+      `[orders] ensureOrderFromPaymentIntentId failed for ${paymentIntentId}:`,
+      err,
+    );
     return null;
   }
 }
@@ -202,10 +253,13 @@ export async function ensureOrderFromPaymentIntentId(
  * yet, since orders are only created on payment_intent.succeeded), so there
  * is nothing to cancel; we just leave a trace for follow-up. Never throws.
  */
-export async function notifyPaymentFailed(pi: Stripe.PaymentIntent): Promise<void> {
+export async function notifyPaymentFailed(
+  pi: Stripe.PaymentIntent,
+): Promise<void> {
   const methodType = pi.last_payment_error?.payment_method?.type ?? null;
   const isOxxo = methodType === "oxxo";
-  const email = pi.receipt_email || pi.metadata?.customer_email || "unknown email";
+  const email =
+    pi.receipt_email || pi.metadata?.customer_email || "unknown email";
   const amount = formatAmount(pi.amount / 100, pi.currency);
   const reason = isOxxo
     ? "OXXO voucher expired without payment"
@@ -219,7 +273,10 @@ export async function notifyPaymentFailed(pi: Stripe.PaymentIntent): Promise<voi
       linkTo: "/admin/orders",
     });
   } catch (err) {
-    console.error(`[orders] payment-failed notification failed for ${pi.id}:`, err);
+    console.error(
+      `[orders] payment-failed notification failed for ${pi.id}:`,
+      err,
+    );
   }
 }
 
@@ -236,14 +293,22 @@ function isUniqueViolation(err: unknown): boolean {
   );
 }
 
-async function decrementStockForItems(items: WebhookOrderItem[]): Promise<void> {
+async function decrementStockForItems(
+  items: WebhookOrderItem[],
+): Promise<void> {
   for (const it of items) {
     if (!it.variantId) {
-      console.warn(`[orders] skipping stock decrement — missing variantId for "${it.productName}" (${it.size})`);
+      console.warn(
+        `[orders] skipping stock decrement — missing variantId for "${it.productName}" (${it.size})`,
+      );
       continue;
     }
     try {
-      const result = await decrementVariantStock(it.variantId, it.size, it.quantity);
+      const result = await decrementVariantStock(
+        it.variantId,
+        it.size,
+        it.quantity,
+      );
       if (result && result.nextStock === 0) {
         const label = it.colorName
           ? `${it.productName} — ${it.colorName} (${it.size})`
@@ -256,7 +321,10 @@ async function decrementStockForItems(items: WebhookOrderItem[]): Promise<void> 
         });
       }
     } catch (err) {
-      console.error(`[orders] decrementVariantStock failed for ${it.variantId} (${it.size}):`, err);
+      console.error(
+        `[orders] decrementVariantStock failed for ${it.variantId} (${it.size}):`,
+        err,
+      );
     }
   }
 }
@@ -269,7 +337,8 @@ async function emitOrderNotifications(input: {
   itemCount: number;
   customerIsNew: boolean;
 }): Promise<void> {
-  const { orderId, customerName, total, currency, itemCount, customerIsNew } = input;
+  const { orderId, customerName, total, currency, itemCount, customerIsNew } =
+    input;
   const amount = formatAmount(total, currency);
   const itemWord = itemCount === 1 ? "item" : "items";
 
@@ -293,7 +362,10 @@ async function emitOrderNotifications(input: {
         linkTo: "/admin/customers",
       });
     } catch (err) {
-      console.error(`[orders] customer notification failed for ${orderId}:`, err);
+      console.error(
+        `[orders] customer notification failed for ${orderId}:`,
+        err,
+      );
     }
   }
 }
@@ -317,7 +389,8 @@ function formatAmount(amount: number, currency: string): string {
  * single `items_json` key so any in-flight pre-migration orders still work.
  */
 function safeParseItems(metadata: Record<string, string>): WebhookOrderItem[] {
-  const raw = joinChunkedMetadata(metadata, "items_json") ?? metadata.items_json;
+  const raw =
+    joinChunkedMetadata(metadata, "items_json") ?? metadata.items_json;
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
@@ -349,7 +422,10 @@ async function sendOrderConfirmation(
   total: number,
   currency: string,
 ): Promise<void> {
-  const settings = await getEmailSettings("order_confirmation");
+  const [settings, brand] = await Promise.all([
+    getEmailSettings("order_confirmation"),
+    getEmailBrand(),
+  ]);
   const resend = getResend();
   const emailProps = {
     orderId,
@@ -360,18 +436,28 @@ async function sendOrderConfirmation(
     subject: settings.subject || undefined,
     headerText: settings.headerText || undefined,
     bodyText: settings.bodyText || undefined,
-    heroImage: settings.heroImage || undefined,
+    // Per-email hero wins; otherwise fall back to the brand base hero.
+    heroImage: settings.heroImage || brand.defaultHeroImage,
     ctaText: settings.ctaText || undefined,
     ctaUrl: settings.ctaUrl || undefined,
+    // Shared brand base — cascades logo, accent, background and footer everywhere.
+    accent: brand.accent,
+    logoImage: brand.logoImage,
+    backgroundImage: brand.backgroundImage,
+    footerTagline: brand.footerTagline,
   };
   const html = await render(OrderConfirmationEmail(emailProps));
-  const text = await render(OrderConfirmationEmail(emailProps), { plainText: true });
+  const text = await render(OrderConfirmationEmail(emailProps), {
+    plainText: true,
+  });
   const replyTo = process.env.RESEND_REPLY_TO || "contact@flowurbanwear.com";
   // Resend v6 never throws — failures come back as { error }. Ignoring it
   // means confirmation emails silently vanish. Log + surface an admin
   // notification, but never fail order creation over an email.
   const { error } = await resend.emails.send({
-    from: process.env.RESEND_FROM_EMAIL || "Flow Urban Wear <contact@flowurbanwear.com>",
+    from:
+      process.env.RESEND_FROM_EMAIL ||
+      "Flow Urban Wear <contact@flowurbanwear.com>",
     to: email,
     subject: settings.subject || "Order Confirmed — FLOW",
     html,
@@ -379,7 +465,10 @@ async function sendOrderConfirmation(
     replyTo,
   });
   if (error) {
-    console.error(`[orders] confirmation email failed for ${orderId} (${email}):`, error);
+    console.error(
+      `[orders] confirmation email failed for ${orderId} (${email}):`,
+      error,
+    );
     await createNotification({
       type: "system",
       title: "Order confirmation email failed",

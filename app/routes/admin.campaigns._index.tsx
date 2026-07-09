@@ -120,7 +120,8 @@ export async function action({ request }: ActionFunctionArgs) {
       status: "draft",
       targetTags: original.target_tags,
     });
-    if (content?.variables) await upsertCampaignContent(newId, content.variables);
+    if (content?.variables)
+      await upsertCampaignContent(newId, content.variables);
     return jsonWithToast(
       { ok: true, newId },
       { type: "success", message: `Duplicated “${original.name}”.` },
@@ -132,40 +133,97 @@ export async function action({ request }: ActionFunctionArgs) {
 
 const emailTypes = [
   {
+    title: "Email Brand Design",
+    description:
+      "The logo, accent color, hero and footer applied to EVERY email — order confirmation, shipped, cart reminders and campaigns.",
+    href: "/admin/email-design",
+    color: "from-accent-500/20 to-accent-600/5 border-accent-500/20",
+    iconColor: "text-accent-400",
+    icon: (
+      <svg
+        className="w-6 h-6"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.5}
+          d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"
+        />
+      </svg>
+    ),
+    action: "Configure",
+  },
+  {
     title: "Newsletter",
-    description: "Quick email blast to all active subscribers. Write a subject and body, hit send.",
+    description:
+      "Quick email blast to all active subscribers. Write a subject and body, hit send.",
     href: "/admin/newsletter",
     color: "from-blue-500/20 to-blue-600/5 border-blue-500/20",
     iconColor: "text-blue-400",
     icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+      <svg
+        className="w-6 h-6"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.5}
+          d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+        />
       </svg>
     ),
     action: "Compose",
   },
   {
     title: "Marketing Campaign",
-    description: "Template-based campaigns with scheduling, previews, and send tracking.",
+    description:
+      "Template-based campaigns with scheduling, previews, and send tracking.",
     href: "/admin/campaigns/new",
     color: "from-purple-500/20 to-purple-600/5 border-purple-500/20",
     iconColor: "text-purple-400",
     icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+      <svg
+        className="w-6 h-6"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.5}
+          d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"
+        />
       </svg>
     ),
     action: "Create",
   },
   {
     title: "Order Confirmation",
-    description: "Automatic email sent to customers after a successful purchase.",
+    description:
+      "Automatic email sent to customers after a successful purchase.",
     href: "/admin/order-confirmation",
     color: "from-green-500/20 to-green-600/5 border-green-500/20",
     iconColor: "text-green-400",
     icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      <svg
+        className="w-6 h-6"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.5}
+          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
       </svg>
     ),
     action: "Configure",
@@ -181,7 +239,9 @@ function formatDate(dateStr: string) {
 }
 
 export default function AdminEmails() {
-  const { campaigns, stats, subscriberCount } = useLoaderData<typeof loader>() as {
+  const { campaigns, stats, subscriberCount } = useLoaderData<
+    typeof loader
+  >() as {
     campaigns: Campaign[];
     stats: CampaignStats;
     subscriberCount: number;
@@ -231,8 +291,18 @@ export default function AdminEmails() {
                 className="inline-flex items-center gap-1.5 text-xs font-medium text-white bg-white/10 hover:bg-white/20 rounded-lg px-3 py-1.5 transition-colors"
               >
                 {type.action}
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                <svg
+                  className="w-3 h-3"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
                 </svg>
               </Link>
             </div>
@@ -243,20 +313,36 @@ export default function AdminEmails() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="bg-flow-900 border border-flow-800/50 rounded-xl p-4">
-          <p className="text-[10px] text-flow-500 uppercase tracking-wider mb-1">Subscribers</p>
-          <p className="text-xl font-display font-bold text-white">{subscriberCount.toLocaleString()}</p>
+          <p className="text-[10px] text-flow-500 uppercase tracking-wider mb-1">
+            Subscribers
+          </p>
+          <p className="text-xl font-display font-bold text-white">
+            {subscriberCount.toLocaleString()}
+          </p>
         </div>
         <div className="bg-flow-900 border border-flow-800/50 rounded-xl p-4">
-          <p className="text-[10px] text-flow-500 uppercase tracking-wider mb-1">Emails Sent</p>
-          <p className="text-xl font-display font-bold text-white">{stats.totalSent.toLocaleString()}</p>
+          <p className="text-[10px] text-flow-500 uppercase tracking-wider mb-1">
+            Emails Sent
+          </p>
+          <p className="text-xl font-display font-bold text-white">
+            {stats.totalSent.toLocaleString()}
+          </p>
         </div>
         <div className="bg-flow-900 border border-flow-800/50 rounded-xl p-4">
-          <p className="text-[10px] text-flow-500 uppercase tracking-wider mb-1">Scheduled</p>
-          <p className="text-xl font-display font-bold text-white">{stats.pending}</p>
+          <p className="text-[10px] text-flow-500 uppercase tracking-wider mb-1">
+            Scheduled
+          </p>
+          <p className="text-xl font-display font-bold text-white">
+            {stats.pending}
+          </p>
         </div>
         <div className="bg-flow-900 border border-flow-800/50 rounded-xl p-4">
-          <p className="text-[10px] text-flow-500 uppercase tracking-wider mb-1">Campaigns</p>
-          <p className="text-xl font-display font-bold text-white">{stats.total}</p>
+          <p className="text-[10px] text-flow-500 uppercase tracking-wider mb-1">
+            Campaigns
+          </p>
+          <p className="text-xl font-display font-bold text-white">
+            {stats.total}
+          </p>
         </div>
       </div>
 
@@ -286,11 +372,22 @@ export default function AdminEmails() {
 
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center bg-flow-900 border border-flow-800/50 rounded-xl">
-            <svg className="w-8 h-8 text-flow-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            <svg
+              className="w-8 h-8 text-flow-600 mb-3"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+              />
             </svg>
             <p className="text-flow-500 text-sm">
-              No campaigns{activeTab !== "all" ? ` with status "${activeTab}"` : ""} yet.
+              No campaigns
+              {activeTab !== "all" ? ` with status "${activeTab}"` : ""} yet.
             </p>
           </div>
         ) : (
@@ -299,23 +396,48 @@ export default function AdminEmails() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-flow-800/30">
-                    <th className="text-left text-flow-500 text-xs uppercase tracking-wide font-medium px-5 py-3">Name</th>
-                    <th className="text-left text-flow-500 text-xs uppercase tracking-wide font-medium px-5 py-3">Template</th>
-                    <th className="text-left text-flow-500 text-xs uppercase tracking-wide font-medium px-5 py-3">Status</th>
-                    <th className="text-left text-flow-500 text-xs uppercase tracking-wide font-medium px-5 py-3">Created</th>
-                    <th className="text-right text-flow-500 text-xs uppercase tracking-wide font-medium px-5 py-3">Actions</th>
+                    <th className="text-left text-flow-500 text-xs uppercase tracking-wide font-medium px-5 py-3">
+                      Name
+                    </th>
+                    <th className="text-left text-flow-500 text-xs uppercase tracking-wide font-medium px-5 py-3">
+                      Template
+                    </th>
+                    <th className="text-left text-flow-500 text-xs uppercase tracking-wide font-medium px-5 py-3">
+                      Status
+                    </th>
+                    <th className="text-left text-flow-500 text-xs uppercase tracking-wide font-medium px-5 py-3">
+                      Created
+                    </th>
+                    <th className="text-right text-flow-500 text-xs uppercase tracking-wide font-medium px-5 py-3">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((c) => (
-                    <tr key={c.id} className="border-b border-flow-800/30 last:border-0 hover:bg-flow-800/50 transition-colors">
+                    <tr
+                      key={c.id}
+                      className="border-b border-flow-800/30 last:border-0 hover:bg-flow-800/50 transition-colors"
+                    >
                       <td className="px-5 py-3">
-                        <p className="text-sm text-white font-medium">{c.name}</p>
-                        {c.subject && <p className="text-xs text-flow-500 mt-0.5 truncate max-w-xs">{c.subject}</p>}
+                        <p className="text-sm text-white font-medium">
+                          {c.name}
+                        </p>
+                        {c.subject && (
+                          <p className="text-xs text-flow-500 mt-0.5 truncate max-w-xs">
+                            {c.subject}
+                          </p>
+                        )}
                       </td>
-                      <td className="px-5 py-3 text-sm text-flow-300">{c.email_templates?.name || "—"}</td>
-                      <td className="px-5 py-3"><StatusBadge status={c.status as CampaignStatus} /></td>
-                      <td className="px-5 py-3 text-sm text-flow-400">{formatDate(c.created_at)}</td>
+                      <td className="px-5 py-3 text-sm text-flow-300">
+                        {c.email_templates?.name || "—"}
+                      </td>
+                      <td className="px-5 py-3">
+                        <StatusBadge status={c.status as CampaignStatus} />
+                      </td>
+                      <td className="px-5 py-3 text-sm text-flow-400">
+                        {formatDate(c.created_at)}
+                      </td>
                       <td className="px-5 py-3">
                         <div className="flex items-center justify-end gap-1">
                           <Link
@@ -323,24 +445,52 @@ export default function AdminEmails() {
                             className="p-2 rounded-lg text-flow-400 hover:text-white hover:bg-flow-800 transition-colors"
                             title="Edit"
                           >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={1.5}
+                                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                              />
                             </svg>
                           </Link>
                           <button
-                            onClick={() => fetcher.submit({ intent: "duplicate", id: c.id }, { method: "post" })}
+                            onClick={() =>
+                              fetcher.submit(
+                                { intent: "duplicate", id: c.id },
+                                { method: "post" },
+                              )
+                            }
                             className="p-2 rounded-lg text-flow-400 hover:text-white hover:bg-flow-800 transition-colors"
                             title="Duplicate"
                           >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={1.5}
+                                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                              />
                             </svg>
                           </button>
                           {confirmDeleteId === c.id ? (
                             <div className="flex items-center gap-1 ml-1">
                               <button
                                 onClick={() => {
-                                  fetcher.submit({ intent: "delete", id: c.id }, { method: "post" });
+                                  fetcher.submit(
+                                    { intent: "delete", id: c.id },
+                                    { method: "post" },
+                                  );
                                   setConfirmDeleteId(null);
                                 }}
                                 className="px-2 py-1 rounded text-xs font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
@@ -360,8 +510,18 @@ export default function AdminEmails() {
                               className="p-2 rounded-lg text-flow-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                               title="Delete"
                             >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={1.5}
+                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                />
                               </svg>
                             </button>
                           )}
@@ -379,8 +539,14 @@ export default function AdminEmails() {
                 <div key={c.id} className="p-4 space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-sm text-white font-medium truncate">{c.name}</p>
-                      {c.subject && <p className="text-xs text-flow-500 mt-0.5 truncate">{c.subject}</p>}
+                      <p className="text-sm text-white font-medium truncate">
+                        {c.name}
+                      </p>
+                      {c.subject && (
+                        <p className="text-xs text-flow-500 mt-0.5 truncate">
+                          {c.subject}
+                        </p>
+                      )}
                     </div>
                     <StatusBadge status={c.status as CampaignStatus} />
                   </div>
@@ -396,7 +562,12 @@ export default function AdminEmails() {
                       Edit
                     </Link>
                     <button
-                      onClick={() => fetcher.submit({ intent: "duplicate", id: c.id }, { method: "post" })}
+                      onClick={() =>
+                        fetcher.submit(
+                          { intent: "duplicate", id: c.id },
+                          { method: "post" },
+                        )
+                      }
                       className="flex-1 text-center px-3 py-1.5 rounded-lg text-xs font-medium text-flow-300 bg-flow-800 hover:text-white transition-colors"
                     >
                       Duplicate
@@ -405,7 +576,10 @@ export default function AdminEmails() {
                       onClick={() =>
                         confirmDeleteId === c.id
                           ? (() => {
-                              fetcher.submit({ intent: "delete", id: c.id }, { method: "post" });
+                              fetcher.submit(
+                                { intent: "delete", id: c.id },
+                                { method: "post" },
+                              );
                               setConfirmDeleteId(null);
                             })()
                           : setConfirmDeleteId(c.id)
