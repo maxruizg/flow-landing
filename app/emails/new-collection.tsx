@@ -1,19 +1,14 @@
 import {
-  Html,
-  Head,
-  Body,
-  Container,
   Section,
   Row,
   Column,
   Img,
   Text,
   Button,
-  Link,
   Hr,
-  Preview,
 } from "@react-email/components";
 import * as t from "./theme";
+import { EmailLayout, type EmailBrand } from "./EmailLayout";
 
 interface Product {
   image: string;
@@ -22,7 +17,7 @@ interface Product {
   sale_price: string;
 }
 
-interface NewCollectionEmailProps {
+interface NewCollectionEmailProps extends EmailBrand {
   hero_title: string;
   hero_subtitle: string;
   hero_image: string;
@@ -42,133 +37,103 @@ export function NewCollectionEmail({
   cta_text,
   cta_url,
   preview,
+  // Brand base.
+  logoImage,
+  backgroundImage,
+  footerTagline,
+  unsubscribeUrl,
 }: NewCollectionEmailProps) {
   // Guard against a non-array `products` prop (e.g. malformed campaign
   // variables) so the template never throws at render time.
   const items = Array.isArray(products) ? products : [];
+  // The campaign's primary_color IS the brand accent for this send.
+  const accent = primary_color || t.colors.accent;
+
   return (
-    <Html>
-      <Head>
-        <style dangerouslySetInnerHTML={{ __html: t.fontImportCss }} />
-      </Head>
-      <Preview>{preview || hero_title}</Preview>
-      <Body style={main}>
-        <Container style={container}>
-          {/* Logo Header */}
-          <Section style={headerSection}>
-            <Text style={logo}>FLOW</Text>
-            <Text style={tagline}>URBAN WEAR</Text>
-          </Section>
+    <EmailLayout
+      preview={preview || hero_title}
+      accent={accent}
+      logoImage={logoImage}
+      backgroundImage={backgroundImage}
+      footerTagline={footerTagline}
+      unsubscribeUrl={unsubscribeUrl}
+      marketing
+    >
+      {/* Hero Image */}
+      <Section style={{ padding: "0" }}>
+        <Img
+          src={t.emailImageUrl(hero_image, 1200)}
+          alt={hero_title}
+          width="600"
+          style={heroImage}
+        />
+      </Section>
 
-          <Hr style={divider} />
+      {/* Hero Text */}
+      <Section style={heroTextSection}>
+        <Text style={heroTitle}>{hero_title}</Text>
+        <Text style={heroSubtitle}>{hero_subtitle}</Text>
+      </Section>
 
-          {/* Hero Image */}
-          <Section style={{ padding: "0" }}>
-            <Img
-              src={t.emailImageUrl(hero_image, 1200)}
-              alt={hero_title}
-              width="600"
-              style={heroImage}
-            />
-          </Section>
+      <Hr style={t.divider} />
 
-          {/* Hero Text */}
-          <Section style={heroTextSection}>
-            <Text style={heroTitle}>{hero_title}</Text>
-            <Text style={heroSubtitle}>{hero_subtitle}</Text>
-          </Section>
+      {/* Product Grid */}
+      <Section style={productGridSection}>
+        {items.length > 0 &&
+          Array.from({ length: Math.ceil(items.length / 2) }, (_, rowIndex) => {
+            const left = items[rowIndex * 2];
+            const right = items[rowIndex * 2 + 1];
+            return (
+              <Row key={rowIndex} style={{ marginBottom: "24px" }}>
+                <Column style={productColumn}>
+                  <Img
+                    src={t.emailImageUrl(left.image, 540)}
+                    alt={left.name}
+                    width="270"
+                    style={productImage}
+                  />
+                  <Text style={productName}>{left.name}</Text>
+                  <Text style={priceRow}>
+                    <span style={originalPrice}>{left.original_price}</span>
+                    <span style={{ ...salePrice, color: accent }}>
+                      {left.sale_price}
+                    </span>
+                  </Text>
+                </Column>
+                {right ? (
+                  <Column style={productColumn}>
+                    <Img
+                      src={t.emailImageUrl(right.image, 540)}
+                      alt={right.name}
+                      width="270"
+                      style={productImage}
+                    />
+                    <Text style={productName}>{right.name}</Text>
+                    <Text style={priceRow}>
+                      <span style={originalPrice}>{right.original_price}</span>
+                      <span style={{ ...salePrice, color: accent }}>
+                        {right.sale_price}
+                      </span>
+                    </Text>
+                  </Column>
+                ) : (
+                  <Column style={productColumn} />
+                )}
+              </Row>
+            );
+          })}
+      </Section>
 
-          <Hr style={divider} />
-
-          {/* Product Grid */}
-          <Section style={productGridSection}>
-            {items.length > 0 &&
-              Array.from(
-                { length: Math.ceil(items.length / 2) },
-                (_, rowIndex) => {
-                  const left = items[rowIndex * 2];
-                  const right = items[rowIndex * 2 + 1];
-                  return (
-                    <Row key={rowIndex} style={{ marginBottom: "24px" }}>
-                      <Column style={productColumn}>
-                        <Img
-                          src={t.emailImageUrl(left.image, 540)}
-                          alt={left.name}
-                          width="270"
-                          style={productImage}
-                        />
-                        <Text style={productName}>{left.name}</Text>
-                        <Text style={priceRow}>
-                          <span style={originalPrice}>
-                            {left.original_price}
-                          </span>
-                          <span style={{ ...salePrice, color: primary_color }}>
-                            {left.sale_price}
-                          </span>
-                        </Text>
-                      </Column>
-                      {right ? (
-                        <Column style={productColumn}>
-                          <Img
-                            src={t.emailImageUrl(right.image, 540)}
-                            alt={right.name}
-                            width="270"
-                            style={productImage}
-                          />
-                          <Text style={productName}>{right.name}</Text>
-                          <Text style={priceRow}>
-                            <span style={originalPrice}>
-                              {right.original_price}
-                            </span>
-                            <span
-                              style={{ ...salePrice, color: primary_color }}
-                            >
-                              {right.sale_price}
-                            </span>
-                          </Text>
-                        </Column>
-                      ) : (
-                        <Column style={productColumn} />
-                      )}
-                    </Row>
-                  );
-                }
-              )}
-          </Section>
-
-          {/* CTA */}
-          <Section style={ctaSection}>
-            <Button href={cta_url} style={ctaButton}>
-              {cta_text}
-            </Button>
-          </Section>
-
-          <Hr style={divider} />
-
-          {/* Footer */}
-          <Section style={footerSection}>
-            <Text style={socialLinks}>
-              <Link href={t.brand.instagram} style={socialLink}>
-                Instagram
-              </Link>
-              {"  ·  "}
-              <Link href={t.brand.tiktok} style={socialLink}>
-                TikTok
-              </Link>
-            </Text>
-            <Text style={footerText}>
-              Flow Urban Wear — Streetwear from Mexico City.
-            </Text>
-            <Text style={unsubscribeText}>
-              You received this because you subscribed to Flow updates.{" "}
-              <Link href={`${t.brand.site}/unsubscribe`} style={unsubscribeLink}>
-                Unsubscribe
-              </Link>
-            </Text>
-          </Section>
-        </Container>
-      </Body>
-    </Html>
+      {/* CTA */}
+      <Section style={ctaSection}>
+        <Button
+          href={cta_url}
+          style={{ ...ctaButton, backgroundColor: accent }}
+        >
+          {cta_text}
+        </Button>
+      </Section>
+    </EmailLayout>
   );
 }
 
@@ -177,11 +142,13 @@ export function getDefaultVariables(): NewCollectionEmailProps {
     hero_title: "NOCTURNA — Fall/Winter 2026",
     hero_subtitle:
       "Inspired by the neon-lit streets of Condesa. Oversized silhouettes meet raw textures.",
-    hero_image: "https://placehold.co/600x400/1a1a1a/ffffff?text=NOCTURNA+COLLECTION",
+    hero_image:
+      "https://placehold.co/600x400/1a1a1a/ffffff?text=NOCTURNA+COLLECTION",
     primary_color: t.colors.accent,
     products: [
       {
-        image: "https://placehold.co/270x270/1a1a1a/ffffff?text=Oversized+Hoodie",
+        image:
+          "https://placehold.co/270x270/1a1a1a/ffffff?text=Oversized+Hoodie",
         name: "Oversized Hoodie — Midnight",
         original_price: "$1,890 MXN",
         sale_price: "$1,490 MXN",
@@ -207,50 +174,12 @@ export function getDefaultVariables(): NewCollectionEmailProps {
     ],
     cta_text: "Shop the Collection",
     cta_url: `${t.brand.site}/collections/nocturna`,
-    preview: "The NOCTURNA collection just dropped. Dark silhouettes, limited stock.",
+    preview:
+      "The NOCTURNA collection just dropped. Dark silhouettes, limited stock.",
   };
 }
 
-/* ─── Styles ─── */
-
-const fontFamily = t.fonts.body;
-
-const main = {
-  backgroundColor: "#0a0a0a",
-  fontFamily,
-};
-
-const container = {
-  margin: "0 auto",
-  padding: "40px 20px",
-  maxWidth: "600px",
-};
-
-const headerSection = {
-  textAlign: "center" as const,
-  padding: "20px 0",
-};
-
-const logo = {
-  fontFamily: t.fonts.display,
-  fontSize: "32px",
-  fontWeight: "700" as const,
-  letterSpacing: "0.3em",
-  color: "#ffffff",
-  margin: "0",
-};
-
-const tagline = {
-  fontSize: "10px",
-  letterSpacing: "0.4em",
-  color: t.colors.accent,
-  margin: "4px 0 0 0",
-};
-
-const divider = {
-  borderColor: "#262626",
-  margin: "24px 0",
-};
+/* ─── Styles (content-only; frame lives in EmailLayout) ─── */
 
 const heroImage = {
   width: "100%",
@@ -266,7 +195,7 @@ const heroTitle = {
   fontFamily: t.fonts.display,
   fontSize: "28px",
   fontWeight: "700" as const,
-  color: "#ffffff",
+  color: t.colors.white,
   letterSpacing: "0.08em",
   lineHeight: "1.2",
   margin: "0 0 12px 0",
@@ -274,9 +203,10 @@ const heroTitle = {
 };
 
 const heroSubtitle = {
+  fontFamily: t.fonts.body,
   fontSize: "15px",
   lineHeight: "1.6",
-  color: "#a3a3a3",
+  color: t.colors.textMuted,
   margin: "0",
 };
 
@@ -297,21 +227,23 @@ const productImage = {
 };
 
 const productName = {
+  fontFamily: t.fonts.body,
   fontSize: "13px",
   fontWeight: "600" as const,
-  color: "#ffffff",
+  color: t.colors.white,
   margin: "10px 0 4px 0",
   lineHeight: "1.3",
 };
 
 const priceRow = {
+  fontFamily: t.fonts.body,
   fontSize: "13px",
   margin: "0",
   lineHeight: "1.4",
 };
 
 const originalPrice = {
-  color: "#525252",
+  color: t.colors.textGhost,
   textDecoration: "line-through" as const,
   marginRight: "8px",
 };
@@ -326,8 +258,8 @@ const ctaSection = {
 };
 
 const ctaButton = {
-  backgroundColor: t.colors.accent,
-  color: "#0a0a0a",
+  fontFamily: t.fonts.body,
+  color: t.colors.black,
   fontSize: "12px",
   fontWeight: "600" as const,
   letterSpacing: "0.15em",
@@ -336,39 +268,6 @@ const ctaButton = {
   padding: "14px 36px",
   borderRadius: "9999px",
   display: "inline-block",
-};
-
-const footerSection = {
-  textAlign: "center" as const,
-  padding: "8px 0 0 0",
-};
-
-const socialLinks = {
-  fontSize: "13px",
-  color: "#737373",
-  margin: "0 0 16px 0",
-};
-
-const socialLink = {
-  color: "#a3a3a3",
-  textDecoration: "none",
-};
-
-const footerText = {
-  fontSize: "12px",
-  color: "#525252",
-  margin: "0 0 8px 0",
-};
-
-const unsubscribeText = {
-  fontSize: "11px",
-  color: "#404040",
-  margin: "0",
-};
-
-const unsubscribeLink = {
-  color: "#525252",
-  textDecoration: "underline",
 };
 
 export default NewCollectionEmail;

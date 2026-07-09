@@ -197,6 +197,22 @@ export const footerLink = {
   textUnderlineOffset: "2px",
 };
 
+/**
+ * Derive a translucent rgba() wash from a brand accent hex, so accent-tinted
+ * surfaces (soft pills, active badges) recolor when the admin changes the
+ * brand accent. Falls back to the taupe wash for malformed input.
+ */
+export function accentAlpha(hex: string, alpha: number): string {
+  const h = hex.replace("#", "").trim();
+  if (h.length !== 6) return `rgba(184, 164, 144, ${alpha})`;
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  if ([r, g, b].some((v) => Number.isNaN(v)))
+    return `rgba(184, 164, 144, ${alpha})`;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 /* ─── Email-safe image URLs ─── */
 
 /**

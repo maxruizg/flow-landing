@@ -1,18 +1,14 @@
 import {
-  Html,
-  Head,
-  Body,
-  Container,
   Section,
   Text,
   Heading,
   Hr,
   Link,
-  Preview,
   Row,
   Column,
 } from "@react-email/components";
 import * as t from "./theme";
+import { EmailLayout, type EmailBrand } from "./EmailLayout";
 
 interface OrderItem {
   productName: string;
@@ -22,7 +18,7 @@ interface OrderItem {
   price: number;
 }
 
-interface OrderShippedProps {
+interface OrderShippedProps extends EmailBrand {
   orderId: string;
   customerName: string;
   items?: OrderItem[];
@@ -44,6 +40,11 @@ export function OrderShippedEmail({
   items = [],
   trackingNumber,
   carrier,
+  // Brand base.
+  accent = t.colors.accent,
+  logoImage,
+  backgroundImage,
+  footerTagline,
 }: OrderShippedProps) {
   const resolvedCarrier = carrier?.trim() || "DHL";
   const trackUrl = trackingNumber
@@ -51,129 +52,108 @@ export function OrderShippedEmail({
     : null;
 
   return (
-    <Html lang="es">
-      <Head>
-        {/* Static brand font import from theme.ts — no dynamic/user content. */}
-        <style dangerouslySetInnerHTML={{ __html: t.fontImportCss }} />
-      </Head>
-      <Preview>¡Tu pedido va en camino! — FLOW</Preview>
-      <Body style={t.main}>
-        <Container style={t.container}>
-          {/* Brand header */}
-          <Section style={t.header}>
-            <Text style={t.logo}>{t.brand.name}</Text>
-            <Text style={t.tagline}>{t.brand.tagline}</Text>
-          </Section>
+    <EmailLayout
+      preview="¡Tu pedido va en camino! — FLOW"
+      lang="es"
+      accent={accent}
+      logoImage={logoImage}
+      backgroundImage={backgroundImage}
+      footerTagline={footerTagline}
+    >
+      {/* Status pill */}
+      <Section style={statusSection}>
+        <Text
+          style={{
+            ...t.accentPill,
+            color: accent,
+            backgroundColor: t.accentAlpha(accent, 0.1),
+            border: `1px solid ${t.accentAlpha(accent, 0.3)}`,
+          }}
+        >
+          ● Pedido enviado
+        </Text>
+      </Section>
 
-          {/* Status pill */}
-          <Section style={statusSection}>
-            <Text style={t.accentPill}>● Pedido enviado</Text>
-          </Section>
+      {/* Headline */}
+      <Section style={content}>
+        <Heading style={heading}>¡Tu pedido va en camino!</Heading>
+        <Text style={bodyTextCentered}>
+          Hola {customerName}, tu pedido ya salió de nuestro estudio y está en
+          manos de {resolvedCarrier}. Pronto lo tendrás contigo.
+        </Text>
+      </Section>
 
-          {/* Headline */}
-          <Section style={content}>
-            <Heading style={heading}>¡Tu pedido va en camino!</Heading>
-            <Text style={bodyTextCentered}>
-              Hola {customerName}, tu pedido ya salió de nuestro estudio y está
-              en manos de {resolvedCarrier}. Pronto lo tendrás contigo.
+      {/* Order ID block */}
+      <Section style={orderIdBlock}>
+        <Text style={orderIdLabel}>Número de pedido</Text>
+        <Text style={orderIdValue}>#{orderId}</Text>
+      </Section>
+
+      {/* Tracking block */}
+      {trackingNumber ? (
+        <>
+          <Hr style={t.divider} />
+          <Section style={trackingBlock}>
+            <Text style={orderIdLabel}>
+              Guía de rastreo · {resolvedCarrier}
             </Text>
-          </Section>
-
-          {/* Order ID block */}
-          <Section style={orderIdBlock}>
-            <Text style={orderIdLabel}>Número de pedido</Text>
-            <Text style={orderIdValue}>#{orderId}</Text>
-          </Section>
-
-          {/* Tracking block */}
-          {trackingNumber ? (
-            <>
-              <Hr style={t.divider} />
-              <Section style={trackingBlock}>
-                <Text style={orderIdLabel}>
-                  Guía de rastreo · {resolvedCarrier}
-                </Text>
-                <Text style={orderIdValue}>{trackingNumber}</Text>
-                {trackUrl ? (
-                  <Section style={ctaSection}>
-                    <Link href={trackUrl} style={t.ctaButton}>
-                      Rastrear mi pedido
-                    </Link>
-                  </Section>
-                ) : null}
+            <Text style={orderIdValue}>{trackingNumber}</Text>
+            {trackUrl ? (
+              <Section style={ctaSection}>
+                <Link
+                  href={trackUrl}
+                  style={{ ...t.ctaButton, backgroundColor: accent }}
+                >
+                  Rastrear mi pedido
+                </Link>
               </Section>
-            </>
-          ) : null}
+            ) : null}
+          </Section>
+        </>
+      ) : null}
 
-          {items.length > 0 ? (
-            <>
-              <Hr style={t.divider} />
-
-              {/* Items summary */}
-              <Section style={content}>
-                <Text style={t.label}>En este envío</Text>
-                {items.map((item, i) => (
-                  <Row key={i} style={itemRow}>
-                    <Column style={itemNameColumn}>
-                      <Text style={itemName}>
-                        {item.productName}
-                        {item.colorName ? ` — ${item.colorName}` : ""}
-                      </Text>
-                      <Text style={itemMeta}>
-                        Talla {item.size} &middot; Cant. {item.quantity}
-                      </Text>
-                    </Column>
-                  </Row>
-                ))}
-              </Section>
-            </>
-          ) : null}
-
+      {items.length > 0 ? (
+        <>
           <Hr style={t.divider} />
 
-          {/* Delivery expectations */}
+          {/* Items summary */}
           <Section style={content}>
-            <Text style={t.label}>Tiempo estimado de entrega</Text>
-            <Text style={deliveryText}>Envío nacional: 5–7 días hábiles</Text>
-            <Text style={deliveryText}>
-              CDMX y área metropolitana: 4–6 días hábiles
-            </Text>
-            <Text style={deliveryNote}>
-              Los tiempos pueden variar según la paquetería y tu zona de
-              entrega.
-            </Text>
+            <Text style={t.label}>En este envío</Text>
+            {items.map((item, i) => (
+              <Row key={i} style={itemRow}>
+                <Column style={itemNameColumn}>
+                  <Text style={itemName}>
+                    {item.productName}
+                    {item.colorName ? ` — ${item.colorName}` : ""}
+                  </Text>
+                  <Text style={itemMeta}>
+                    Talla {item.size} &middot; Cant. {item.quantity}
+                  </Text>
+                </Column>
+              </Row>
+            ))}
           </Section>
+        </>
+      ) : null}
 
-          <Hr style={t.divider} />
+      <Hr style={t.divider} />
 
-          {/* Footer */}
-          <Section style={t.footer}>
-            <Text style={t.socialLinks}>
-              <Link href={t.brand.instagram} style={t.socialLink}>
-                Instagram
-              </Link>
-              {"   ·   "}
-              <Link href={t.brand.tiktok} style={t.socialLink}>
-                TikTok
-              </Link>
-            </Text>
-            <Text style={t.footerText}>
-              Flow Urban Wear — Community-based streetwear from Mexico City.
-            </Text>
-            <Text style={t.footerSmall}>
-              ¿Dudas sobre tu envío? Responde a este correo o escríbenos a{" "}
-              <Link href={`mailto:${t.brand.email}`} style={t.footerLink}>
-                {t.brand.email}
-              </Link>
-            </Text>
-          </Section>
-        </Container>
-      </Body>
-    </Html>
+      {/* Delivery expectations */}
+      <Section style={content}>
+        <Text style={t.label}>Tiempo estimado de entrega</Text>
+        <Text style={deliveryText}>Envío nacional: 5–7 días hábiles</Text>
+        <Text style={deliveryText}>
+          CDMX y área metropolitana: 4–6 días hábiles
+        </Text>
+        <Text style={deliveryNote}>
+          Los tiempos pueden variar según la paquetería y tu zona de entrega.
+        </Text>
+      </Section>
+    </EmailLayout>
   );
 }
 
-/* ─── Styles (template-specific; shared fragments come from ./theme) ─── */
+/* ─── Styles (content-only; frame lives in EmailLayout) ─── */
 
 const statusSection = {
   textAlign: "center" as const,

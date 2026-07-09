@@ -1,19 +1,8 @@
-import {
-  Html,
-  Head,
-  Body,
-  Container,
-  Section,
-  Text,
-  Heading,
-  Hr,
-  Link,
-  Img,
-  Preview,
-} from "@react-email/components";
+import { Section, Text, Heading, Link } from "@react-email/components";
 import * as t from "./theme";
+import { EmailLayout, type EmailBrand } from "./EmailLayout";
 
-interface NewDropEmailProps {
+interface NewDropEmailProps extends EmailBrand {
   subject: string;
   body: string;
   heroImage?: string;
@@ -29,67 +18,42 @@ export function NewDropEmail({
   ctaText = "Shop Now",
   ctaUrl,
   siteUrl = t.brand.site,
+  // Brand base.
+  accent = t.colors.accent,
+  logoImage,
+  backgroundImage,
+  footerTagline,
+  unsubscribeUrl,
 }: NewDropEmailProps) {
   const finalCtaUrl = ctaUrl || `${siteUrl}/showroom`;
 
   return (
-    <Html>
-      <Head>
-        <style dangerouslySetInnerHTML={{ __html: t.fontImportCss }} />
-      </Head>
-      <Preview>{subject}</Preview>
-      <Body style={t.main}>
-        <Container style={t.container}>
-          <Section style={t.header}>
-            <Text style={t.logo}>{t.brand.name}</Text>
-            <Text style={t.tagline}>{t.brand.tagline}</Text>
-          </Section>
+    <EmailLayout
+      preview={subject}
+      accent={accent}
+      logoImage={logoImage}
+      backgroundImage={backgroundImage}
+      footerTagline={footerTagline}
+      heroImage={heroImage}
+      unsubscribeUrl={unsubscribeUrl}
+      marketing
+    >
+      <Section style={content}>
+        <Heading style={t.heading}>{subject}</Heading>
+        <Text style={bodyText}>{body}</Text>
+      </Section>
 
-          <Hr style={t.divider} />
-
-          {heroImage && (
-            <Section>
-              <Img
-                src={t.emailImageUrl(heroImage, 1200)}
-                alt=""
-                width="100%"
-                style={heroImageStyle}
-              />
-            </Section>
-          )}
-
-          <Section style={content}>
-            <Heading style={t.heading}>{subject}</Heading>
-            <Text style={bodyText}>{body}</Text>
-          </Section>
-
-          <Section style={ctaSection}>
-            <Link href={finalCtaUrl} style={t.ctaButton}>
-              {ctaText}
-            </Link>
-          </Section>
-
-          <Hr style={t.divider} />
-
-          <Section style={t.footer}>
-            <Text style={t.footerText}>
-              Flow Urban Wear — Community based streetwear from Mexico City.
-            </Text>
-            <Text style={t.footerSmall}>
-              You received this because you subscribed to Flow updates.
-            </Text>
-          </Section>
-        </Container>
-      </Body>
-    </Html>
+      <Section style={ctaSection}>
+        <Link
+          href={finalCtaUrl}
+          style={{ ...t.ctaButton, backgroundColor: accent }}
+        >
+          {ctaText}
+        </Link>
+      </Section>
+    </EmailLayout>
   );
 }
-
-const heroImageStyle = {
-  borderRadius: "12px",
-  marginBottom: "24px",
-  border: `1px solid ${t.colors.border}`,
-};
 
 const content = {
   padding: "16px 0",

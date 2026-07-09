@@ -1,21 +1,16 @@
 import {
-  Html,
-  Head,
-  Body,
-  Container,
   Section,
   Row,
   Column,
   Img,
   Text,
   Button,
-  Link,
   Hr,
-  Preview,
 } from "@react-email/components";
 import * as t from "./theme";
+import { EmailLayout, type EmailBrand } from "./EmailLayout";
 
-interface ProductLaunchEmailProps {
+interface ProductLaunchEmailProps extends EmailBrand {
   product_name: string;
   product_description: string;
   hero_image: string;
@@ -43,6 +38,11 @@ export function ProductLaunchEmail({
   preview,
   cta_text = "Buy Now",
   cta_url = `${t.brand.site}/shop`,
+  // Brand base.
+  logoImage,
+  backgroundImage,
+  footerTagline,
+  unsubscribeUrl,
 }: ProductLaunchEmailProps) {
   // Tolerate both the editor's comma-separated string and an array so a
   // "Product Launch" campaign never throws at render time (which would make
@@ -53,141 +53,109 @@ export function ProductLaunchEmail({
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean);
+  // accent_color IS the accent for this send (drives the header tagline too).
+  const accent = accent_color || t.colors.accent;
+
   return (
-    <Html>
-      <Head>
-        <style dangerouslySetInnerHTML={{ __html: t.fontImportCss }} />
-      </Head>
-      <Preview>{preview || `Introducing ${product_name} — Now available`}</Preview>
-      <Body style={main}>
-        <Container style={container}>
-          {/* Logo Header */}
-          <Section style={headerSection}>
-            <Text style={logo}>FLOW</Text>
-            <Text style={tagline}>URBAN WEAR</Text>
-          </Section>
+    <EmailLayout
+      preview={preview || `Introducing ${product_name} — Now available`}
+      accent={accent}
+      logoImage={logoImage}
+      backgroundImage={backgroundImage}
+      footerTagline={footerTagline}
+      unsubscribeUrl={unsubscribeUrl}
+      marketing
+    >
+      {/* Intro Label */}
+      <Section style={introSection}>
+        <Text style={introLabel}>NEW RELEASE</Text>
+      </Section>
 
-          <Hr style={divider} />
+      {/* Hero Product Image */}
+      <Section style={{ padding: "0" }}>
+        <Img
+          src={t.emailImageUrl(hero_image, 1200)}
+          alt={product_name}
+          width="600"
+          style={heroImage}
+        />
+      </Section>
 
-          {/* Intro Label */}
-          <Section style={introSection}>
-            <Text style={introLabel}>NEW RELEASE</Text>
-          </Section>
+      {/* Product Info */}
+      <Section style={productInfoSection}>
+        <Text style={productName}>{product_name}</Text>
+        <Text style={{ ...priceText, color: accent }}>{price}</Text>
+        <Text style={descriptionText}>{product_description}</Text>
+      </Section>
 
-          {/* Hero Product Image */}
-          <Section style={{ padding: "0" }}>
-            <Img
-              src={t.emailImageUrl(hero_image, 1200)}
-              alt={product_name}
-              width="600"
-              style={heroImage}
-            />
-          </Section>
+      <Hr style={t.divider} />
 
-          {/* Product Info */}
-          <Section style={productInfoSection}>
-            <Text style={productName}>{product_name}</Text>
-            <Text style={{ ...priceText, color: accent_color }}>{price}</Text>
-            <Text style={descriptionText}>{product_description}</Text>
-          </Section>
+      {/* Gallery Row */}
+      {gallery_images.length >= 3 && (
+        <Section style={gallerySection}>
+          <Text style={sectionLabel}>DETAILS</Text>
+          <Row>
+            <Column style={galleryColumn}>
+              <Img
+                src={t.emailImageUrl(gallery_images[0], 360)}
+                alt={`${product_name} detail 1`}
+                width="180"
+                style={galleryImage}
+              />
+            </Column>
+            <Column style={galleryColumn}>
+              <Img
+                src={t.emailImageUrl(gallery_images[1], 360)}
+                alt={`${product_name} detail 2`}
+                width="180"
+                style={galleryImage}
+              />
+            </Column>
+            <Column style={galleryColumn}>
+              <Img
+                src={t.emailImageUrl(gallery_images[2], 360)}
+                alt={`${product_name} detail 3`}
+                width="180"
+                style={galleryImage}
+              />
+            </Column>
+          </Row>
+        </Section>
+      )}
 
-          <Hr style={divider} />
+      <Hr style={t.divider} />
 
-          {/* Gallery Row */}
-          {gallery_images.length >= 3 && (
-            <Section style={gallerySection}>
-              <Text style={sectionLabel}>DETAILS</Text>
-              <Row>
-                <Column style={galleryColumn}>
-                  <Img
-                    src={t.emailImageUrl(gallery_images[0], 360)}
-                    alt={`${product_name} detail 1`}
-                    width="180"
-                    style={galleryImage}
-                  />
-                </Column>
-                <Column style={galleryColumn}>
-                  <Img
-                    src={t.emailImageUrl(gallery_images[1], 360)}
-                    alt={`${product_name} detail 2`}
-                    width="180"
-                    style={galleryImage}
-                  />
-                </Column>
-                <Column style={galleryColumn}>
-                  <Img
-                    src={t.emailImageUrl(gallery_images[2], 360)}
-                    alt={`${product_name} detail 3`}
-                    width="180"
-                    style={galleryImage}
-                  />
-                </Column>
-              </Row>
-            </Section>
-          )}
+      {/* Available Sizes */}
+      <Section style={sizesSection}>
+        <Text style={sectionLabel}>AVAILABLE SIZES</Text>
+        <Text style={sizeBadgesRow}>
+          {sizes.map((size, i) => (
+            <span key={i}>
+              <span style={sizeBadge}>{size}</span>
+              {i < sizes.length - 1 ? "  " : ""}
+            </span>
+          ))}
+        </Text>
+      </Section>
 
-          <Hr style={divider} />
+      <Hr style={t.divider} />
 
-          {/* Available Sizes */}
-          <Section style={sizesSection}>
-            <Text style={sectionLabel}>AVAILABLE SIZES</Text>
-            <Text style={sizeBadgesRow}>
-              {sizes.map((size, i) => (
-                <span key={i}>
-                  <span style={sizeBadge}>{size}</span>
-                  {i < sizes.length - 1 ? "  " : ""}
-                </span>
-              ))}
-            </Text>
-          </Section>
+      {/* Brand Story */}
+      <Section style={brandStorySection}>
+        <Text style={brandStoryLabel}>THE STORY</Text>
+        <Text style={brandStoryText}>{brand_story}</Text>
+      </Section>
 
-          <Hr style={divider} />
-
-          {/* Brand Story */}
-          <Section style={brandStorySection}>
-            <Text style={brandStoryLabel}>THE STORY</Text>
-            <Text style={brandStoryText}>{brand_story}</Text>
-          </Section>
-
-          {/* CTA */}
-          <Section style={ctaSection}>
-            <Button
-              href={cta_url}
-              style={{ ...ctaButton, backgroundColor: accent_color }}
-            >
-              {cta_text}
-            </Button>
-          </Section>
-
-          <Hr style={divider} />
-
-          {/* Footer */}
-          <Section style={footerSection}>
-            <Text style={socialLinks}>
-              <Link href={t.brand.instagram} style={socialLink}>
-                Instagram
-              </Link>
-              {"  ·  "}
-              <Link href={t.brand.tiktok} style={socialLink}>
-                TikTok
-              </Link>
-            </Text>
-            <Text style={footerText}>
-              Flow Urban Wear — Streetwear from Mexico City.
-            </Text>
-            <Text style={unsubscribeText}>
-              You received this because you subscribed to Flow updates.{" "}
-              <Link
-                href={`${t.brand.site}/unsubscribe`}
-                style={unsubscribeLink}
-              >
-                Unsubscribe
-              </Link>
-            </Text>
-          </Section>
-        </Container>
-      </Body>
-    </Html>
+      {/* CTA */}
+      <Section style={ctaSection}>
+        <Button
+          href={cta_url}
+          style={{ ...ctaButton, backgroundColor: accent }}
+        >
+          {cta_text}
+        </Button>
+      </Section>
+    </EmailLayout>
   );
 }
 
@@ -196,8 +164,7 @@ export function getDefaultVariables(): ProductLaunchEmailProps {
     product_name: "Shadow Bomber Jacket",
     product_description:
       "Heavyweight cotton-nylon shell with a matte black finish. Ribbed collar, cuffs, and hem. Interior pocket with FLOW embossed zipper pull. Relaxed fit, designed to layer over hoodies. Made in small batches in Mexico City.",
-    hero_image:
-      "https://placehold.co/600x600/1a1a1a/ffffff?text=SHADOW+BOMBER",
+    hero_image: "https://placehold.co/600x600/1a1a1a/ffffff?text=SHADOW+BOMBER",
     gallery_images: [
       "https://placehold.co/180x180/1a1a1a/ffffff?text=Detail+1",
       "https://placehold.co/180x180/1a1a1a/ffffff?text=Detail+2",
@@ -215,46 +182,7 @@ export function getDefaultVariables(): ProductLaunchEmailProps {
   };
 }
 
-/* ─── Styles ─── */
-
-const fontFamily = t.fonts.body;
-
-const main = {
-  backgroundColor: "#0a0a0a",
-  fontFamily,
-};
-
-const container = {
-  margin: "0 auto",
-  padding: "40px 20px",
-  maxWidth: "600px",
-};
-
-const headerSection = {
-  textAlign: "center" as const,
-  padding: "20px 0",
-};
-
-const logo = {
-  fontFamily: t.fonts.display,
-  fontSize: "32px",
-  fontWeight: "700" as const,
-  letterSpacing: "0.3em",
-  color: "#ffffff",
-  margin: "0",
-};
-
-const tagline = {
-  fontSize: "10px",
-  letterSpacing: "0.4em",
-  color: t.colors.accent,
-  margin: "4px 0 0 0",
-};
-
-const divider = {
-  borderColor: "#262626",
-  margin: "24px 0",
-};
+/* ─── Styles (content-only; frame lives in EmailLayout) ─── */
 
 const introSection = {
   textAlign: "center" as const,
@@ -262,10 +190,11 @@ const introSection = {
 };
 
 const introLabel = {
+  fontFamily: t.fonts.body,
   fontSize: "11px",
   fontWeight: "700" as const,
   letterSpacing: "0.3em",
-  color: "#737373",
+  color: t.colors.textFaint,
   margin: "0",
 };
 
@@ -283,7 +212,7 @@ const productName = {
   fontFamily: t.fonts.display,
   fontSize: "30px",
   fontWeight: "700" as const,
-  color: "#ffffff",
+  color: t.colors.white,
   letterSpacing: "0.04em",
   lineHeight: "1.2",
   margin: "0 0 8px 0",
@@ -291,15 +220,17 @@ const productName = {
 };
 
 const priceText = {
+  fontFamily: t.fonts.body,
   fontSize: "20px",
   fontWeight: "600" as const,
   margin: "0 0 20px 0",
 };
 
 const descriptionText = {
+  fontFamily: t.fonts.body,
   fontSize: "15px",
   lineHeight: "1.7",
-  color: "#a3a3a3",
+  color: t.colors.textMuted,
   margin: "0",
   textAlign: "left" as const,
 };
@@ -309,10 +240,11 @@ const gallerySection = {
 };
 
 const sectionLabel = {
+  fontFamily: t.fonts.body,
   fontSize: "11px",
   fontWeight: "700" as const,
   letterSpacing: "0.25em",
-  color: "#737373",
+  color: t.colors.textFaint,
   textAlign: "center" as const,
   margin: "0 0 16px 0",
 };
@@ -335,15 +267,16 @@ const sizesSection = {
 };
 
 const sizeBadgesRow = {
+  fontFamily: t.fonts.body,
   fontSize: "14px",
-  color: "#ffffff",
+  color: t.colors.white,
   margin: "0",
   lineHeight: "2.4",
 };
 
 const sizeBadge = {
   display: "inline-block" as const,
-  border: "1px solid #404040",
+  border: `1px solid ${t.colors.borderFaint}`,
   borderRadius: "4px",
   padding: "6px 14px",
   fontSize: "13px",
@@ -357,18 +290,20 @@ const brandStorySection = {
 };
 
 const brandStoryLabel = {
+  fontFamily: t.fonts.body,
   fontSize: "11px",
   fontWeight: "700" as const,
   letterSpacing: "0.25em",
-  color: "#737373",
+  color: t.colors.textFaint,
   textAlign: "center" as const,
   margin: "0 0 12px 0",
 };
 
 const brandStoryText = {
+  fontFamily: t.fonts.body,
   fontSize: "14px",
   lineHeight: "1.8",
-  color: "#737373",
+  color: t.colors.textFaint,
   fontStyle: "italic" as const,
   margin: "0",
   textAlign: "center" as const,
@@ -380,7 +315,8 @@ const ctaSection = {
 };
 
 const ctaButton = {
-  color: "#ffffff",
+  fontFamily: t.fonts.body,
+  color: t.colors.white,
   fontSize: "13px",
   fontWeight: "700" as const,
   letterSpacing: "0.12em",
@@ -389,39 +325,6 @@ const ctaButton = {
   padding: "16px 40px",
   borderRadius: "9999px",
   display: "inline-block",
-};
-
-const footerSection = {
-  textAlign: "center" as const,
-  padding: "8px 0 0 0",
-};
-
-const socialLinks = {
-  fontSize: "13px",
-  color: "#737373",
-  margin: "0 0 16px 0",
-};
-
-const socialLink = {
-  color: "#a3a3a3",
-  textDecoration: "none",
-};
-
-const footerText = {
-  fontSize: "12px",
-  color: "#525252",
-  margin: "0 0 8px 0",
-};
-
-const unsubscribeText = {
-  fontSize: "11px",
-  color: "#404040",
-  margin: "0",
-};
-
-const unsubscribeLink = {
-  color: "#525252",
-  textDecoration: "underline",
 };
 
 export default ProductLaunchEmail;

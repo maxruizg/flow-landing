@@ -1,19 +1,14 @@
 import {
-  Html,
-  Head,
-  Body,
-  Container,
   Section,
   Row,
   Column,
   Img,
   Text,
   Button,
-  Link,
   Hr,
-  Preview,
 } from "@react-email/components";
 import * as t from "./theme";
+import { EmailLayout, type EmailBrand } from "./EmailLayout";
 
 interface Category {
   image: string;
@@ -24,7 +19,7 @@ interface Category {
   discount?: string;
 }
 
-interface FlashSaleEmailProps {
+interface FlashSaleEmailProps extends EmailBrand {
   discount_percentage: string;
   expiration_text: string;
   banner_image: string;
@@ -46,132 +41,102 @@ export function FlashSaleEmail({
   preview,
   cta_text = "Shop the Sale",
   cta_url = `${t.brand.site}/sale`,
+  // Brand base.
+  logoImage,
+  backgroundImage,
+  footerTagline,
+  unsubscribeUrl,
 }: FlashSaleEmailProps) {
   // Guard against a non-array `categories` prop so the template never throws
   // at render time. (Named `cats` to avoid colliding with the per-row `items`
   // slice used inside the category grid below.)
   const cats = Array.isArray(categories) ? categories : [];
+  // urgency_color IS the accent for this send (drives the header tagline too).
+  const accent = urgency_color || t.colors.accent;
+
   return (
-    <Html>
-      <Head>
-        <style dangerouslySetInnerHTML={{ __html: t.fontImportCss }} />
-      </Head>
-      <Preview>
-        {preview || `${discount_percentage} OFF — ${expiration_text}`}
-      </Preview>
-      <Body style={main}>
-        <Container style={container}>
-          {/* Logo Header */}
-          <Section style={headerSection}>
-            <Text style={logo}>FLOW</Text>
-            <Text style={tagline}>URBAN WEAR</Text>
-          </Section>
+    <EmailLayout
+      preview={preview || `${discount_percentage} OFF — ${expiration_text}`}
+      accent={accent}
+      logoImage={logoImage}
+      backgroundImage={backgroundImage}
+      footerTagline={footerTagline}
+      unsubscribeUrl={unsubscribeUrl}
+      marketing
+    >
+      {/* Discount Hero */}
+      <Section style={discountSection}>
+        <Text style={{ ...discountText, color: accent }}>
+          {discount_percentage}
+        </Text>
+        <Text style={discountLabel}>OFF EVERYTHING</Text>
+        <Text style={expirationStyle}>{expiration_text}</Text>
+      </Section>
 
-          <Hr style={divider} />
+      {/* Banner Image */}
+      <Section style={{ padding: "0" }}>
+        <Img
+          src={t.emailImageUrl(banner_image, 1200)}
+          alt="Flash Sale"
+          width="600"
+          style={bannerImage}
+        />
+      </Section>
 
-          {/* Discount Hero */}
-          <Section style={discountSection}>
-            <Text style={{ ...discountText, color: urgency_color }}>
-              {discount_percentage}
-            </Text>
-            <Text style={discountLabel}>OFF EVERYTHING</Text>
-            <Text style={expirationStyle}>{expiration_text}</Text>
-          </Section>
+      <Hr style={t.divider} />
 
-          {/* Banner Image */}
-          <Section style={{ padding: "0" }}>
-            <Img
-              src={t.emailImageUrl(banner_image, 1200)}
-              alt="Flash Sale"
-              width="600"
-              style={bannerImage}
-            />
-          </Section>
+      {/* Category Cards */}
+      <Section style={categoriesSection}>
+        <Text style={sectionTitle}>SHOP BY CATEGORY</Text>
+        {Array.from({ length: Math.ceil(cats.length / 3) }, (_, rowIndex) => {
+          const items = cats.slice(rowIndex * 3, rowIndex * 3 + 3);
+          return (
+            <Row key={rowIndex} style={{ marginBottom: "16px" }}>
+              {items.map((cat, i) => (
+                <Column key={i} style={categoryColumn}>
+                  <Img
+                    src={t.emailImageUrl(cat.image, 360)}
+                    alt={cat.name}
+                    width="180"
+                    style={categoryImage}
+                  />
+                  <Text style={categoryName}>{cat.name}</Text>
+                  <Text style={{ ...categoryDiscount, color: accent }}>
+                    {cat.discount_pct ?? cat.discount}
+                  </Text>
+                </Column>
+              ))}
+              {/* Fill empty columns for alignment */}
+              {items.length < 3 &&
+                Array.from({ length: 3 - items.length }, (_, i) => (
+                  <Column key={`empty-${i}`} style={categoryColumn} />
+                ))}
+            </Row>
+          );
+        })}
+      </Section>
 
-          <Hr style={divider} />
+      <Hr style={t.divider} />
 
-          {/* Category Cards */}
-          <Section style={categoriesSection}>
-            <Text style={sectionTitle}>SHOP BY CATEGORY</Text>
-            {Array.from(
-              { length: Math.ceil(cats.length / 3) },
-              (_, rowIndex) => {
-                const items = cats.slice(
-                  rowIndex * 3,
-                  rowIndex * 3 + 3
-                );
-                return (
-                  <Row key={rowIndex} style={{ marginBottom: "16px" }}>
-                    {items.map((cat, i) => (
-                      <Column key={i} style={categoryColumn}>
-                        <Img
-                          src={t.emailImageUrl(cat.image, 360)}
-                          alt={cat.name}
-                          width="180"
-                          style={categoryImage}
-                        />
-                        <Text style={categoryName}>{cat.name}</Text>
-                        <Text
-                          style={{ ...categoryDiscount, color: urgency_color }}
-                        >
-                          {cat.discount_pct ?? cat.discount}
-                        </Text>
-                      </Column>
-                    ))}
-                    {/* Fill empty columns for alignment */}
-                    {items.length < 3 &&
-                      Array.from({ length: 3 - items.length }, (_, i) => (
-                        <Column key={`empty-${i}`} style={categoryColumn} />
-                      ))}
-                  </Row>
-                );
-              }
-            )}
-          </Section>
+      {/* Coupon Code Box */}
+      <Section style={couponSection}>
+        <Text style={couponLabel}>YOUR EXCLUSIVE CODE</Text>
+        <Section style={couponBox}>
+          <Text style={couponCodeText}>{coupon_code}</Text>
+        </Section>
+        <Text style={couponHint}>Apply at checkout. One use per customer.</Text>
+      </Section>
 
-          <Hr style={divider} />
-
-          {/* Coupon Code Box */}
-          <Section style={couponSection}>
-            <Text style={couponLabel}>YOUR EXCLUSIVE CODE</Text>
-            <Section style={couponBox}>
-              <Text style={couponCodeText}>{coupon_code}</Text>
-            </Section>
-            <Text style={couponHint}>
-              Apply at checkout. One use per customer.
-            </Text>
-          </Section>
-
-          {/* CTA */}
-          <Section style={ctaSection}>
-            <Button
-              href={cta_url}
-              style={{ ...ctaButton, backgroundColor: urgency_color }}
-            >
-              {cta_text}
-            </Button>
-          </Section>
-
-          <Hr style={divider} />
-
-          {/* Footer */}
-          <Section style={footerSection}>
-            <Text style={footerText}>
-              Flow Urban Wear — Streetwear from Mexico City.
-            </Text>
-            <Text style={unsubscribeText}>
-              You received this because you subscribed to Flow updates.{" "}
-              <Link
-                href={`${t.brand.site}/unsubscribe`}
-                style={unsubscribeLink}
-              >
-                Unsubscribe
-              </Link>
-            </Text>
-          </Section>
-        </Container>
-      </Body>
-    </Html>
+      {/* CTA */}
+      <Section style={ctaSection}>
+        <Button
+          href={cta_url}
+          style={{ ...ctaButton, backgroundColor: accent }}
+        >
+          {cta_text}
+        </Button>
+      </Section>
+    </EmailLayout>
   );
 }
 
@@ -206,46 +171,7 @@ export function getDefaultVariables(): FlashSaleEmailProps {
   };
 }
 
-/* ─── Styles ─── */
-
-const fontFamily = t.fonts.body;
-
-const main = {
-  backgroundColor: "#0a0a0a",
-  fontFamily,
-};
-
-const container = {
-  margin: "0 auto",
-  padding: "40px 20px",
-  maxWidth: "600px",
-};
-
-const headerSection = {
-  textAlign: "center" as const,
-  padding: "20px 0",
-};
-
-const logo = {
-  fontFamily: t.fonts.display,
-  fontSize: "32px",
-  fontWeight: "700" as const,
-  letterSpacing: "0.3em",
-  color: "#ffffff",
-  margin: "0",
-};
-
-const tagline = {
-  fontSize: "10px",
-  letterSpacing: "0.4em",
-  color: t.colors.accent,
-  margin: "4px 0 0 0",
-};
-
-const divider = {
-  borderColor: "#262626",
-  margin: "24px 0",
-};
+/* ─── Styles (content-only; frame lives in EmailLayout) ─── */
 
 const discountSection = {
   textAlign: "center" as const,
@@ -262,16 +188,18 @@ const discountText = {
 };
 
 const discountLabel = {
+  fontFamily: t.fonts.display,
   fontSize: "18px",
   fontWeight: "700" as const,
   letterSpacing: "0.25em",
-  color: "#ffffff",
+  color: t.colors.white,
   margin: "8px 0 0 0",
 };
 
 const expirationStyle = {
+  fontFamily: t.fonts.body,
   fontSize: "14px",
-  color: "#a3a3a3",
+  color: t.colors.textMuted,
   margin: "12px 0 0 0",
   lineHeight: "1.4",
 };
@@ -286,10 +214,11 @@ const categoriesSection = {
 };
 
 const sectionTitle = {
+  fontFamily: t.fonts.body,
   fontSize: "12px",
   fontWeight: "700" as const,
   letterSpacing: "0.2em",
-  color: "#737373",
+  color: t.colors.textFaint,
   textAlign: "center" as const,
   margin: "0 0 20px 0",
 };
@@ -308,13 +237,15 @@ const categoryImage = {
 };
 
 const categoryName = {
+  fontFamily: t.fonts.body,
   fontSize: "13px",
   fontWeight: "600" as const,
-  color: "#ffffff",
+  color: t.colors.white,
   margin: "10px 0 2px 0",
 };
 
 const categoryDiscount = {
+  fontFamily: t.fonts.body,
   fontSize: "12px",
   fontWeight: "600" as const,
   margin: "0",
@@ -326,15 +257,16 @@ const couponSection = {
 };
 
 const couponLabel = {
+  fontFamily: t.fonts.body,
   fontSize: "11px",
   fontWeight: "700" as const,
   letterSpacing: "0.2em",
-  color: "#737373",
+  color: t.colors.textFaint,
   margin: "0 0 12px 0",
 };
 
 const couponBox = {
-  border: "2px dashed #404040",
+  border: `2px dashed ${t.colors.borderFaint}`,
   borderRadius: "8px",
   padding: "16px 24px",
   margin: "0 auto",
@@ -346,14 +278,15 @@ const couponCodeText = {
   fontSize: "28px",
   fontWeight: "800" as const,
   letterSpacing: "0.15em",
-  color: "#ffffff",
+  color: t.colors.white,
   margin: "0",
   textAlign: "center" as const,
 };
 
 const couponHint = {
+  fontFamily: t.fonts.body,
   fontSize: "12px",
-  color: "#525252",
+  color: t.colors.textGhost,
   margin: "10px 0 0 0",
 };
 
@@ -363,7 +296,8 @@ const ctaSection = {
 };
 
 const ctaButton = {
-  color: "#ffffff",
+  fontFamily: t.fonts.body,
+  color: t.colors.white,
   fontSize: "13px",
   fontWeight: "700" as const,
   letterSpacing: "0.12em",
@@ -372,28 +306,6 @@ const ctaButton = {
   padding: "16px 40px",
   borderRadius: "9999px",
   display: "inline-block",
-};
-
-const footerSection = {
-  textAlign: "center" as const,
-  padding: "8px 0 0 0",
-};
-
-const footerText = {
-  fontSize: "12px",
-  color: "#525252",
-  margin: "0 0 8px 0",
-};
-
-const unsubscribeText = {
-  fontSize: "11px",
-  color: "#404040",
-  margin: "0",
-};
-
-const unsubscribeLink = {
-  color: "#525252",
-  textDecoration: "underline",
 };
 
 export default FlashSaleEmail;
