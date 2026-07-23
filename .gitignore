@@ -7,3 +7,4 @@ node_modules
 
 # Documento interno de pendientes (no subir a GitHub)
 PENDIENTES-GO-LIVE.md
+.env*
