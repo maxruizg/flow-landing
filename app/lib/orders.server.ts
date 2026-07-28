@@ -9,6 +9,7 @@ import {
   getEmailSettings,
   getEmailBrand,
   getOrderByStripeSession,
+  getVariantImages,
 } from "~/data/queries.server";
 import { getResend } from "~/lib/resend.server";
 import { markCartRecovered } from "~/lib/abandoned-carts.server";
@@ -22,6 +23,8 @@ export interface WebhookOrderItem {
   size: string;
   quantity: number;
   price: number;
+  /** Product thumbnail, attached at send time from the variant record. */
+  image?: string | null;
 }
 
 interface EnsureOrderResult {
@@ -422,15 +425,24 @@ async function sendOrderConfirmation(
   total: number,
   currency: string,
 ): Promise<void> {
-  const [settings, brand] = await Promise.all([
+  const [settings, brand, variantImages] = await Promise.all([
     getEmailSettings("order_confirmation"),
     getEmailBrand(),
+    // Attach product thumbnails to the summary list. Best-effort: if the
+    // lookup fails, items just render without an image (never blocks the email).
+    getVariantImages(items.map((it) => it.variantId)).catch(
+      (): Record<string, string> => ({}),
+    ),
   ]);
+  const itemsWithImages = items.map((it) => ({
+    ...it,
+    image: it.variantId ? (variantImages[it.variantId] ?? null) : null,
+  }));
   const resend = getResend();
   const emailProps = {
     orderId,
     customerName,
-    items,
+    items: itemsWithImages,
     total,
     currency,
     subject: settings.subject || undefined,

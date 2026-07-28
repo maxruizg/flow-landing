@@ -18,15 +18,61 @@ import { ProductLaunchEmail } from "~/emails/product-launch";
 
 // Realistic sample product images (public FLOW catalog).
 const P = [
-  { img: "https://bnqmxddffoxwprwecksu.supabase.co/storage/v1/render/image/public/images/products/1780032315113-7sx5av9pzji.png?width=1280&quality=85&resize=contain", name: "Back Crop Top — Black", price: 780 },
-  { img: "https://bnqmxddffoxwprwecksu.supabase.co/storage/v1/render/image/public/images/products/1780030787181-jlpwrik6sx.png?width=1280&quality=85&resize=contain", name: "Long Sleeve Crop Top — Black", price: 880 },
-  { img: "https://bnqmxddffoxwprwecksu.supabase.co/storage/v1/render/image/public/images/products/1780030089484-2dfyrpb1ye7.png?width=1280&quality=85&resize=contain", name: "LTMF Crop Top — Black", price: 1170 },
-  { img: "https://bnqmxddffoxwprwecksu.supabase.co/storage/v1/render/image/public/images/products/1780354367639-xfrmguge9cg.jpg?width=1280&quality=85&resize=contain", name: "Mantis Crop Top — Black", price: 1170 },
+  {
+    img: "https://bnqmxddffoxwprwecksu.supabase.co/storage/v1/render/image/public/images/products/1780032315113-7sx5av9pzji.png?width=1280&quality=85&resize=contain",
+    name: "Back Crop Top — Black",
+    price: 780,
+  },
+  {
+    img: "https://bnqmxddffoxwprwecksu.supabase.co/storage/v1/render/image/public/images/products/1780030787181-jlpwrik6sx.png?width=1280&quality=85&resize=contain",
+    name: "Long Sleeve Crop Top — Black",
+    price: 880,
+  },
+  {
+    img: "https://bnqmxddffoxwprwecksu.supabase.co/storage/v1/render/image/public/images/products/1780030089484-2dfyrpb1ye7.png?width=1280&quality=85&resize=contain",
+    name: "LTMF Crop Top — Black",
+    price: 1170,
+  },
+  {
+    img: "https://bnqmxddffoxwprwecksu.supabase.co/storage/v1/render/image/public/images/products/1780354367639-xfrmguge9cg.jpg?width=1280&quality=85&resize=contain",
+    name: "Mantis Crop Top — Black",
+    price: 1170,
+  },
 ];
 const mx = (n: number) => `$${n.toLocaleString("es-MX")} MXN`;
 const sampleItems = [
-  { productName: P[0].name, colorName: "Black", size: "M", quantity: 1, price: P[0].price },
-  { productName: P[1].name, colorName: "Black", size: "L", quantity: 2, price: P[1].price },
+  {
+    productName: P[0].name,
+    colorName: "Black",
+    size: "M",
+    quantity: 1,
+    price: P[0].price,
+    image: P[0].img,
+  },
+  {
+    productName: P[1].name,
+    colorName: "Black",
+    size: "L",
+    quantity: 2,
+    price: P[1].price,
+    image: P[1].img,
+  },
+  {
+    productName: P[2].name,
+    colorName: "Black",
+    size: "S",
+    quantity: 1,
+    price: P[2].price,
+    image: P[2].img,
+  },
+  {
+    productName: P[3].name,
+    colorName: "Black",
+    size: "M",
+    quantity: 3,
+    price: P[3].price,
+    image: P[3].img,
+  },
 ];
 
 /** Render a template to HTML with the given brand base applied. Empty brand
@@ -89,7 +135,8 @@ export async function renderEmailPreview(
       return render(
         NewCollectionEmail({
           hero_title: "NUEVA COLECCIÓN",
-          hero_subtitle: "Crop tops en negro, café y off white. Edición limitada.",
+          hero_subtitle:
+            "Crop tops en negro, café y off white. Edición limitada.",
           hero_image: heroFallback,
           primary_color: b.accent || "#b8a490",
           products: P.map((p) => ({
@@ -114,9 +161,21 @@ export async function renderEmailPreview(
           banner_image: heroFallback,
           urgency_color: b.accent || "#b8a490",
           categories: [
-            { image: P[0].img, name: "Crop Tops", discount_pct: "Hasta 30% off" },
-            { image: P[1].img, name: "Long Sleeve", discount_pct: "Hasta 25% off" },
-            { image: P[2].img, name: "Basketball", discount_pct: "Hasta 20% off" },
+            {
+              image: P[0].img,
+              name: "Crop Tops",
+              discount_pct: "Hasta 30% off",
+            },
+            {
+              image: P[1].img,
+              name: "Long Sleeve",
+              discount_pct: "Hasta 25% off",
+            },
+            {
+              image: P[2].img,
+              name: "Basketball",
+              discount_pct: "Hasta 20% off",
+            },
           ],
           coupon_code: "FLOW30",
           cta_text: "Ver la venta",

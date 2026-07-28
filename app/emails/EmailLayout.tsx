@@ -63,7 +63,8 @@ const DEFAULT_FOOTER_TAGLINE =
 const responsiveCss = `
 @media only screen and (max-width:620px){
   .flow-container{padding:24px 14px !important}
-  .flow-hero-band{padding:104px 16px !important}
+  .flow-hero-band{padding:150px 16px !important}
+  .flow-hero-logo{font-size:40px !important}
   .flow-hero-img{max-width:210px !important}
 }`;
 
@@ -110,8 +111,18 @@ export function EmailLayout({
                 />
               ) : (
                 <>
-                  <Text style={heroLogo}>{t.brand.name}</Text>
-                  <Text style={{ ...t.tagline, color: accent, margin: "8px 0 0 0" }}>
+                  <Text className="flow-hero-logo" style={heroLogo}>
+                    {t.brand.name}
+                  </Text>
+                  <Text
+                    style={{
+                      ...t.tagline,
+                      color: accent,
+                      fontSize: "12px",
+                      letterSpacing: "0.5em",
+                      margin: "10px 0 0 0",
+                    }}
+                  >
                     {t.brand.tagline}
                   </Text>
                 </>
@@ -202,14 +213,14 @@ const heroBand = {
   backgroundPosition: "center",
   backgroundRepeat: "no-repeat",
   textAlign: "center" as const,
-  padding: "80px 24px",
+  padding: "120px 24px",
   borderRadius: "16px",
   marginBottom: "8px",
 };
 
 const heroLogo = {
   ...t.logo,
-  fontSize: "34px",
+  fontSize: "48px",
 };
 
 const heroSection = {

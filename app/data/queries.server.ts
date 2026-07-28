@@ -1458,6 +1458,24 @@ export async function saveEmailSettings(
 /** Admin-editable brand base shared by EVERY email (structurally an EmailBrand
  *  from ~/emails/EmailLayout). Empty strings collapse to undefined so each
  *  template falls back to its ./theme tokens when the admin hasn't set a value. */
+/** variantId → main product image (Supabase object URL), for the given ids.
+ *  Used to attach small thumbnails to order-confirmation line items. Missing
+ *  ids simply aren't in the map, so callers degrade to no image. */
+export async function getVariantImages(
+  variantIds: (string | null | undefined)[],
+): Promise<Record<string, string>> {
+  const ids = [...new Set(variantIds.filter((v): v is string => !!v))];
+  if (ids.length === 0) return {};
+  const { data, error } = await supabase
+    .from("product_variants")
+    .select("id, image")
+    .in("id", ids);
+  if (error || !data) return {};
+  const map: Record<string, string> = {};
+  for (const v of data) if (v.image) map[v.id as string] = v.image as string;
+  return map;
+}
+
 export interface EmailBrandSettings {
   accent?: string;
   logoImage?: string;

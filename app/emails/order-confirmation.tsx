@@ -6,6 +6,7 @@ import {
   Link,
   Row,
   Column,
+  Img,
 } from "@react-email/components";
 import * as t from "./theme";
 import { EmailLayout, type EmailBrand } from "./EmailLayout";
@@ -16,6 +17,8 @@ interface OrderItem {
   size: string;
   quantity: number;
   price: number;
+  /** Product thumbnail (Supabase object URL); shown small in the summary list. */
+  image?: string | null;
 }
 
 interface OrderConfirmationProps extends EmailBrand {
@@ -41,7 +44,6 @@ export function OrderConfirmationEmail({
   subject = "Order Confirmed — FLOW",
   headerText = "Your order is confirmed",
   bodyText = "We're preparing your pieces and will send a tracking link the moment they ship.",
-  heroImage,
   ctaText = "View Showroom",
   ctaUrl = `${t.brand.site}/showroom`,
   // Brand base (falls back to theme tokens inside EmailLayout).
@@ -61,7 +63,6 @@ export function OrderConfirmationEmail({
       logoImage={logoImage}
       backgroundImage={backgroundImage}
       footerTagline={footerTagline}
-      heroImage={heroImage}
     >
       {/* Status pill */}
       <Section style={statusSection}>
@@ -95,10 +96,26 @@ export function OrderConfirmationEmail({
 
       {/* Order summary */}
       <Section style={content}>
-        <Text style={sectionTitle}>Order Summary</Text>
+        <Text style={sectionTitle}>
+          Order Summary &middot; {items.length}{" "}
+          {items.length === 1 ? "item" : "items"}
+        </Text>
         {items.map((item, i) => (
           <Row key={i} style={itemRow}>
-            <Column style={itemNameColumn}>
+            <Column style={itemThumbCol}>
+              {item.image ? (
+                <Img
+                  src={t.emailImageUrl(item.image, 120)}
+                  alt={item.productName}
+                  width="46"
+                  height="46"
+                  style={itemThumb}
+                />
+              ) : (
+                <span style={itemThumbPlaceholder} />
+              )}
+            </Column>
+            <Column style={itemInfoCol}>
               <Text style={itemName}>
                 {item.productName}
                 {item.colorName ? ` — ${item.colorName}` : ""}
@@ -107,7 +124,7 @@ export function OrderConfirmationEmail({
                 Size {item.size} &middot; Qty {item.quantity}
               </Text>
             </Column>
-            <Column style={itemPriceColumn}>
+            <Column style={itemAmtCol}>
               <Text style={itemPrice}>
                 {currencySymbol}
                 {(item.price * item.quantity).toFixed(2)}
@@ -271,7 +288,44 @@ const sectionTitle = {
 };
 
 const itemRow = {
-  marginBottom: "14px",
+  marginBottom: "10px",
+};
+
+/* Compact list row: small thumbnail · name/meta · line total. Built to stay
+   readable even with many items on a large ticket. */
+const itemThumbCol = {
+  width: "58px",
+  verticalAlign: "middle" as const,
+};
+
+const itemThumb = {
+  width: "46px",
+  height: "46px",
+  borderRadius: "8px",
+  border: `1px solid ${t.colors.border}`,
+  objectFit: "cover" as const,
+  display: "block" as const,
+  backgroundColor: "#e8e6e1",
+};
+
+const itemThumbPlaceholder = {
+  display: "inline-block" as const,
+  width: "46px",
+  height: "46px",
+  borderRadius: "8px",
+  border: `1px solid ${t.colors.border}`,
+  backgroundColor: "#0f0f0f",
+};
+
+const itemInfoCol = {
+  verticalAlign: "middle" as const,
+  paddingLeft: "2px",
+};
+
+const itemAmtCol = {
+  width: "78px",
+  textAlign: "right" as const,
+  verticalAlign: "middle" as const,
 };
 
 const itemNameColumn = { width: "70%", verticalAlign: "top" as const };
