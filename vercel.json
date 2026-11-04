@@ -4,6 +4,17 @@
   "installCommand": "pnpm install",
   "redirects": [
     {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "flowurbanwear.com"
+        }
+      ],
+      "destination": "https://www.flowurbanwear.com/",
+      "permanent": true
+    },
+    {
       "source": "/:path*",
       "has": [
         {
@@ -12,6 +23,17 @@
         }
       ],
       "destination": "https://www.flowurbanwear.com/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "flow-landing-theta.vercel.app"
+        }
+      ],
+      "destination": "https://www.flowurbanwear.com/",
       "permanent": true
     },
     {
